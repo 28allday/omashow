@@ -312,7 +312,7 @@ Item {
         anchors.fill: parent
         onDropped: drop => {
             root.commitTextEdit()
-            if (drop.hasUrls) for (const url of drop.urls) backend.insertImage(url)
+            if (drop.hasUrls) for (const url of drop.urls) backend.insertImageAsync(url)
         }
     }
 

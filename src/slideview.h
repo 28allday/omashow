@@ -11,6 +11,7 @@
 
 // Backend is a Q_PROPERTY type here, so moc needs the full definition.
 #include "backend.h"
+#include "render/liveframes.h"
 
 class SlideView : public QQuickPaintedItem {
     Q_OBJECT
@@ -35,6 +36,7 @@ class SlideView : public QQuickPaintedItem {
 
 public:
     explicit SlideView(QQuickItem *parent = nullptr);
+    bool hardwarePainting() const { return m_hardwarePainting.load(); }
 
     Backend *deck() const { return m_deck; }
     void setDeck(Backend *deck);
@@ -52,9 +54,9 @@ public:
     Q_INVOKABLE QPointF toDocument(qreal x, qreal y) const;
 
     QString cropObject() const { return m_cropObject; }
-    void setCropObject(const QString &id) { if(m_cropObject==id) return; m_cropObject=id; emit cropObjectChanged(); update(); }
+    void setCropObject(const QString &id) { if(m_cropObject==id) return; m_cropObject=id; emit cropObjectChanged(); polish(); update(); }
     QString hiddenObject() const { return m_hiddenObject; }
-    void setHiddenObject(const QString &id) { if(m_hiddenObject==id) return; m_hiddenObject=id; emit hiddenObjectChanged(); update(); }
+    void setHiddenObject(const QString &id) { if(m_hiddenObject==id) return; m_hiddenObject=id; emit hiddenObjectChanged(); polish(); update(); }
     qreal zoom() const { return m_scale; }
     bool fitMode() const { return m_zoom <= 0; }
     Q_INVOKABLE void zoomAt(qreal scale, qreal x, qreal y);
@@ -63,6 +65,7 @@ public:
     Q_INVOKABLE void panBy(qreal dx, qreal dy);
     void paint(QPainter *painter) override;
 protected:
+    void updatePolish() override;
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 signals:
@@ -74,6 +77,11 @@ signals:
     void layoutChanged();
 
 private:
+    std::atomic_bool m_hardwarePainting{false};
+    LiveFrames m_frames;
+    QVector<SceneObject> m_states;
+    QColor m_background = Qt::black;
+    QSizeF m_documentSize;
     QString m_hiddenObject, m_cropObject;
     void updateLayout();
     qreal m_zoom = 0;

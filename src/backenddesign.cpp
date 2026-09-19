@@ -1,12 +1,13 @@
 #include "backend.h"
 #include "core/design.h"
 #include "core/edit.h"
+#include <QDate>
 
 QVariantMap Backend::design() const {
   QVariantMap colors, fonts;
   for (auto it = m_document.theme.colors.cbegin();
        it != m_document.theme.colors.cend(); ++it)
-    colors[it.key()] = it.value().name(QColor::HexRgb);
+    colors[it.key()] = it.value().name(it.value().alpha() == 255 ? QColor::HexRgb : QColor::HexArgb);
   for (auto it = m_document.theme.fonts.cbegin();
        it != m_document.theme.fonts.cend(); ++it)
     fonts[it.key()] = it.value();
@@ -32,7 +33,8 @@ QVariantMap Backend::design() const {
                     {"background", m_document.theme.colors
                                        .value(m.backgroundToken, m.background)
                                        .name(QColor::HexRgb)},
-                    {"backgroundToken", m.backgroundToken}});
+                    {"backgroundToken", m.backgroundToken},
+                    {"fields", Design::fieldProperties(m.fields)}});
   }
   for (const auto &l : m_document.layouts) {
     int uses = 0;
@@ -50,6 +52,7 @@ QVariantMap Backend::design() const {
                                {"placeholders", placeholders}});
   }
   return {{"name", m_document.theme.name},
+          {"contrast", Design::themeContrast(m_document.theme)},
           {"colors", colors},
           {"fonts", fonts},
           {"masters", masters},
@@ -63,6 +66,9 @@ QVariantMap Backend::slideDesign() const {
   const auto *l = Design::layout(m_document, s.layoutId);
   return {{"layoutId", s.layoutId},
           {"layoutName", l ? l->name : tr("Freeform")},
+          {"showMasterObjects", s.showMasterObjects},
+          {"showMasterFields", s.showMasterFields},
+          {"hasMaster", l && Design::master(m_document, l->masterId)},
           {"background", Design::resolve(m_document, m_currentSlide)
                              .background.name(QColor::HexRgb)},
           {"backgroundOverride", s.backgroundOverride}};
@@ -384,6 +390,7 @@ void Backend::deletePlaceholder(const QString &id, const QString &role) {
   touch();
 }
 QVariantList Backend::navigator() const {
+  if (m_navigatorRevision == m_revision) return m_navigator;
   QVariantList list;
   QString previous;
   for (int i = 0; i < m_document.slides.size(); ++i) {
@@ -395,7 +402,7 @@ QVariantList Backend::navigator() const {
     QStringList outline;
     int pictures=0,media=0;
     for(const auto &o:Design::resolve(m_document,i).objects) {
-      if(o.hidden) continue;
+      if(o.hidden || o.id.startsWith("@field/")) continue;
       if(o.type==ObjectType::Text && !o.text.trimmed().isEmpty()) outline.append(o.text);
       if(o.type==ObjectType::Image) ++pictures;
       if(o.type==ObjectType::Media) ++media;
@@ -415,6 +422,8 @@ QVariantList Backend::navigator() const {
                                          (i == 0 || previous != s.sectionId)}});
     previous = s.sectionId;
   }
+  m_navigator = list;
+  m_navigatorRevision = m_revision;
   return list;
 }
 void Backend::startSection(const QString &name) {
@@ -457,4 +466,21 @@ void Backend::removeSection(const QString &id) {
       touch();
       return;
     }
+}
+
+void Backend::setMasterField(const QString &masterId, const QString &key, const QVariant &value) {
+  for (int index = 0; index < m_document.masters.size(); ++index) {
+    const auto master = m_document.masters.at(index);
+    if (master.id != masterId) continue;
+    auto fields = master.fields;
+    if (!Design::setFieldProperty(fields, key, value)) return;
+    if (key == "showDate" && fields.showDate && fields.date.isEmpty())
+      fields.date = QDate::currentDate().toString(Qt::ISODate);
+    if (Design::fieldProperties(fields) == Design::fieldProperties(master.fields)) return;
+    m_history.begin(m_document, tr("Change master fields"));
+    m_document.masters[index].fields = fields;
+    m_history.commit();
+    touch();
+    return;
+  }
 }

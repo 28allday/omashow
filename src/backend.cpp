@@ -24,6 +24,7 @@ Backend::Backend(QObject *parent)
   connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
   connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
+  connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, [this] { ++m_clipboardVersion; });
   connect(m_chooser, &PortalFileChooser::selected, this,
           [this](const QUrl &url) {
             const Pending pending = m_pending;
@@ -38,11 +39,11 @@ Backend::Backend(QObject *parent)
             switch (pending) {
             case Pending::SaveDeck:
               ensureSuffix(QStringLiteral(".omashow"));
-              saveTo(path);
+              saveAsync(path);
               break;
             case Pending::ExportPdf:
               ensureSuffix(QStringLiteral(".pdf"));
-              exportPdf(path, m_pendingPdfStages, m_pendingPdfSkipped);
+              exportPdfAsync(path, m_pendingPdfStages, m_pendingPdfSkipped);
               break;
             case Pending::InsertMedia:
             case Pending::ReplaceMedia:
@@ -53,11 +54,11 @@ Backend::Backend(QObject *parent)
             case Pending::ReplaceImage: {
               int index=-1;
               for(int i=0;i<m_document.slides.size();++i) if(m_document.slides.at(i).id==m_imageSlideId) index=i;
-              loadImage(url,pending==Pending::ReplaceImage,index,m_imageTargetId);
+              loadImageAsync(url,pending==Pending::ReplaceImage,index,m_imageTargetId);
               break;
             }
             case Pending::None:
-              open(url);
+              openAsync(url);
               break;
             }
           });
@@ -86,6 +87,12 @@ Backend::Backend(QObject *parent)
   m_mediaProgressTimer.setInterval(100);
   connect(&m_mediaProgressTimer,&QTimer::timeout,this,&Backend::mediaJobChanged);
   connect(this,&Backend::documentChanged,this,&Backend::mediaJobChanged);
+  const auto invalidateLayoutPreview = [this] {
+    if (!m_layoutPreview.isEmpty()) emit layoutPreviewChanged();
+  };
+  connect(this, &Backend::documentChanged, this, invalidateLayoutPreview);
+  connect(this, &Backend::currentSlideChanged, this, invalidateLayoutPreview);
+  connect(this, &Backend::slideSelectionChanged, this, invalidateLayoutPreview);
 
   // The CLI fixture remains available; the GUI opens the Start centre.
   resetMediaSession();
@@ -106,6 +113,8 @@ Backend::Backend(QObject *parent)
 }
 
 Backend::~Backend() {
+  cancelOperation();
+  cancelJournal();
   cancelMediaJob();
   // A clean exit leaves no journal behind — otherwise every launch would
   // offer to recover from the last ordinary quit.
@@ -117,16 +126,6 @@ void Backend::scheduleAutosave() {
     m_autosave.start();
 }
 
-void Backend::writeJournal() {
-  if (!m_modified)
-    return;
-  QString error;
-  if (!Recovery::write(m_document, m_fileUrl.toLocalFile(), &error)) {
-    // A journal that cannot be written is worth saying out loud — the user
-    // is working without a net and has no other way to find out.
-    setStatus(tr("Autosave failed: %1").arg(error));
-  }
-}
 
 QVariantList Backend::recoveryCandidates() const {
   QVariantList list;
@@ -233,8 +232,12 @@ void Backend::open(const QUrl &url) {
     return;
   }
 
+  acceptOpen(result.document, url);
+}
+
+void Backend::acceptOpen(const Document &document, const QUrl &url) {
   resetMediaSession();
-  m_document = result.document;
+  m_document = document;
   m_history.reset(m_document);
   pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
   m_currentSlide = 0;
@@ -253,16 +256,17 @@ void Backend::open(const QUrl &url) {
   emit documentChanged();
   emit deckChanged();
   activateDocument();
-  rememberRecent(path);
+  if (url.isLocalFile()) rememberRecent(url.toLocalFile());
   m_autosave.stop(); Recovery::discard();
   setStatus(tr("Opened %1").arg(fileName()));
+  emit opened();
 }
 
 void Backend::newDeck() { createDeck(0, 1920, 1080); }
 
 void Backend::save() {
   if (m_fileUrl.isLocalFile())
-    saveTo(m_fileUrl.toLocalFile());
+    saveAsync(m_fileUrl.toLocalFile());
   else
     saveAsDialog();
 }
@@ -283,6 +287,7 @@ bool Backend::saveTo(const QString &path) {
     return false;
   }
   m_modified = false;
+  cancelJournal();
   m_autosave.stop();
   // The deck on disk is now the truth; the journal has nothing left to add.
   Recovery::discard();
@@ -343,14 +348,22 @@ void Backend::setIncludeSkipped(bool value) {
   pause(); m_includeSkipped=value; m_time=qMin(m_time,duration());
   emit deckChanged(); emit timeChanged(); emit selectionChanged();
 }
-qreal Backend::duration() const { return Presentation::duration(m_document,m_includeSkipped); }
+const PresentationCache &Backend::presentation(bool includeSkipped) const {
+  if (m_presentationRevision != m_revision || m_presentationSkipped != includeSkipped) {
+    m_presentation.reset(m_document, includeSkipped);
+    m_presentationRevision = m_revision;
+    m_presentationSkipped = includeSkipped;
+  }
+  return m_presentation;
+}
+qreal Backend::duration() const { return presentation(m_includeSkipped).duration(); }
 
 int Backend::slideIndex() const {
-  return Presentation::frameAt(m_document, m_time,m_includeSkipped).slideIndex;
+  return presentation(m_includeSkipped).frameAt(m_time).slideIndex;
 }
 
 bool Backend::inTransition() const {
-  return Presentation::frameAt(m_document, m_time,m_includeSkipped).inTransition;
+  return presentation(m_includeSkipped).frameAt(m_time).inTransition;
 }
 
 QString Backend::timecode() const {

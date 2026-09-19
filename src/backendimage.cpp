@@ -40,6 +40,10 @@ bool Backend::loadImage(const QUrl &url, bool replace, int index,
     emit failed(error);
     return false;
   }
+  return applyImage(image, replace, index, target, m_groupScope);
+}
+
+bool Backend::applyImage(SceneObject image, bool replace, int index, const QString &target, const QStringList &groups) {
   if (replace) {
     const auto *existing = m_document.slides.at(index).find(target);
     if (!existing || (existing->type != ObjectType::Image &&
@@ -59,7 +63,7 @@ bool Backend::loadImage(const QUrl &url, bool replace, int index,
       Design::markOverride(*o, key);
   } else {
     image.id = Edit::newId("image");
-    image.groups = m_groupScope;
+    image.groups = groups;
     QSizeF size = ImageAsset::size(image);
     size.scale(m_document.size * .7, Qt::KeepAspectRatio);
     image.rect = QRectF(QPointF((m_document.size.width() - size.width()) / 2,

@@ -19,3 +19,8 @@ Makefile
 *.zip
 *-dev.desktop
 __pycache__/
+
+# The demo film recorder is a private tool, never tracked
+/demo/
+/build-demo/
+/tools/demo-video.sh

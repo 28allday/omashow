@@ -12,6 +12,7 @@
 #include <QString>
 
 #include "core/scene.h"
+#include "core/workers.h"
 
 namespace Pdf {
 
@@ -27,7 +28,8 @@ struct Options {
 };
 
 bool write(const Document &document, const QString &path,
-           const Options &options = {}, QString *error = nullptr);
+           const Options &options = {}, QString *error = nullptr,
+           const std::shared_ptr<Workers::Job> &job = {});
 
 // The times each slide contributes, in order: one settled time normally, or
 // one per build stage when asked.

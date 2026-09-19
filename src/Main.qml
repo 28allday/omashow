@@ -27,7 +27,7 @@ ApplicationWindow {
     // Presenter notes under the Edit canvas, as in the concept; View toggles it.
     property bool notesOpen: true
     // Below this width the toolbar drops its labels and keeps the icons.
-    readonly property bool compactToolbar: width < 1280
+    readonly property bool compactToolbar: width < 1440
     readonly property string aspectName: {
         const w = backend.slideSize.width, h = backend.slideSize.height
         const ratio = h > 0 ? w / h : 0
@@ -79,64 +79,64 @@ ApplicationWindow {
                onActivated: { win.commitEditors(); backend.save() } }
     Shortcut { sequences: [StandardKey.SaveAs]; context: Qt.ApplicationShortcut; enabled: !presenter.running && !backend.startVisible
                onActivated: { win.commitEditors(); backend.saveAsDialog() } }
-    Shortcut { sequence: "Ctrl+Shift+N"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running
+    Shortcut { sequence: "Ctrl+Shift+N"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running
                onActivated: { win.commitEditors(); backend.showStart() } }
-    Shortcut { sequence: "Ctrl+E"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible
+    Shortcut { sequence: "Ctrl+E"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible
                onActivated: { win.commitEditors(); backend.exportPdfDialog(false) } }
-    Shortcut { sequence: "Ctrl+Z"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.undo() }
-    Shortcut { sequence: "Ctrl+Shift+Z"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.redo() }
-    Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible; onActivated: backend.addSlide() }
-    Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.slideFocus && !win.textEntryFocused;
+    Shortcut { sequence: "Ctrl+Z"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.undo() }
+    Shortcut { sequence: "Ctrl+Shift+Z"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.redo() }
+    Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible; onActivated: backend.addSlide() }
+    Shortcut { sequence: "Ctrl+Shift+Up"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.slideFocus && !win.textEntryFocused;
                onActivated: backend.nudgeSelectedSlides(-1) }
-    Shortcut { sequence: "Ctrl+Shift+Down"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.slideFocus && !win.textEntryFocused;
+    Shortcut { sequence: "Ctrl+Shift+Down"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.slideFocus && !win.textEntryFocused;
                onActivated: backend.nudgeSelectedSlides(1) }
-    Shortcut { sequence: "Ctrl+A"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.selectAll() }
-    Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.groupSelected() }
-    Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.ungroupSelected() }
-    Shortcut { sequence: "Return"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing && !!backend.selection.groupId); onActivated: backend.enterGroup() }
-    Shortcut { sequence: "Ctrl+D"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus; onActivated: win.editing && backend.hasSelection ? backend.duplicateSelected() : backend.duplicateSlide() }
-    Shortcut { sequences: [StandardKey.Copy]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.copySelected() }
-    Shortcut { sequences: [StandardKey.Cut]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.cutSelected() }
-    Shortcut { sequences: [StandardKey.Paste]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.paste() }
-    Shortcut { sequence: "T"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "Ctrl+A"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.selectAll() }
+    Shortcut { sequence: "Ctrl+G"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.groupSelected() }
+    Shortcut { sequence: "Ctrl+Shift+G"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing); onActivated: backend.ungroupSelected() }
+    Shortcut { sequence: "Return"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing && !!backend.selection.groupId); onActivated: backend.enterGroup() }
+    Shortcut { sequence: "Ctrl+D"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus; onActivated: win.editing && backend.hasSelection ? backend.duplicateSelected() : backend.duplicateSlide() }
+    Shortcut { sequences: [StandardKey.Copy]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.copyAsync() }
+    Shortcut { sequences: [StandardKey.Cut]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.copyAsync(true) }
+    Shortcut { sequences: [StandardKey.Paste]; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused && !win.slideFocus; onActivated: backend.pasteAsync() }
+    Shortcut { sequence: "T"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
                onActivated: backend.addText() }
-    Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
                onActivated: backend.addRect() }
     Shortcut { sequences: [StandardKey.Delete, StandardKey.Backspace]
-               context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+               context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
                onActivated: editCanvas.pathMode===3 ? editCanvas.deletePathNode() : backend.deleteSelected() }
-    Shortcut { sequence: "Escape"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible
+    Shortcut { sequence: "Escape"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible
                onActivated: {
                    if (win.presenting) win.endShow()
                    else if(editCanvas.cropMode) editCanvas.cancelCrop()
                    else if(editCanvas.pathMode!==0) editCanvas.cancelPathTool()
                    else { backend.cancelEdit(); backend.leaveGroup() }
                } }
-    Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && (win.workspace === 2 || win.workspace === 4)
+    Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && (win.workspace === 2 || win.workspace === 4)
                onActivated: backend.togglePlay() }
-    Shortcut { sequence: "F5"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible; onActivated: win.startShow() }
-    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: helpSheet.open() }
+    Shortcut { sequence: "F5"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible; onActivated: win.startShow() }
+    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: helpSheet.open() }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; enabled: !presenter.running; onActivated: win.close() }
 
-    Shortcut { sequences: ["Ctrl++", "Ctrl+="]; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.zoomBy(1.25) }
-    Shortcut { sequence: "Ctrl+-"; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.zoomBy(1/1.25) }
-    Shortcut { sequence: "Ctrl+0"; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.fit() }
-    Shortcut { sequence: "Ctrl+Shift+0"; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.fitSelection() }
-    Shortcut { sequence: "Ctrl+1"; enabled: !tableEditor.visible && !diagramDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.actualSize() }
+    Shortcut { sequences: ["Ctrl++", "Ctrl+="]; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.zoomBy(1.25) }
+    Shortcut { sequence: "Ctrl+-"; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.zoomBy(1/1.25) }
+    Shortcut { sequence: "Ctrl+0"; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.fit() }
+    Shortcut { sequence: "Ctrl+Shift+0"; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.fitSelection() }
+    Shortcut { sequence: "Ctrl+1"; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.actualSize() }
 
     // Arrows mean different things per workspace, so they are bound per
     // workspace rather than doing something surprising in one of them.
-    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
+    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
                onActivated: win.editing ? backend.nudgeSelected(-Theme.nudge, 0) : backend.step(-0.1) }
-    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
+    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
                onActivated: win.editing ? backend.nudgeSelected(Theme.nudge, 0) : backend.step(0.1) }
-    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
                onActivated: backend.nudgeSelected(0, -Theme.nudge) }
-    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
                onActivated: backend.nudgeSelected(0, Theme.nudge) }
-    Shortcut { sequence: "PgDown"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible
+    Shortcut { sequence: "PgDown"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible
                onActivated: backend.currentSlide = backend.currentSlide + 1 }
-    Shortcut { sequence: "PgUp"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !presenter.running && !backend.startVisible
+    Shortcut { sequence: "PgUp"; context: Qt.ApplicationShortcut; enabled: !tableEditor.visible && !diagramDialog.visible && !layoutApplyDialog.visible && !presenter.running && !backend.startVisible
                onActivated: backend.currentSlide = backend.currentSlide - 1 }
 
 
@@ -153,6 +153,7 @@ ApplicationWindow {
     function confirmThenNew() { win.guard(() => { if (backend.createDeck(startCentre.themeIndex, startCentre.deckWidth, startCentre.deckHeight, startCentre.layoutIndex)) win.workspace = 0 }) }
     function confirmThenOpen() { win.guard(() => backend.openDialog()) }
     function guard(action) {
+        if (backend.operation.length > 0) return
         win.commitEditors()
         if (!backend.modified) {
             action()
@@ -165,6 +166,7 @@ ApplicationWindow {
     function startShow() { win.commitEditors(); win.workspace = 4; presenter.start(false,false) }
     function endShow() { presenter.stop() }
     SlideSizeDialog { id: slideSizeDialog }
+    LayoutApplyDialog { id: layoutApplyDialog }
     ShapeGallery { id: shapeGallery }
     TableEditor { id: tableEditor }
     DiagramDialog { id: diagramDialog }
@@ -192,6 +194,24 @@ ApplicationWindow {
             Label { text: qsTr("%1% complete").arg(backend.mediaProgress); Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted }
             ProgressBar { Layout.fillWidth: true; from: 0; to: 100; value: backend.mediaProgress }
             Button { objectName: "cancelMediaImport"; text: qsTr("Cancel"); onClicked: backend.cancelMediaJob() }
+        }
+    }
+    Timer { id: operationDelay; interval: 150; onTriggered: if (backend.operation.length > 0) operationDialog.open() }
+    Connections {
+        target: backend
+        function onOperationChanged() {
+            if (backend.operation.length > 0) operationDelay.start()
+            else { operationDelay.stop(); operationDialog.close() }
+        }
+    }
+    Dialog {
+        id: operationDialog; objectName: "documentOperationDialog"
+        parent: Overlay.overlay; anchors.centerIn: parent
+        width: 380; modal: true; closePolicy: Popup.NoAutoClose
+        title: backend.operation
+        contentItem: ColumnLayout {
+            ProgressBar { Layout.fillWidth: true; indeterminate: true }
+            Button { text: qsTr("Cancel"); onClicked: backend.cancelOperation() }
         }
     }
     CombineShapesDialog { id: combineShapesDialog }
@@ -250,9 +270,9 @@ ApplicationWindow {
                         MenuItem { text: backend.canUndo ? qsTr("Undo %1").arg(backend.undoLabel) : qsTr("Undo"); icon.name: "undo-2"; enabled: backend.canUndo; onTriggered: backend.undo() }
                         MenuItem { text: qsTr("Redo"); icon.name: "redo-2"; enabled: backend.canRedo; onTriggered: backend.redo() }
                         MenuSeparator {}
-                        MenuItem { text: qsTr("Cut"); icon.name: "scissors"; enabled: backend.hasSelection; onTriggered: backend.cutSelected() }
-                        MenuItem { text: qsTr("Copy"); icon.name: "copy"; enabled: backend.hasSelection; onTriggered: backend.copySelected() }
-                        MenuItem { text: qsTr("Paste"); icon.name: "clipboard-paste"; enabled: backend.canPaste; onTriggered: backend.paste() }
+                        MenuItem { text: qsTr("Cut"); icon.name: "scissors"; enabled: backend.hasSelection; onTriggered: backend.copyAsync(true) }
+                        MenuItem { text: qsTr("Copy"); icon.name: "copy"; enabled: backend.hasSelection; onTriggered: backend.copyAsync() }
+                        MenuItem { text: qsTr("Paste"); icon.name: "clipboard-paste"; enabled: backend.canPaste; onTriggered: backend.pasteAsync() }
                         MenuItem { text: qsTr("Duplicate"); enabled: backend.hasSelection; onTriggered: backend.duplicateSelected() }
                         MenuItem { text: qsTr("Delete"); icon.name: "trash-2"; enabled: backend.hasSelection; onTriggered: backend.deleteSelected() }
                         MenuSeparator {}
@@ -474,7 +494,7 @@ ApplicationWindow {
                             text: modelData.name
                             checkable: true
                             checked: modelData.id === backend.slideDesign.layoutId
-                            onTriggered: backend.applyLayout(modelData.id)
+                            onTriggered: { win.commitEditors(); layoutApplyDialog.show(modelData.id) }
                         }
                         onObjectAdded: (index, object) => layoutMenu.insertItem(index, object)
                         onObjectRemoved: (index, object) => layoutMenu.removeItem(object)
@@ -499,9 +519,9 @@ ApplicationWindow {
                 ToolAction { id: arrangeButton; objectName: "arrangeMenuButton"; icon.name: "layers"; text: qsTr("Arrange"); property bool opensMenu: true; tip: qsTr("Arrange, group, lock and connect"); onClicked: arrangeMenu.popup(arrangeButton,0,arrangeButton.height) }
                 Menu {
                     id: arrangeMenu
-                    MenuItem { text: qsTr("Copy"); icon.name: "copy"; enabled: backend.hasSelection; onTriggered: backend.copySelected() }
-                    MenuItem { text: qsTr("Cut"); icon.name: "scissors"; enabled: backend.hasSelection; onTriggered: backend.cutSelected() }
-                    MenuItem { text: qsTr("Paste"); icon.name: "clipboard-paste"; enabled: backend.canPaste; onTriggered: backend.paste() }
+                    MenuItem { text: qsTr("Copy"); icon.name: "copy"; enabled: backend.hasSelection; onTriggered: backend.copyAsync() }
+                    MenuItem { text: qsTr("Cut"); icon.name: "scissors"; enabled: backend.hasSelection; onTriggered: backend.copyAsync(true) }
+                    MenuItem { text: qsTr("Paste"); icon.name: "clipboard-paste"; enabled: backend.canPaste; onTriggered: backend.pasteAsync() }
                     MenuItem { text: qsTr("Duplicate objects"); enabled: backend.hasSelection; onTriggered: backend.duplicateSelected() }
                     MenuSeparator {}
                     MenuItem { text: qsTr("Select all"); onTriggered: backend.selectAll() }
@@ -523,7 +543,7 @@ ApplicationWindow {
                 ToolAction { icon.name: "undo-2"; text: qsTr("Undo"); display: AbstractButton.IconOnly; enabled: backend.canUndo; tip: qsTr("Undo %1  Ctrl+Z").arg(backend.undoLabel); onClicked: backend.undo() }
                 ToolAction { icon.name: "redo-2"; text: qsTr("Redo"); display: AbstractButton.IconOnly; enabled: backend.canRedo; tip: qsTr("Redo  Ctrl+Shift+Z"); onClicked: backend.redo() }
                 ToolbarRule {}
-                ToolAction { icon.name: "play"; text: qsTr("Play"); highlighted: true; flat: false; tip: qsTr("Play from the start  F5"); onClicked: win.startShow() }
+                ToolAction { objectName: "toolbarPlay"; icon.name: "play"; text: qsTr("Play"); highlighted: true; flat: false; tip: qsTr("Play from the start  F5"); onClicked: win.startShow() }
             }
             Hairline { anchors.bottom: parent.bottom; width: parent.width }
         }
@@ -620,6 +640,7 @@ ApplicationWindow {
             }
 
             DesignWorkspace {
+                onApplyLayoutRequested: layoutId => { win.commitEditors(); layoutApplyDialog.show(layoutId) }
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: win.workspace === 1
@@ -727,6 +748,7 @@ ApplicationWindow {
             }
 
             Inspector {
+                onApplyLayoutRequested: layoutId => { win.commitEditors(); layoutApplyDialog.show(layoutId) }
                 Layout.preferredWidth: Theme.wInspector
                 Layout.minimumWidth: Theme.wInspectorMin
                 Layout.fillHeight: true
@@ -847,7 +869,7 @@ ApplicationWindow {
                     ToolAction {
                         text: qsTr("Recover")
                         onClicked: {
-                            backend.recoverFrom(modelData.journalPath)
+                            backend.openAsync("file://" + modelData.journalPath, true)
                             recoverySheet.candidates = backend.recoveryCandidates()
                             if (recoverySheet.candidates.length === 0)
                                 recoverySheet.close()
@@ -865,6 +887,7 @@ ApplicationWindow {
     }
 
     onClosing: event => {
+        if (backend.operation.length > 0) { event.accepted = false; return }
         if (presenter.running) { event.accepted = false; presenter.stop(); return }
         win.commitEditors()
         if (backend.modified && !win.allowClose) {

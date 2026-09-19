@@ -28,6 +28,8 @@
 #include <QDir>
 #include <QEventLoop>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
+#include <QSurfaceFormat>
 #include <QTimer>
 
 namespace {
@@ -132,7 +134,17 @@ int captureInterface(QQmlApplicationEngine &engine, Backend &backend, Presenter 
 }
 
 int main(int argc, char *argv[]) {
+    // FBO-backed QPainter is supported on Qt's OpenGL renderer. Honour explicit
+    // platform/backend choices, including the software screenshot harness.
+    if (qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") &&
+        qEnvironmentVariableIsEmpty("QT_QUICK_BACKEND") && qgetenv("OMASHOW_RENDERER") != "raster") {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+        auto format = QSurfaceFormat::defaultFormat();
+        format.setSamples(4);
+        QSurfaceFormat::setDefaultFormat(format);
+    }
     QGuiApplication app(argc, argv);
+    Workers::Session workerSession;
 
     // The identity trio. setDesktopFileName is what becomes the Wayland app_id,
     // which is what Hyprland rules, the taskbar and the icon lookup key off.
@@ -239,6 +251,13 @@ int main(int argc, char *argv[]) {
                            parser.value(widthOption).toInt(), parser.value(fpsOption).toInt(), parser.isSet(skippedOption));
     }
 
+    // A capture run rehearses a show, and a rehearsal must never reach the
+    // real desktop: no do-not-disturb, no idle inhibitor.
+    if (parser.isSet(uiShotOption)) {
+        showGuard.setIdleInhibitor(QString());
+        showGuard.setRunner([](const QString &, const QStringList &) { return QString(); });
+    }
+
     if (parser.isSet(atOption)) {
         backend.setDocument(backend.document());
         backend.setTime(parser.value(atOption).toDouble());
@@ -292,9 +311,12 @@ int main(int argc, char *argv[]) {
 
     // "Open with", and `omashow somefile` from a terminal.
     const QStringList positional = parser.positionalArguments();
-    if (!positional.isEmpty())
-        backend.open(QUrl::fromLocalFile(positional.first()));
-    if (parser.isSet(atOption)) backend.setTime(parser.value(atOption).toDouble());
+    if (!positional.isEmpty()) {
+        if (parser.isSet(atOption))
+            QObject::connect(&backend, &Backend::opened, &app, [&] { backend.setTime(parser.value(atOption).toDouble()); }, Qt::SingleShotConnection);
+        if (parser.isSet(uiShotOption)) backend.open(QUrl::fromLocalFile(positional.first()));
+        else backend.openAsync(QUrl::fromLocalFile(positional.first()));
+    } else if (parser.isSet(atOption)) backend.setTime(parser.value(atOption).toDouble());
     if (parser.isSet(uiShotOption)) {
         const QStringList wh = parser.value(uiSizeOption).split(QLatin1Char('x'));
         const QSize size(wh.value(0).toInt(), wh.value(1).toInt());

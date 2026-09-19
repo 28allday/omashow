@@ -140,3 +140,14 @@ SOURCES += src/core/datasource.cpp
 
 HEADERS += src/core/diagram.h
 SOURCES += src/core/diagram.cpp src/backenddiagram.cpp
+
+HEADERS += src/core/layoutapply.h
+SOURCES += src/core/layoutapply.cpp src/backendlayout.cpp
+SOURCES += src/core/designfields.cpp
+
+HEADERS += src/anim/presentationcache.h src/render/liveframes.h
+SOURCES += src/anim/presentationcache.cpp src/render/liveframes.cpp
+HEADERS += src/core/workers.h
+SOURCES += src/core/workers.cpp src/backendjobs.cpp
+HEADERS += src/core/hardwaredecode.h
+SOURCES += src/core/hardwaredecode.cpp

@@ -8,8 +8,16 @@ const Master *master(const Document &document, const QString &id);
 SceneObject themed(const DeckTheme &theme, SceneObject object);
 Slide resolve(const Document &document, int index);
 DeckTheme preset(int index);
+QVariantList themeContrast(const DeckTheme &theme);
+QVariantMap fieldProperties(const MasterFields &fields);
+bool setFieldProperty(MasterFields &fields, const QString &key, const QVariant &value);
+QVector<SceneObject> fields(const Document &document, int index, const Master &master);
 void ensureDefaults(Document &document);
 bool applyLayout(Document &document, int index, const QString &id);
+// Geometry: 0 keeps local overrides, 1 reapplies layout positions, 2 keeps all positions.
+// Mapping keys are source placeholder roles; an empty target keeps an independent object.
+bool applyLayout(Document &document, int index, const QString &id,
+                 const QVariantMap &mapping, int geometry);
 SceneObject detached(SceneObject object);
 QVariantMap properties(const SceneObject &object);
 // Manual editing constrains input; resolution/loading preserve already-authored scaled values.

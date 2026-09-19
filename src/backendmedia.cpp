@@ -5,15 +5,19 @@
 #include "core/imageasset.h"
 #include "filepicker.h"
 #include "mediaplayback.h"
+#include "io/recovery.h"
 #include <QFutureWatcher>
 #include <QtConcurrent>
 #include <cmath>
 
 void Backend::resetMediaSession() {
+  cancelJournal();
+  Recovery::discard();
   if (m_mediaPlayback)
     m_mediaPlayback->clear();
   discardMediaOptimisation();
   ++m_documentGeneration;
+  m_imageQueue.clear();
   cancelMediaJob();
   m_mediaPermissions.clear();
 }
@@ -245,7 +249,7 @@ void Backend::embedSelectedMedia() {
             m_document.slides.at(m_currentSlide).id, o->id);
 }
 QVector<SceneObject> Backend::statesAt(qreal time, bool includeSkipped) const {
-  auto states = Presentation::stateAt(m_document, time, includeSkipped);
+  auto states = presentation(includeSkipped).statesAt(time);
   for (auto &o : states)
     if (o.type == ObjectType::Media)
       o.mediaReadAllowed = !o.mediaPath.isEmpty() &&

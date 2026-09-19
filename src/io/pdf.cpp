@@ -5,6 +5,8 @@
 #include <QPageSize>
 #include <QPainter>
 #include <QPdfWriter>
+#include <QSaveFile>
+#include <QMutexLocker>
 
 #include <algorithm>
 
@@ -31,7 +33,7 @@ QVector<qreal> Pdf::stageTimes(const Slide &slide, bool pagePerBuildStage) {
 }
 
 bool Pdf::write(const Document &document, const QString &path,
-                const Options &options, QString *error) {
+                const Options &options, QString *error, const std::shared_ptr<Workers::Job> &job) {
     if (document.slides.isEmpty()) {
         if (error) *error = QStringLiteral("The deck has no slides.");
         return false;
@@ -51,7 +53,10 @@ bool Pdf::write(const Document &document, const QString &path,
     const qreal pageWidth = options.pageWidthPoints;
     const qreal pageHeight = pageWidth * document.size.height() / document.size.width();
 
-    QPdfWriter writer(path);
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) { if (error) *error = file.errorString(); return false; }
+    {
+    QPdfWriter writer(&file);
     writer.setResolution(72);   // 1 unit == 1 point, so the maths below is plain
     writer.setPageSize(QPageSize(QSizeF(pageWidth, pageHeight), QPageSize::Point,
                                  QStringLiteral("Slide")));
@@ -72,12 +77,15 @@ bool Pdf::write(const Document &document, const QString &path,
     bool firstPage = true;
 
     for (int index : eligible) {
+        if (job && job->canceled) { painter.end(); file.cancelWriting(); return false; }
         const Slide slide = Design::resolve(document, index);
         const QVector<qreal> times = stageTimes(slide, options.pagePerBuildStage);
 
         for (const qreal time : times) {
-            if (!firstPage)
-                writer.newPage();
+            if (!firstPage && !writer.newPage()) {
+                if (error) *error = QStringLiteral("Could not write the next PDF page.");
+                painter.end(); file.cancelWriting(); return false;
+            }
             firstPage = false;
 
             painter.save();
@@ -91,5 +99,9 @@ bool Pdf::write(const Document &document, const QString &path,
     }
 
     painter.end();
+    } // Finish the PDF trailer before committing the atomic output.
+    QMutexLocker lock(job ? &job->commitMutex : nullptr);
+    if (job && job->canceled) { file.cancelWriting(); return false; }
+    if (!file.commit()) { if (error) *error = file.errorString(); return false; }
     return true;
 }

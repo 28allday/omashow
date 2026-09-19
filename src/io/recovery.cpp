@@ -44,7 +44,7 @@ QString Recovery::directory() {
     return base + QStringLiteral("/recovery");
 }
 
-bool Recovery::write(const Document &document, const QString &originalPath, QString *error) {
+bool Recovery::write(const Document &document, const QString &originalPath, QString *error, const std::shared_ptr<Workers::Job> &job) {
     QDir().mkpath(directory());
 
     QJsonObject meta;
@@ -52,37 +52,8 @@ bool Recovery::write(const Document &document, const QString &originalPath, QStr
     meta[QStringLiteral("savedAt")] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
     meta[QStringLiteral("pid")] = QCoreApplication::applicationPid();
 
-    // The journal is a normal deck with one extra member, so it can be opened
-    // by hand if everything else fails.
-    QByteArray raw = Bundle::toBytes(document);
-    const Zip::Reader reader(raw);
-    if (!reader.isValid()) {
-        if (error) *error = QStringLiteral("could not build the journal");
-        return false;
-    }
-
-    QVector<Zip::Entry> entries;
-    for (const QString &name : reader.names())
-        entries.append({name, reader.read(name), true});
-    entries.append({QString::fromLatin1(kMetaMember),
-                    QJsonDocument(meta).toJson(QJsonDocument::Indented), true});
-
-    QSaveFile file(journalPathForPid(QCoreApplication::applicationPid()));
-    if (!file.open(QIODevice::WriteOnly)) {
-        if (error) *error = file.errorString();
-        return false;
-    }
-    const QByteArray out = Zip::write(entries);
-    if (file.write(out) != out.size()) {
-        if (error) *error = file.errorString();
-        file.cancelWriting();
-        return false;
-    }
-    if (!file.commit()) {
-        if (error) *error = file.errorString();
-        return false;
-    }
-    return true;
+    const auto bytes = Bundle::toBytes(document, QJsonDocument(meta).toJson(QJsonDocument::Compact));
+    return Workers::write(journalPathForPid(QCoreApplication::applicationPid()), bytes, error, job);
 }
 
 void Recovery::discard() {

@@ -66,6 +66,7 @@ bool valid(const QSize &size) {
          qint64(size.width()) * size.height() <= ImageAsset::maxPixels;
 }
 } // namespace
+QImage ImageAsset::displayImage(const SceneObject &object) { return adjusted(object); }
 QString ImageAsset::identity(const QByteArray &bytes) {
   return QString::fromLatin1(
       QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());

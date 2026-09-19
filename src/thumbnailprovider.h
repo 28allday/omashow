@@ -6,6 +6,9 @@
 // its slide actually changes and not on every repaint.
 
 #include <QQuickImageProvider>
+#include <QMutex>
+#include <QObject>
+#include "core/scene.h"
 
 class Backend;
 
@@ -16,5 +19,16 @@ public:
     QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize) override;
 
 private:
-    Backend *m_backend;
+    struct Snapshot {
+        Document document, layoutDocument;
+        QVector<SceneObject> diagram;
+        SceneObject before, after;
+        QStringList selected;
+        int current = 0;
+        bool layoutOk = false;
+    };
+    void capture(Backend *backend);
+    QObject m_observer;
+    QMutex m_mutex;
+    Snapshot m_snapshot;
 };

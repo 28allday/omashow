@@ -120,6 +120,8 @@ struct Slide {
     QString sectionId;
     QString notes;
     bool backgroundOverride = false;
+    bool showMasterObjects = true;
+    bool showMasterFields = true;
     bool skipped = false;
 
     const SceneObject *find(const QString &id) const;
@@ -144,11 +146,18 @@ struct DeckTheme {
     };
 };
 
+struct MasterFields {
+    bool showNumber = false, showDate = false, showFooter = false, hideOnFirst = false;
+    int firstNumber = 1;
+    QString date, footer;
+};
+
 struct Master {
     QString id, name;
     QColor background = QColor(12, 16, 24);
     QString backgroundToken = QStringLiteral("background");
     QVector<SceneObject> objects;
+    MasterFields fields;
 };
 
 struct SlideLayout {

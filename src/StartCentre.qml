@@ -142,6 +142,7 @@ Rectangle {
                     delegate: Rectangle {
                         id: recent
                         required property var modelData
+                        required property int index
                         width: recentList.width
                         implicitHeight: recentContent.implicitHeight + Theme.s3 * 2
                         color: Theme.panelBg; radius: Theme.rControl
@@ -151,6 +152,7 @@ Rectangle {
                             anchors.top: parent.top; anchors.margins: Theme.s3
                             spacing: Theme.s1
                             Button {
+                                objectName: "recentDeck" + recent.index
                                 Layout.fillWidth: true; flat: true
                                 text: recent.modelData.name
                                 enabled: !recent.modelData.missing

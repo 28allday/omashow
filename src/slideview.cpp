@@ -8,25 +8,31 @@
 #include "render/scenerenderer.h"
 
 #include <QPainter>
+#include <QPaintEngine>
 #include <cmath>
 
 SlideView::SlideView(QQuickItem *parent) : QQuickPaintedItem(parent) {
     setAntialiasing(true);
-    // Image, not FramebufferObject: this routes painting through the same
-    // raster engine the export path uses, so the live view and a rendered frame
-    // are the same pixels rather than merely similar ones.
-    setRenderTarget(QQuickPaintedItem::Image);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    // Qt 6.9+ accelerates QPainter on OpenGL FBOs. Other scene-graph APIs
+    // automatically retain the image path; exports always use CPU raster.
+    if (qgetenv("OMASHOW_RENDERER") != "raster")
+        setRenderTarget(QQuickPaintedItem::FramebufferObject);
+#endif
+    connect(&m_frames, &LiveFrames::ready, this, [this] { polish(); update(); });
 }
 
 void SlideView::setDeck(Backend *deck) {
     if (m_deck == deck)
         return;
     if (m_deck) disconnect(m_deck, nullptr, this, nullptr);
+    m_frames.reset();
     m_deck = deck;
-    if (m_deck) connect(m_deck, &Backend::documentChanged, this, [this] { updateLayout(); update(); });
-    if(m_deck) connect(m_deck,&Backend::deckChanged,this,[this]{update();});
+    if (m_deck) connect(m_deck, &Backend::documentChanged, this, [this] { updateLayout(); polish(); update(); });
+    if(m_deck) connect(m_deck,&Backend::deckChanged,this,[this]{polish(); update();});
+    if(m_deck) connect(m_deck,&Backend::mediaJobChanged,this,[this]{polish(); update();});
     emit deckChanged();
-    updateLayout(); update();
+    updateLayout(); polish(); update();
 }
 
 void SlideView::setEditSlide(int index) {
@@ -34,7 +40,7 @@ void SlideView::setEditSlide(int index) {
         return;
     m_editSlide = index;
     emit editSlideChanged();
-    update();
+    polish(); update();
 }
 
 QPointF SlideView::toDocument(qreal x, qreal y) const {
@@ -48,43 +54,43 @@ void SlideView::setTime(qreal time) {
         return;
     m_time = time;
     emit timeChanged();
-    update();
+    polish(); update();
+}
+
+void SlideView::updatePolish() {
+    if (!m_deck) { m_states.clear(); return; }
+    updateLayout();
+    m_documentSize = m_deck->slideSize();
+    const auto &cache = m_deck->presentation(m_deck->includeSkipped());
+    if (m_editSlide >= 0 && m_editSlide < m_deck->slideCount()) {
+        const auto slide = cache.slide(m_editSlide);
+        m_background = slide.background;
+        m_states = slide.objects;
+        for (auto &o : m_states) if (o.id == m_hiddenObject) o.hidden = true;
+    } else {
+        m_background = cache.backgroundAt(m_time);
+        m_states = m_deck->statesAt(m_time, m_deck->includeSkipped());
+    }
+    m_states = m_frames.prepare(m_states);
 }
 
 void SlideView::paint(QPainter *painter) {
-    if (!m_deck)
-        return;
-
-    const Document &document = m_deck->document();
-    const QSizeF documentSize = document.size;
-    if (documentSize.isEmpty() || width() <= 0 || height() <= 0)
-        return;
-
-    updateLayout();
-    const qreal scale = m_scale;
-    const QRectF slideRect(m_origin, QSizeF(documentSize.width()*scale,documentSize.height()*scale));
-
-    const bool editing = m_editSlide >= 0 && m_editSlide < document.slides.size();
-    const int shown = editing ? m_editSlide : Presentation::frameAt(document, m_time, m_deck->includeSkipped()).slideIndex;
-    const QColor background = document.slides.isEmpty()
-                                  ? QColor(0, 0, 0)
-                                  : editing ? Design::resolve(document, shown).background : Presentation::backgroundAt(document, m_time, m_deck->includeSkipped());
-
+    m_hardwarePainting = painter->paintEngine()->type() == QPaintEngine::OpenGL2;
+    if (m_documentSize.isEmpty() || width() <= 0 || height() <= 0) return;
+    const QRectF slideRect(m_origin, m_documentSize * m_scale);
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setRenderHint(QPainter::TextAntialiasing, true);
-    painter->fillRect(slideRect, background);
-
+    painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter->fillRect(slideRect, m_background);
     painter->save();
     painter->setClipRect(slideRect);
     painter->translate(slideRect.topLeft());
-    painter->scale(scale, scale);
-    if (editing) {
-        Slide slide = Design::resolve(document, m_editSlide);
-        if (!m_hiddenObject.isEmpty()) for(auto &o:slide.objects) if(o.id==m_hiddenObject) o.hidden=true;
-        if(m_cropObject.isEmpty()) SceneRenderer::paint(*painter,slide.objects);
-        else for(const auto &o:slide.objects) { if(o.id==m_cropObject && o.type==ObjectType::Image) SceneRenderer::paint(*painter,{ImageCrop::preview(o)}); SceneRenderer::paint(*painter,{o}); }
-    } else {
-        SceneRenderer::paint(*painter, m_deck->statesAt(m_time, m_deck->includeSkipped()));
+    painter->scale(m_scale, m_scale);
+    if (m_cropObject.isEmpty()) SceneRenderer::paint(*painter, m_states);
+    else for (const auto &o : m_states) {
+        if (o.id == m_cropObject && o.type == ObjectType::Image)
+            SceneRenderer::paint(*painter, {ImageCrop::preview(o)});
+        SceneRenderer::paint(*painter, {o});
     }
     painter->restore();
 }
@@ -115,7 +121,7 @@ void SlideView::zoomAt(qreal scale, qreal x, qreal y) {
 void SlideView::fit() { m_zoom = 0; m_pan = {}; updateLayout(); emit layoutChanged(); update(); }
 void SlideView::panBy(qreal dx, qreal dy) {
     if (!std::isfinite(dx) || !std::isfinite(dy)) return;
-    m_pan += QPointF(dx,dy); updateLayout(); update();
+    m_pan += QPointF(dx,dy); updateLayout(); polish(); update();
 }
 
 void SlideView::fitRect(const QRectF &rect) {

@@ -186,10 +186,12 @@ Slide Design::resolve(const Document &d, int index) {
     if (base) {
         if (!slide.backgroundOverride)
             slide.background = d.theme.colors.value(base->backgroundToken, base->background);
-        for (auto o : base->objects) {
-            o.id = QStringLiteral("@master/") + base->id + '/' + o.id;
-            slide.objects.append(themed(d.theme, o));
-        }
+        if (slide.showMasterObjects)
+            for (auto o : base->objects) {
+                o.id = QStringLiteral("@master/") + base->id + '/' + o.id;
+                slide.objects.append(themed(d.theme, o));
+            }
+        if (slide.showMasterFields) slide.objects += fields(d, index, *base);
     }
     for (const auto &local : d.slides.at(index).objects) {
         SceneObject o = local;
@@ -274,21 +276,45 @@ SceneObject Design::detached(SceneObject o) {
     return o;
 }
 bool Design::applyLayout(Document &d, int index, const QString &id) {
+    return applyLayout(d, index, id, {}, 0);
+}
+bool Design::applyLayout(Document &d, int index, const QString &id,
+                         const QVariantMap &mapping, int geometry) {
     const auto *target = layout(d,id);
-    if (!target || index < 0 || index >= d.slides.size()) return false;
+    if (!target || index < 0 || index >= d.slides.size() || geometry < 0 || geometry > 2) return false;
     const auto definition = *target;
     const Slide previous = resolve(d,index);
-    Slide &slide = d.slides[index];
+    Slide slide = d.slides[index];
     QSet<QString> used;
     for (auto &o : slide.objects) {
         if (o.placeholderId.isEmpty()) continue;
-        bool match = false;
+        const QString role = mapping.value(o.placeholderId, o.placeholderId).toString();
+        const SceneObject *match = nullptr;
         for (const auto &p : definition.placeholders) {
-            if (p.id == o.placeholderId && p.type == o.type && !used.contains(p.id)) {
-                match = true; used.insert(p.id); break;
-            }
+            if (p.id == role && p.type == o.type) { match = &p; break; }
         }
-        if (!match) if (const auto *old = previous.find(o.id)) o = detached(*old);
+        // Explicit invalid/duplicate mappings fail atomically, including earlier objects.
+        if (!role.isEmpty() && mapping.contains(o.placeholderId) && !match) return false;
+        if (match && used.contains(role)) {
+            if (mapping.contains(o.placeholderId)) return false;
+            match = nullptr;
+        }
+        const auto *old = previous.find(o.id);
+        if (!match) {
+            if (old) o = detached(*old);
+            continue;
+        }
+        used.insert(role);
+        if (old && role != o.placeholderId && o.type == ObjectType::Text) {
+            o.text = old->text;
+            markOverride(o, "text");
+        }
+        o.placeholderId = role;
+        if (geometry == 1) reset(o, true);
+        if (geometry == 2 && old) {
+            o.rect = old->rect; o.rotation = old->rotation;
+            for (const QString &key : {"x", "y", "w", "h", "rotation"}) markOverride(o, key);
+        }
     }
     for (const auto &p : definition.placeholders) {
         if (used.contains(p.id)) continue;
@@ -297,6 +323,7 @@ bool Design::applyLayout(Document &d, int index, const QString &id) {
         slide.objects.append(o);
     }
     slide.layoutId = id;
+    d.slides[index] = slide;
     return true;
 }
 void Design::markOverride(SceneObject &o, const QString &key) {

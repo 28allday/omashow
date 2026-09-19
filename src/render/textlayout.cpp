@@ -6,6 +6,8 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextList>
+#include <QCache>
+#include <QDataStream>
 #include <memory>
 namespace {
 QFont fontFor(const SceneObject &o, qreal size) {
@@ -27,8 +29,18 @@ bool legacy(const SceneObject &o) {
     return o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
            o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0;
 }
-std::unique_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
-    auto doc = std::make_unique<QTextDocument>();
+std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
+    // QTextDocument belongs to its creating thread. Cache per thread, with a
+    // memory budget, and exclude position/opacity so animation reuses layout.
+    static thread_local QCache<QByteArray, std::shared_ptr<QTextDocument>> cache(16*1024);
+    QByteArray key;
+    QDataStream stream(&key, QIODevice::WriteOnly);
+    stream << o.text << o.fontFamily << size << o.rect.width() << o.fontWeight
+           << o.italic << o.underline << o.letterSpacing << o.uppercase
+           << o.textAlign << o.lineHeight << o.paragraphSpacing << o.textIndent
+           << o.listStyle << o.listStart << o.textColor;
+    if (auto *cached = cache.object(key)) return *cached;
+    auto doc = std::make_shared<QTextDocument>();
     doc->setUndoRedoEnabled(false);
     doc->setDocumentMargin(0);
     doc->setDefaultFont(fontFor(o, size));
@@ -79,17 +91,21 @@ std::unique_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
                     ++it;
         }
     }
+    cache.insert(key, new std::shared_ptr<QTextDocument>(doc), qMax(1, int((o.text.size()*10+4096)/1024)));
     return doc;
 }
-qreal height(const SceneObject &o, qreal size) {
+QSizeF contentSize(const SceneObject &o, qreal size) {
     if (legacy(o)) {
         const QFontMetricsF metrics(fontFor(o, size));
         return metrics
             .boundingRect(QRectF(0, 0, qMax(1.0, o.rect.width()), 1000000), Qt::TextWordWrap,
                           o.uppercase ? o.text.toUpper() : o.text)
-            .height();
+            .size();
     }
-    return layout(o, size)->documentLayout()->documentSize().height();
+    return layout(o, size)->documentLayout()->documentSize();
+}
+qreal height(const SceneObject &o, qreal size) {
+    return contentSize(o, size).height();
 }
 } // namespace
 TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
@@ -97,7 +113,8 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     if (o.type != ObjectType::Text)
         return m;
     m.effectiveSize = o.fontSize;
-    m.naturalHeight = height(o, o.fontSize);
+    auto dimensions = contentSize(o, o.fontSize);
+    m.naturalHeight = dimensions.height();
     m.renderedHeight = m.naturalHeight;
     if (o.textFit == 1 && m.renderedHeight > o.rect.height()) {
         int lo = 4, hi = qMax(4, int(o.fontSize));
@@ -109,9 +126,11 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
                 hi = mid - 1;
         }
         m.effectiveSize = lo;
-        m.renderedHeight = height(o, lo);
+        dimensions = contentSize(o, lo);
+        m.renderedHeight = dimensions.height();
     }
-    m.overflow = m.renderedHeight > o.rect.height() + .5;
+    m.overflow = m.renderedHeight > o.rect.height() + .5 ||
+                 dimensions.width() > o.rect.width() + .5;
     return m;
 }
 void TextLayout::paint(QPainter &painter, const SceneObject &o) {

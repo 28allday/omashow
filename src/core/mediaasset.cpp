@@ -1,5 +1,6 @@
 #include "core/mediaasset.h"
 #include "core/imageasset.h"
+#include "core/hardwaredecode.h"
 #include <QBuffer>
 #include <QCache>
 #include <QColorSpace>
@@ -7,19 +8,34 @@
 #include <QDateTime>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QDebug>
 #include <QFile>
 #include <QFileInfo>
 #include <QPainter>
 #include <QRegularExpression>
+#include <QSet>
 #include <cmath>
 #include <limits>
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/display.h>
+#include <libavutil/hwcontext.h>
+#include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
 namespace {
+const AVCodec *hardwareDecoder(AVCodecID id, AVHWDeviceType type) {
+  // FFmpeg may prefer a software-only implementation (notably libdav1d for
+  // AV1). Discover the implementation that actually exposes this hardware API.
+  void *iterator = nullptr;
+  while (const auto *candidate = av_codec_iterate(&iterator)) {
+    if (candidate->id != id || !av_codec_is_decoder(candidate)) continue;
+    for (int i = 0; const auto *config = avcodec_get_hw_config(candidate, i); ++i)
+      if (config->device_type == type && (config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) return candidate;
+  }
+  return nullptr;
+}
 class Decoder {
 public:
   std::unique_ptr<QIODevice> input;
@@ -27,18 +43,23 @@ public:
   AVIOContext *io = nullptr;
   AVCodecContext *codec = nullptr;
   AVPacket *packet = nullptr;
-  AVFrame *frame = nullptr;
+  AVFrame *frame = nullptr, *download = nullptr;
+  AVPixelFormat hardwareFormat = AV_PIX_FMT_NONE;
+  QString hardwareDevice;
+  QSet<QString> rejectedDevices;
+  bool usedHardware = false;
   SwsContext *scaler = nullptr;
   std::shared_ptr<MediaAsset::Job> job;
   QElapsedTimer deadline;
   int video = -1, audio = -1;
   qreal duration = 0, currentTime = -1, nextTime = -1, origin = 0, rotation = 0;
   QImage current, next;
-  bool drained = false;
+  bool drained = false, decodeFailed = false;
   QString error;
   ~Decoder() {
     sws_freeContext(scaler);
     av_frame_free(&frame);
+    av_frame_free(&download);
     av_packet_free(&packet);
     avcodec_free_context(&codec);
     avformat_close_input(&format);
@@ -81,8 +102,41 @@ public:
                       AVDictionary **) {
     return AVERROR(EACCES);
   }
+  static AVPixelFormat chooseFormat(AVCodecContext *context, const AVPixelFormat *formats) {
+    const auto *self = static_cast<Decoder *>(context->opaque);
+    for (auto *format = formats; *format != AV_PIX_FMT_NONE; ++format)
+      if (*format == self->hardwareFormat) return *format;
+    // Do not silently accept software under a hardware label. A rejected
+    // profile/format advances to the next adapter, then the explicit CPU path.
+    return AV_PIX_FMT_NONE;
+  }
+  bool configureHardware(const AVCodec *implementation, const HardwareDecode::Candidate &candidate) {
+    static thread_local QHash<QString, qint64> unavailableUntil;
+    const auto key = candidate.key();
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    if (unavailableUntil.value(key) > now) return false;
+    const auto type = av_hwdevice_find_type_by_name(candidate.backend.toLatin1().constData());
+    for (int i = 0; const auto *config = avcodec_get_hw_config(implementation, i); ++i) {
+      if (config->device_type != type || !(config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) continue;
+      AVBufferRef *device = nullptr;
+      const auto name = candidate.device.toLocal8Bit();
+      if (av_hwdevice_ctx_create(&device, type, name.isEmpty() ? nullptr : name.constData(), nullptr, 0) < 0) {
+        // A failed adapter never disables the whole backend. Retry transient
+        // driver/permission failures after 30 seconds, not on every frame.
+        unavailableUntil.insert(key, now + 30000);
+        return false;
+      }
+      hardwareFormat = config->pix_fmt;
+      hardwareDevice = key;
+      codec->hw_device_ctx = device;
+      codec->opaque = this;
+      codec->get_format = chooseFormat;
+      return true;
+    }
+    return false;
+  }
   bool open(const SceneObject &object,
-            const std::shared_ptr<MediaAsset::Job> &task = {}) {
+            const std::shared_ptr<MediaAsset::Job> &task = {}, const HardwareDecode::Candidate *hardware = nullptr) {
     job = task;
     deadline.start();
     if (!object.mediaData.isEmpty()) {
@@ -157,7 +211,9 @@ public:
       error = "Video dimensions must be at most 4096 × 4096.";
       return false;
     }
-    const AVCodec *implementation = avcodec_find_decoder(parameters->codec_id);
+    const AVCodec *implementation = hardware
+        ? hardwareDecoder(parameters->codec_id, av_hwdevice_find_type_by_name(hardware->backend.toLatin1().constData()))
+        : avcodec_find_decoder(parameters->codec_id);
     if (!implementation) {
       error = "The video codec is unavailable.";
       return false;
@@ -167,6 +223,7 @@ public:
       error = "Could not configure video decoder.";
       return false;
     }
+    if (hardware && !configureHardware(implementation, *hardware)) return false;
     codec->thread_count = 2;
     codec->max_pixels = 4096LL * 4096;
     if (avcodec_open2(codec, implementation, nullptr) < 0) {
@@ -175,7 +232,8 @@ public:
     }
     packet = av_packet_alloc();
     frame = av_frame_alloc();
-    if (!packet || !frame) {
+    download = av_frame_alloc();
+    if (!packet || !frame || !download) {
       error = "Not enough memory to decode video.";
       return false;
     }
@@ -193,48 +251,56 @@ public:
     return true;
   }
   bool decodeNext(QImage &image, qreal &seconds) {
+    decodeFailed = true;
     for (int attempts = 0; attempts < 20000 && !interrupt(this); ++attempts) {
       int result = avcodec_receive_frame(codec, frame);
       if (result == 0) {
-        if (frame->color_trc == AVCOL_TRC_SMPTE2084 ||
-            frame->color_trc == AVCOL_TRC_ARIB_STD_B67 ||
-            frame->color_primaries == AVCOL_PRI_BT2020) {
+        AVFrame *pixels = frame;
+        if (frame->format == hardwareFormat && hardwareFormat != AV_PIX_FMT_NONE) {
+          av_frame_unref(download);
+          if (av_hwframe_transfer_data(download, frame, 0) < 0 || av_frame_copy_props(download, frame) < 0) return false;
+          pixels = download;
+          usedHardware = true;
+        }
+        if (pixels->color_trc == AVCOL_TRC_SMPTE2084 ||
+            pixels->color_trc == AVCOL_TRC_ARIB_STD_B67 ||
+            pixels->color_primaries == AVCOL_PRI_BT2020) {
           error = "HDR and wide-gamut video need conversion to SDR Rec.709 "
                   "before insertion.";
           return false;
         }
-        const int64_t pts = frame->best_effort_timestamp;
+        const int64_t pts = pixels->best_effort_timestamp;
         seconds =
             pts == AV_NOPTS_VALUE
                 ? qMax(0.0, nextTime + .04)
                 : pts * av_q2d(format->streams[video]->time_base) - origin;
-        if (frame->width <= 0 || frame->height <= 0 || frame->width > 4096 ||
-            frame->height > 4096)
+        if (pixels->width <= 0 || pixels->height <= 0 || pixels->width > 4096 ||
+            pixels->height > 4096)
           return false;
         scaler = sws_getCachedContext(
-            scaler, frame->width, frame->height, AVPixelFormat(frame->format),
-            frame->width, frame->height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr,
+            scaler, pixels->width, pixels->height, AVPixelFormat(pixels->format),
+            pixels->width, pixels->height, AV_PIX_FMT_RGBA, SWS_BILINEAR, nullptr,
             nullptr, nullptr);
         if (!scaler)
           return false;
-        const int space = frame->colorspace == AVCOL_SPC_BT709 ? SWS_CS_ITU709
-                          : frame->colorspace == AVCOL_SPC_BT2020_NCL
+        const int space = pixels->colorspace == AVCOL_SPC_BT709 ? SWS_CS_ITU709
+                          : pixels->colorspace == AVCOL_SPC_BT2020_NCL
                               ? SWS_CS_BT2020
                               : SWS_CS_ITU601;
         const auto *coefficients = sws_getCoefficients(space);
         sws_setColorspaceDetails(scaler, coefficients,
-                                 frame->color_range == AVCOL_RANGE_JPEG,
+                                 pixels->color_range == AVCOL_RANGE_JPEG,
                                  coefficients, 1, 0, 1 << 16, 1 << 16);
-        image = QImage(frame->width, frame->height, QImage::Format_RGBA8888);
+        image = QImage(pixels->width, pixels->height, QImage::Format_RGBA8888);
         if (image.isNull())
           return false;
         uint8_t *planes[] = {image.bits(), nullptr, nullptr, nullptr};
         int strides[] = {int(image.bytesPerLine()), 0, 0, 0};
-        if (sws_scale(scaler, frame->data, frame->linesize, 0, frame->height,
+        if (sws_scale(scaler, pixels->data, pixels->linesize, 0, pixels->height,
                       planes, strides) <= 0)
           return false;
         const AVRational aspect =
-            av_guess_sample_aspect_ratio(format, format->streams[video], frame);
+            av_guess_sample_aspect_ratio(format, format->streams[video], pixels);
         if (aspect.num > 0 && aspect.den > 0 && aspect.num != aspect.den) {
           const int width = qRound(image.width() * av_q2d(aspect));
           if (width <= 0 || width > 4096)
@@ -247,8 +313,11 @@ public:
                                     Qt::SmoothTransformation);
         image.setColorSpace(QColorSpace::SRgb);
         av_frame_unref(frame);
+        av_frame_unref(download);
+        decodeFailed = false;
         return true;
       }
+      if (result == AVERROR_EOF) { decodeFailed = false; return false; }
       if (result != AVERROR(EAGAIN) || drained)
         return false;
       do {
@@ -299,7 +368,9 @@ public:
       nextTime = -1;
       decodeNext(next, nextTime);
     }
-    return current;
+    // A decoder/transfer failure after an earlier good frame must trigger the
+    // next device (or software), rather than freeze on that earlier frame.
+    return decodeFailed ? QImage() : current;
   }
 };
 QString hashFile(QFile &file, const std::shared_ptr<MediaAsset::Job> &job,
@@ -458,27 +529,69 @@ QString MediaAsset::linkState(const SceneObject &o, bool authorized) {
     return QStringLiteral("Changed · relink to review");
   return QStringLiteral("Linked · keep source file");
 }
-QImage MediaAsset::frameAt(const SceneObject &o, qreal seconds) {
-  if (!o.mediaVideo || !std::isfinite(seconds) || seconds < 0)
-    return o.image;
-  if (!o.mediaPath.isEmpty() && linkState(o, o.mediaReadAllowed) !=
-                                    QStringLiteral("Linked · keep source file"))
-    return o.image;
-  // Four software decoders, each with at most two decoded frames. Cache is
-  // scoped to the rendering thread and never confers linked-file permission.
+QImage MediaAsset::frameAt(const SceneObject &o, qreal seconds, const std::shared_ptr<Job> &job,
+                          bool hardware, QString *decoderBackend) {
+  if (decoderBackend) *decoderBackend = "poster";
+  if (job && job->canceled) return o.image;
+  if (!o.mediaVideo || !std::isfinite(seconds) || seconds < 0) return o.image;
+  if (!o.mediaPath.isEmpty() && linkState(o, o.mediaReadAllowed) != QStringLiteral("Linked · keep source file")) return o.image;
+  // Four decoders per thread; cached entries never confer file permission.
   thread_local QCache<QString, Decoder> decoders(4);
-  const QString key = o.mediaId + "/" + o.mediaPath;
-  auto *decoder = decoders.object(key);
-  if (!decoder) {
-    auto fresh = std::make_unique<Decoder>();
-    if (!fresh->open(o))
-      return o.image;
-    decoder = fresh.release();
-    decoders.insert(key, decoder);
+  const auto preference = hardware ? qEnvironmentVariable("OMASHOW_VIDEO_DECODER", "auto") : QStringLiteral("software");
+  const auto device = hardware ? qEnvironmentVariable("OMASHOW_VIDEO_DEVICE") : QString();
+  const auto key = o.mediaId + '/' + o.mediaPath + '/' + preference + '/' + device;
+  QSet<QString> rejected;
+  if (auto *decoder = decoders.object(key)) {
+    decoder->job = job;
+    const auto image = decoder->at(seconds);
+    if (job && job->canceled) { decoders.remove(key); return o.image; }
+    if (!image.isNull()) {
+      if (decoderBackend) *decoderBackend = decoder->usedHardware ? decoder->hardwareDevice : QStringLiteral("software");
+      return image;
+    }
+    rejected = decoder->rejectedDevices;
+    if (!decoder->hardwareDevice.isEmpty()) rejected.insert(decoder->hardwareDevice);
+    decoders.remove(key);
   }
-  const auto image = decoder->at(seconds);
-  return image.isNull() ? o.image : image;
+
+  // Read the actual stream/codec before selecting adapters. Its metadata and
+  // each successful device initialization are insufficient on their own: a
+  // candidate must also decode this stream's profile and download a frame.
+  auto software = std::make_unique<Decoder>();
+  if (!software->open(o, job)) return o.image;
+  QStringList supported;
+  if (hardware && software->codec) {
+    if (hardwareDecoder(software->codec->codec_id, AV_HWDEVICE_TYPE_VAAPI)) supported.append("vaapi");
+    if (hardwareDecoder(software->codec->codec_id, AV_HWDEVICE_TYPE_CUDA)) supported.append("cuda");
+  }
+  const auto plan = HardwareDecode::candidates(supported, hardware ? HardwareDecode::renderNodes() : QStringList(),
+                                              hardware ? HardwareDecode::cudaDeviceCount() : 0, preference, device);
+  std::unique_ptr<Decoder> chosen;
+  QImage image;
+  HardwareDecode::firstWorking(plan, [&](const HardwareDecode::Candidate &candidate) {
+    if ((job && job->canceled) || rejected.contains(candidate.key())) return false;
+    if (candidate.backend == "software") {
+      image = software->at(seconds);
+      if (image.isNull()) return false;
+      chosen = std::move(software);
+      return true;
+    }
+    auto attempt = std::make_unique<Decoder>();
+    if (attempt->open(o, job, &candidate)) image = attempt->at(seconds);
+    if (!image.isNull() && attempt->usedHardware) { chosen = std::move(attempt); return true; }
+    image = {};
+    rejected.insert(candidate.key());
+    return false;
+  });
+  if (!chosen || (job && job->canceled)) return o.image;
+  chosen->rejectedDevices = rejected;
+  const auto selected = chosen->usedHardware ? chosen->hardwareDevice : QStringLiteral("software");
+  if (decoderBackend) *decoderBackend = selected;
+  if (hardware && qEnvironmentVariableIsSet("OMASHOW_PERF_LOG")) qInfo().noquote() << "OmaShow video decoder:" << selected;
+  decoders.insert(key, chosen.release());
+  return image;
 }
+
 qreal MediaAsset::playbackDuration(const SceneObject &o) {
   return (o.mediaTrimEnd - o.mediaTrimStart) * o.mediaLoops;
 }

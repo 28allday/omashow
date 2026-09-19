@@ -18,7 +18,9 @@ Result fromFile(const QString &path, bool embed,
                 const std::shared_ptr<Job> &job = {},
                 const QString &displayName = {});
 bool validate(const SceneObject &object, QString *error);
-QImage frameAt(const SceneObject &object, qreal seconds);
+QImage frameAt(const SceneObject &object, qreal seconds,
+               const std::shared_ptr<Job> &job = {}, bool hardware = false,
+               QString *decoderBackend = nullptr);
 qreal playbackDuration(const SceneObject &object);
 void evaluate(SceneObject &object, qreal elapsed, qreal cueDuration);
 qint64 embeddedBytes(const Document &document);

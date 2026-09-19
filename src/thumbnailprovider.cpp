@@ -8,27 +8,74 @@
 #include "backend.h"
 #include "core/scene.h"
 #include "render/scenerenderer.h"
+#include <QMutexLocker>
 
 SlideThumbnailProvider::SlideThumbnailProvider(Backend *backend)
-    : QQuickImageProvider(QQuickImageProvider::Image), m_backend(backend) {}
+    : QQuickImageProvider(QQuickImageProvider::Image, ForceAsynchronousImageLoading) {
+    // Capture implicitly shared values only on the GUI thread. The provider's
+    // low-priority image thread never calls Backend or reads its live document.
+    const auto refresh = [this, backend] { capture(backend); };
+    QObject::connect(backend, &Backend::documentChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::selectionChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::currentSlideChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::layoutPreviewChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::diagramPreviewChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::mediaOptimisationChanged, &m_observer, refresh);
+    capture(backend);
+}
+
+void SlideThumbnailProvider::capture(Backend *backend) {
+    Snapshot next;
+    next.document = backend->document();
+    next.layoutDocument = backend->layoutPreviewDocument();
+    next.layoutOk = backend->layoutPreview().value("ok").toBool();
+    next.diagram = backend->diagramObjects();
+    next.current = backend->currentSlide();
+    next.selected = backend->selectedIds();
+    next.before = backend->m_mediaPreviewSource;
+    next.after = backend->m_mediaPreview;
+    QMutexLocker lock(&m_mutex);
+    m_snapshot = std::move(next);
+}
 
 QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
                                             const QSize &requestedSize) {
+    const auto blank = [&] {
+        const int width = qBound(1, requestedSize.width() > 0 ? requestedSize.width() : 320, 2048);
+        QImage image(width, qMax(1, width * 9 / 16), QImage::Format_RGBA8888);
+        image.fill(Qt::transparent);
+        if (size) *size = image.size();
+        return image;
+    };
+    Snapshot snapshot;
+    { QMutexLocker lock(&m_mutex); snapshot = m_snapshot; }
     if(id.startsWith("media-comparison/")) {
-        auto image=m_backend->mediaComparisonFrame(id.section('/',1,1)=="after",id.section('/',2,2).toDouble());
-        if(!image.isNull() && requestedSize.width()>0) image=image.scaledToWidth(requestedSize.width(),Qt::SmoothTransformation);
+        const auto &object = id.section('/',1,1)=="after" ? snapshot.after : snapshot.before;
+        auto image = object.type == ObjectType::Media ? MediaAsset::frameAt(object, id.section('/',2,2).toDouble()) : object.image;
+        if (image.isNull()) return blank();
+        if(requestedSize.width()>0) image=image.scaledToWidth(requestedSize.width(),Qt::SmoothTransformation);
         if(size) *size=image.size();
         return image;
     }
     if(id.startsWith("diagram/")) {
-        const auto docSize=m_backend->slideSize();
+        const auto docSize=snapshot.document.size;
         const int width=requestedSize.width()>0?requestedSize.width():800;
         const QSize pixels(width,qMax(1,qRound(width*docSize.height()/docSize.width()))); if(size)*size=pixels;
-        return SceneRenderer::render(m_backend->diagramObjects(),docSize,pixels,m_backend->document().theme.colors.value("background"));
+        return SceneRenderer::render(snapshot.diagram,docSize,pixels,snapshot.document.theme.colors.value("background"));
+    }
+    if (id.startsWith("layout-apply/")) {
+        const auto &document = snapshot.layoutDocument;
+        const int index = id.section('/', 1, 1).toInt();
+        if (!snapshot.layoutOk || index < 0 || index >= document.slides.size()) return blank();
+        const auto slide = Design::resolve(document, index);
+        const int width = requestedSize.width() > 0 ? requestedSize.width() : 640;
+        const QSize pixels(width, qRound(width * document.size.height() / document.size.width()));
+        if (size) *size = pixels;
+        return SceneRenderer::render(slide.objects, document.size, pixels, slide.background);
     }
     if(id.startsWith("table/")) {
-        auto slide=Design::resolve(m_backend->document(),id.section('/',1,1).toInt());
-        const auto *found=slide.find(id.section('/',2,2)); if(!found || (found->type!=ObjectType::Table && found->type!=ObjectType::Chart)) return {};
+        auto slide=Design::resolve(snapshot.document,id.section('/',1,1).toInt());
+        const auto *found=slide.find(id.section('/',2,2)); if(!found || (found->type!=ObjectType::Table && found->type!=ObjectType::Chart)) return blank();
         auto o=*found; o.rotation=0; o.rect.moveTopLeft(QPointF(0,0));
         const int width=requestedSize.width()>0?requestedSize.width():800;
         const QSize pixels(width,qMax(1,qRound(width*o.rect.height()/o.rect.width()))); if(size) *size=pixels;
@@ -42,19 +89,21 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
     }
     if(id.startsWith("combine/")) {
         const int operation=id.section('/',1,1).toInt();
-        auto slide=Design::resolve(m_backend->document(),m_backend->currentSlide()); const auto ids=m_backend->selectedIds();
+        auto slide=Design::resolve(snapshot.document,snapshot.current); const auto ids=snapshot.selected;
+        QVector<SceneObject> selected;
+        for (const auto &o : slide.objects) if (ids.contains(o.id)) selected.append(o);
         for(int i=slide.objects.size()-1;i>=0;--i) if(ids.contains(slide.objects[i].id)) slide.objects.removeAt(i);
-        slide.objects+=m_backend->combinedShapes(operation);
-        const auto docSize=m_backend->slideSize(); const int width=requestedSize.width()>0?requestedSize.width():640;
+        slide.objects+=Shape::combine(selected, operation);
+        const auto docSize=snapshot.document.size; const int width=requestedSize.width()>0?requestedSize.width():640;
         const QSize pixels(width,qRound(width*docSize.height()/docSize.width())); if(size) *size=pixels;
         return SceneRenderer::render(slide.objects,docSize,pixels,slide.background);
     }
     if(id.startsWith("resize/")) {
         const auto parts=id.split('/');
-        auto preview=m_backend->document();
+        auto preview=snapshot.document;
         DeckResize::apply(preview,QSizeF(parts.value(1).toDouble(),parts.value(2).toDouble()),parts.value(3).toInt()==0);
         const int index=parts.value(4).toInt();
-        if(index<0 || index>=preview.slides.size()) return {};
+        if(index<0 || index>=preview.slides.size()) return blank();
         const auto slide=Design::resolve(preview,index);
         const int width=requestedSize.width()>0?requestedSize.width():640;
         const QSize pixels(width,qRound(width*preview.size.height()/preview.size.width()));
@@ -65,7 +114,7 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         const auto parts = id.split('/');
         const Document preview = Starter::create(parts.value(1).toInt(),
             QSizeF(parts.value(2).toDouble(), parts.value(3).toDouble()), parts.value(4).toInt());
-        if (preview.slides.isEmpty()) return {};
+        if (preview.slides.isEmpty()) return blank();
         const Slide slide = Design::resolve(preview, 0);
         const int w = requestedSize.width() > 0 ? requestedSize.width() : 640;
         const QSize pixels(w, qRound(w * preview.size.height() / preview.size.width()));
@@ -73,7 +122,7 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         return SceneRenderer::render(slide.objects, preview.size, pixels, slide.background);
     }
     if (id.startsWith("layout/")) {
-        Document preview = m_backend->document();
+        Document preview = snapshot.document;
         Design::ensureDefaults(preview);
         const QString layoutId = id.section('/', 1, 1);
         const int preset = id.section('/', 3, 3).toInt();
@@ -89,7 +138,7 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         return SceneRenderer::render(resolved.objects, preview.size, pixels, resolved.background);
     }
     const int index = id.section(QLatin1Char('/'), 0, 0).toInt();
-    const Document &document = m_backend->document();
+    const Document &document = snapshot.document;
 
     const int width = requestedSize.width() > 0 ? requestedSize.width() : 320;
     const int height = qRound(width * document.size.height() / document.size.width());

@@ -9,11 +9,14 @@
 
 #include <QVariantMap>
 #include <QHash>
+#include <functional>
 #include "core/mediaasset.h"
 
 #include "core/history.h"
 #include "tablemodel.h"
 #include "core/scene.h"
+#include "anim/presentationcache.h"
+#include "core/workers.h"
 
 class PortalFileChooser;
 class MediaPlayback;
@@ -27,6 +30,7 @@ class TableModel;
 // copy of a slide, it asks for the time and lets the evaluator answer.
 class Backend : public QObject {
     Q_OBJECT
+    friend class SlideThumbnailProvider;
     Q_PROPERTY(QVariantMap diagramPreview READ diagramPreview NOTIFY diagramPreviewChanged)
     Q_PROPERTY(QStringList chartNames READ chartNames CONSTANT)
     Q_PROPERTY(TableModel *tableModel READ tableModel CONSTANT)
@@ -41,6 +45,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
+    Q_PROPERTY(QString operation READ operation NOTIFY operationChanged)
 
     Q_PROPERTY(bool includeSkipped READ includeSkipped WRITE setIncludeSkipped NOTIFY deckChanged)
     Q_PROPERTY(qreal time READ time WRITE setTime NOTIFY timeChanged)
@@ -85,6 +90,7 @@ class Backend : public QObject {
     Q_PROPERTY(qreal localTime READ localTime NOTIFY timeChanged)
     Q_PROPERTY(qreal playbackRate READ playbackRate WRITE setPlaybackRate NOTIFY playbackRateChanged)
     Q_PROPERTY(QVariantMap design READ design NOTIFY documentChanged)
+    Q_PROPERTY(QVariantMap layoutPreview READ layoutPreview NOTIFY layoutPreviewChanged)
     Q_PROPERTY(QVariantMap slideDesign READ slideDesign NOTIFY selectionChanged)
 
 public:
@@ -95,8 +101,18 @@ public:
     QString fileName() const;
     QString status() const { return m_status; }
     bool busy() const { return m_busy; }
+    QString operation() const { return m_operation.isEmpty() && m_imageImportRunning ? tr("Importing pictures…") : m_operation; }
+    Q_INVOKABLE void cancelOperation();
+    Q_INVOKABLE void openAsync(const QUrl &url, bool recovery = false);
+    Q_INVOKABLE void saveAsync(const QString &path);
+    Q_INVOKABLE void exportPdfAsync(const QString &path, bool stages = false, bool skipped = false);
+    Q_INVOKABLE bool insertImageAsync(const QUrl &url);
+    Q_INVOKABLE void copyAsync(bool cut = false);
+    Q_INVOKABLE void pasteAsync();
+    Q_INVOKABLE void previewLayoutAsync(const QString &id, int scope, const QVariantMap &mapping, int geometry);
 
     const Document &document() const { return m_document; }
+    const PresentationCache &presentation(bool includeSkipped) const;
     void setDocument(const Document &document);
 
     bool includeSkipped() const { return m_includeSkipped; }
@@ -228,7 +244,7 @@ public:
     Q_INVOKABLE void cutSelected();
     Q_INVOKABLE void paste();
     Q_INVOKABLE void duplicateSelected();
-    Q_INVOKABLE void openRecent(const QString &path) { open(QUrl::fromLocalFile(path)); }
+    Q_INVOKABLE void openRecent(const QString &path) { openAsync(QUrl::fromLocalFile(path)); }
     Q_INVOKABLE void fitSelectedTextBox();
     Q_INVOKABLE void commitTextDocument(const QString &slideId, const QString &id, QQuickTextDocument *editor);
     Q_INVOKABLE int pasteEditorText(QQuickTextDocument *editor, int start, int end);
@@ -342,6 +358,14 @@ public:
     Q_INVOKABLE void applyTheme(int index);
     Q_INVOKABLE void setThemeToken(const QString &name, const QString &value, bool font = false);
     Q_INVOKABLE void applyLayout(const QString &id);
+    QVariantMap layoutPreview() const;
+    const Document &layoutPreviewDocument() const { return m_layoutPreviewDocument; }
+    Q_INVOKABLE void previewLayout(const QString &id, int scope, const QVariantMap &mapping, int geometry);
+    Q_INVOKABLE bool applyLayoutPreview();
+    Q_INVOKABLE void clearLayoutPreview();
+    Q_INVOKABLE void setMasterArtworkVisible(bool visible);
+    Q_INVOKABLE void setMasterFieldsVisible(bool visible);
+    Q_INVOKABLE void setMasterField(const QString &masterId, const QString &key, const QVariant &value);
     Q_INVOKABLE void setSlideBackground(const QString &color, bool reset = false);
     Q_INVOKABLE void resetPlaceholder(bool geometry);
     Q_INVOKABLE QString addMaster(const QString &copyId = QString());
@@ -357,6 +381,9 @@ public:
     Q_INVOKABLE void deletePlaceholder(const QString &id, const QString &role);
 
 signals:
+    void opened();
+    void operationChanged();
+    void layoutPreviewChanged();
     void diagramPreviewChanged();
     void tableEditorRequested();
     void mediaOptimisationRequested();
@@ -388,6 +415,31 @@ signals:
     void guidesChanged();
 
 private:
+    int m_clipboardVersion = 0;
+    bool m_copyPending = false, m_pasteAfterCopy = false;
+    struct ImageRequest {
+        QUrl url;
+        bool replace;
+        QString slide, target;
+        QStringList groups;
+        int generation;
+    };
+    QList<ImageRequest> m_imageQueue;
+    bool m_imageImportRunning = false, m_cancelImages = false;
+    void startImageImport();
+    void commitImageImport(const ImageRequest &request, const SceneObject &image, const QString &error);
+    quint64 m_layoutRequest = 0;
+    bool m_layoutRunning = false;
+    std::function<void()> m_nextLayoutPreview;
+    QString m_operation;
+    std::shared_ptr<Workers::Job> m_operationJob, m_journalJob;
+    bool m_journalRunning = false, m_journalAgain = false;
+    void cancelJournal();
+    bool beginOperation(const QString &label);
+    void endOperation();
+    void acceptOpen(const Document &document, const QUrl &url);
+    bool loadImageAsync(const QUrl &url, bool replace, int index, const QString &target);
+    bool applyImage(SceneObject image, bool replace, int index, const QString &target, const QStringList &groups);
     TableModel *m_tableModel = nullptr;
     QString m_mediaJobLabel;
     SceneObject m_mediaPreviewSource, m_mediaPreview;
@@ -441,6 +493,10 @@ private:
     const SceneObject *selectedObject() const;
 
     Document m_document;
+    mutable PresentationCache m_presentation;
+    mutable int m_presentationRevision = -1, m_navigatorRevision = -1;
+    mutable bool m_presentationSkipped = false;
+    mutable QVariantList m_navigator;
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);
@@ -452,6 +508,11 @@ private:
     QStringList m_selectedIds;
     QStringList m_groupScope;
     QVariantMap m_diagramPreview;
+    QVariantMap m_layoutPreview;
+    Document m_layoutPreviewDocument;
+    int m_layoutPreviewRevision = 0, m_layoutBaseRevision = -1, m_layoutScope = 0;
+    QStringList m_layoutSlideIds;
+    QStringList layoutSlideIds(int scope) const;
     QVector<SceneObject> m_diagramObjects;
     int m_diagramRevision=0,m_diagramBaseRevision=-1;
     QString m_diagramSlide;

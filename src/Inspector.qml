@@ -11,6 +11,7 @@ Rectangle {
     color: Theme.panelBg
 
     property bool stylesExpanded: false
+    signal applyLayoutRequested(string layoutId)
     readonly property var sel: backend.selection
     readonly property bool isMedia: backend.hasSelection && sel.type === "media"
     readonly property bool isImage: backend.hasSelection && sel.type === "image"
@@ -90,7 +91,7 @@ Rectangle {
                 textRole: "name"; valueRole: "id"
                 currentIndex: model.findIndex(l => l.id === backend.slideDesign.layoutId)
                 displayText: currentIndex < 0 ? qsTr("Freeform") : currentText
-                onActivated: backend.applyLayout(currentValue)
+                onActivated: root.applyLayoutRequested(currentValue)
             }
             Button { visible: backend.design.layouts.length === 0; Layout.fillWidth: true; text: qsTr("Add layouts"); icon.name: "layout-template"; onClicked: backend.setupDesign() }
         }
@@ -109,6 +110,21 @@ Rectangle {
             Button { Layout.fillWidth: true; text: qsTr("Use master background"); icon.name: "rotate-ccw"
                      enabled: backend.slideDesign.backgroundOverride ?? false
                      onClicked: backend.setSlideBackground("", true) }
+        }
+        CheckBox {
+            objectName: "showMasterArtwork"
+            Layout.fillWidth: true
+            text: qsTr("Show master artwork")
+            enabled: backend.slideDesign.hasMaster ?? false
+            checked: backend.slideDesign.showMasterObjects ?? true
+            onToggled: backend.setMasterArtworkVisible(checked)
+        }
+        CheckBox {
+            objectName: "showMasterFields"
+            Layout.fillWidth: true; text: qsTr("Show numbers, date and footer")
+            enabled: backend.slideDesign.hasMaster ?? false
+            checked: backend.slideDesign.showMasterFields ?? true
+            onToggled: backend.setMasterFieldsVisible(checked)
         }
         Divider {}
         RowLayout {

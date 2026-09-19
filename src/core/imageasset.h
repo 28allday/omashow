@@ -14,5 +14,7 @@ QSizeF size(const SceneObject &object);
 void copyData(SceneObject &target, const SceneObject &source);
 QString identity(const QByteArray &bytes);
 void paint(QPainter &painter, const SceneObject &object);
+// The shared adjustment implementation, also used by live-view workers.
+QImage displayImage(const SceneObject &object);
 QRectF sourceRect(const SceneObject &object);
 } // namespace ImageAsset

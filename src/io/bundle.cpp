@@ -107,6 +107,8 @@ QByteArray slideToJson(const Slide &slide) {
     json["notes"] = slide.notes;
     json["skipped"] = slide.skipped;
     json["backgroundOverride"] = slide.backgroundOverride;
+    json["showMasterObjects"] = slide.showMasterObjects;
+    json["showMasterFields"] = slide.showMasterFields;
 
     QJsonArray objects;
     for (const SceneObject &object : slide.objects)
@@ -131,12 +133,19 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
     }
 
     const QJsonObject json = document.object();
+    if ((json.contains("showMasterObjects") && !json.value("showMasterObjects").isBool()) ||
+        (json.contains("showMasterFields") && !json.value("showMasterFields").isBool())) {
+        if (ok) *ok = false;
+        return slide;
+    }
     slide.id = json.value(QStringLiteral("id")).toString();
     slide.layoutId = json.value("layoutId").toString();
     slide.sectionId = json.value("sectionId").toString();
     slide.notes = json.value("notes").toString();
     slide.skipped = json.value("skipped").toBool();
     slide.backgroundOverride = json.value("backgroundOverride").toBool();
+    slide.showMasterObjects = json.value("showMasterObjects").toBool(true);
+    slide.showMasterFields = json.value("showMasterFields").toBool(true);
     slide.background = colorFromString(json.value(QStringLiteral("background")).toString(),
                                        QColor(11, 22, 38));
 
@@ -154,8 +163,9 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
 
 } // namespace
 
-QByteArray Bundle::toBytes(const Document &document) {
+QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryMetadata) {
     QVector<Zip::Entry> entries;
+    if (!recoveryMetadata.isEmpty()) entries.append({"recovery.json", recoveryMetadata, true});
 
     QJsonObject manifest;
     manifest[QStringLiteral("version")] = kFormatVersion;
@@ -184,7 +194,8 @@ QByteArray Bundle::toBytes(const Document &document) {
         QJsonArray objects;
         for (const auto &o : m.objects) objects.append(objectToJson(o));
         masters.append(QJsonObject{{"id",m.id},{"name",m.name},{"background",colorToString(m.background)},
-                                   {"backgroundToken",m.backgroundToken},{"objects",objects}});
+                                   {"backgroundToken",m.backgroundToken},{"objects",objects},
+                                   {"fields",QJsonObject::fromVariantMap(Design::fieldProperties(m.fields))}});
     }
     for (const auto &l : document.layouts) {
         QJsonArray objects;
@@ -296,6 +307,14 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
             m.id = json.value("id").toString(); m.name = json.value("name").toString();
             m.background = colorFromString(json.value("background").toString(), m.background);
             m.backgroundToken = json.value("backgroundToken").toString();
+            if (json.contains("fields") && !json.value("fields").isObject()) {
+                result.error = QStringLiteral("Invalid master fields."); return result;
+            }
+            const auto fields = json.value("fields").toObject();
+            for (auto it = fields.begin(); it != fields.end(); ++it)
+                if (!Design::setFieldProperty(m.fields, it.key(), it.value().toVariant())) {
+                    result.error = QStringLiteral("Invalid master field: %1.").arg(it.key()); return result;
+                }
             if (m.id.isEmpty() || masterIds.contains(m.id)) {
                 result.error = QStringLiteral("Invalid or duplicate master."); return result;
             }

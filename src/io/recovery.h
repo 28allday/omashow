@@ -22,6 +22,7 @@
 #include <QVector>
 
 #include "core/scene.h"
+#include "core/workers.h"
 
 namespace Recovery {
 
@@ -37,7 +38,8 @@ struct Journal {
 QString directory();
 
 // Writes (or rewrites) this process's journal. Cheap enough to call on a timer.
-bool write(const Document &document, const QString &originalPath, QString *error = nullptr);
+bool write(const Document &document, const QString &originalPath, QString *error = nullptr,
+           const std::shared_ptr<Workers::Job> &job = {});
 
 // Removes this process's journal — on a clean save and on a clean exit.
 void discard();

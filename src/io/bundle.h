@@ -32,9 +32,10 @@ namespace Bundle {
 // Format 9 adds native tables and cell formatting.
 // Format 10 adds native charts with embedded data and axis/series settings.
 // Format 11 adds explicit local CSV links with cached data. Opening never reads them.
-constexpr int kFormatVersion = 11;
+// Format 12 adds master number/date/footer fields and per-slide artwork/field visibility.
+constexpr int kFormatVersion = 12;
 
-QByteArray toBytes(const Document &document);
+QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 
 struct ReadResult {
     bool ok = false;

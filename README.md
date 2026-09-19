@@ -43,7 +43,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   Codec, duration, poster and portability appear in the inspector. Trim, volume,
   one to 100 plays and automatic/on-next-click cues share the presentation
   timeline. Preview opens Animate; Stop returns to the cue start. Video frames
-  are decoded at the requested time; audio follows pause, seek and playback rate.
+  decode on workers during playback; exports decode the exact requested time.
+  Audio follows pause, seek and playback rate.
   Presenter blank/freeze suppresses audio. Media preflight approves, locates,
   relinks or embeds linked files. Opening a deck resets linked-file permission.
   Import runs in the background with progress/cancel and one undo step.
@@ -75,8 +76,17 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   either direction. Shapes, labels and attached connectors remain grouped and
   editable; outline validation and text-fit checks catch unreadable layouts.
 - **Design:** Midnight, Paper and Grove theme previews; editable colour/font
-  tokens; master management; text/shape placeholder layouts; layout changes
-  that preserve content and local edits. Reset position and style separately.
+  tokens with contrast feedback; master management; text/shape placeholder layouts.
+  Apply layouts to the current, selected or all slides with placeholder mapping,
+  before/after previews and overflow/displacement warnings. Keep local position
+  edits, reapply layout positions or keep every current position. The whole batch
+  undoes together. Reset position and style separately.
+- **Master fields:** Design → Fields controls slide numbers, a saved date and
+  footer text, the starting number and first-slide visibility. Numbers follow
+  deck order, including skipped slides. Fields use the theme's body font and
+  muted colour in a footer strip that follows slide size. In Edit, deselect
+  objects to toggle master artwork or fields for that slide, independently of
+  its background colour. Fields stay as selectable text in PDF.
 - **Animate:** Fade and Rise builds in/out, individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
@@ -102,7 +112,7 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Files:** atomic `.omashow` saves, autosave recovery, PDF export with real
   text, build-stage handouts and headless PNG frame rendering.
 
-Template-pack installation, recording, charts, interchange imports and
+Template-pack installation, recording, interchange imports and
 other release features remain on the roadmap. Text formatting applies to whole
 boxes; per-character styles and advanced typography remain planned.
 
@@ -122,6 +132,28 @@ similarity, and fades unmatched objects. Slide backgrounds blend too.
 On-click groups wait for the speaker in Present. Preview and export use their
 resolved timing. Ordinary PDF pages show authored content, including objects
 with build-outs; build-stage handouts show the animation states.
+
+## Rendering and responsiveness
+
+The live canvas uses vendor-neutral OpenGL through Qt's GPU-backed QPainter on
+Qt 6.9+: Intel, AMD and NVIDIA use the same rendering path. Explicit alternative
+Qt backends retain Qt's raster fallback. Live video probes available VA-API
+devices (including Intel and AMD), then optional CUDA devices, and falls back to
+software if the installed drivers or codec cannot accelerate it. A failed GPU
+does not prevent trying another GPU on a mixed system. No NVIDIA SDK or
+vendor-specific driver is required to build or run OmaShow. Exports keep the
+deterministic software decoder. GPU antialiasing can differ slightly from raster
+exports.
+
+Thumbnail rendering, picture adjustments, file image imports, batch layout previews,
+open/recovery, save/autosave, object/picture clipboard processing and PDF export
+run on workers. Playback caches resolved
+slides, timings and transition matches; text layouts and navigator summaries are
+cached too. Worker queues are bounded, and late file/preview results cannot discard
+newer edits. PDF and deck saves commit atomically.
+
+See [performance checks and limits](docs/performance.md) for reproduction commands,
+measurements and renderer fallback switches.
 
 ## Build and run
 
@@ -190,10 +222,9 @@ Select the audience output in Present. With two displays, the console opens
 on the other output. On one display, full-screen mode shows slides only;
 **Rehearse in windows** also opens the console.
 
-Display routing and swapping pass a two-screen Qt simulation. A physical
-Hyprland test with the desktop and Acer display is still required. This
-session exposed only a fallback output. Hot-plug behavior also needs that
-hardware check.
+Display routing and swapping pass a two-screen Qt simulation. Native rendering
+has been checked on one physical ASUS 4K display. Two physical outputs, mixed
+monitor scaling and unplug/reconnect still need hardware acceptance.
 
 ## Headless export
 
@@ -208,10 +239,11 @@ hardware check.
 
 Without a positional deck, headless exports use the built-in Morph fixture.
 
-The native format is version 11, adding explicit local CSV links and cached data
-to the existing picture, media, shape and playback fields. Versions 1–10 still
+The native format is version 12, adding master number/date/footer fields and
+per-slide artwork/field visibility to the existing local CSV links and cached
+data, picture, media, shape and playback fields. Versions 1–11 still
 open; versions 1 and 2 retain their original text appearance. Older app builds
-refuse version 11 to preserve its features.
+refuse version 12 to preserve its features.
 Identical image assets are stored once under `assets/`, named by a content hash;
 moving the original files cannot break a deck. PDF images use lossless encoding.
 
@@ -223,9 +255,13 @@ moving the original files cannot break a deck. PDF images use lossless encoding.
 
 This builds the app and runs core, persistence, export, QML interaction and
 presentation tests, simulated two-display routing, and the 13-frame rendering
-harness. The current checkpoint passes 149 tests. UI tests run offscreen and mock notification/idle changes. Captured
+harness. The suite includes large-deck responsiveness, background-job cancellation and stale-result checks. UI tests run offscreen and mock notification/idle changes. Captured
 screens are in `build/qa/`; 100% reference captures for tables and charts are in `build/qa/table-scale-100/` and `build/qa/chart-scale-100/`.
-All thirteen QML interaction flows also pass at 125% scaling.
+To include the real Wayland/OpenGL canvas and hardware video check, run
+`OMASHOW_TEST_GPU=1 ./bin/test-all` on a graphical session. The default run uses
+software rendering and skips the hardware-dependent cases. Extended codec,
+scaling, sustained GPU load and isolated package checks are documented in
+[hardware validation](docs/hardware-validation.md).
 
 ## Licence
 

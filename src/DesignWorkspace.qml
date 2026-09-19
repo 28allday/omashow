@@ -12,6 +12,7 @@ RowLayout {
     property string layoutId: ""
     property string roleId: ""
     property int previewTheme: -1
+    signal applyLayoutRequested(string layoutId)
     readonly property var master: info.masters.find(m => m.id === masterId) ?? info.masters[0] ?? ({})
     readonly property var layouts: info.layouts.filter(l => l.masterId === (master.id ?? ""))
     readonly property var layout: layouts.find(l => l.id === layoutId) ?? layouts[0] ?? ({})
@@ -125,8 +126,8 @@ RowLayout {
                 TextField { Layout.fillWidth: true; text: root.layout.name ?? ""; enabled: !!root.layout.id;
                             placeholderText: qsTr("Layout name"); onEditingFinished: backend.setLayoutProperty(root.layout.id, "name", text) }
                 Label { Layout.fillWidth: true; text: qsTr("Used by %1 slides").arg(root.layout.slides ?? 0); color: Theme.textMuted }
-                Button { objectName: "applyLayoutButton"; Layout.fillWidth: true; text: qsTr("Apply to slide %1").arg(backend.currentSlide + 1);
-                         enabled: !!root.layout.id; onClicked: backend.applyLayout(root.layout.id) }
+                Button { objectName: "applyLayoutButton"; Layout.fillWidth: true; text: qsTr("Apply layout…");
+                         enabled: !!root.layout.id; onClicked: root.applyLayoutRequested(root.layout.id) }
                 Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel;
                         text: qsTr("Matching placeholders keep their content and local edits. Unmatched objects stay on the slide.") }
             }
@@ -207,9 +208,11 @@ RowLayout {
             spacing: 0
             TabBar {
                 id: inspectorTabs
+                objectName: "designInspectorTabs"
                 Layout.fillWidth: true
                 TabButton { text: qsTr("Placeholder") }
                 TabButton { text: qsTr("Theme") }
+                TabButton { text: qsTr("Fields") }
             }
             ScrollView {
                 Layout.fillWidth: true
@@ -292,10 +295,25 @@ RowLayout {
                                 label: modelData.charAt(0).toUpperCase() + modelData.slice(1)
                                 Rectangle { implicitWidth: Theme.hControl; implicitHeight: Theme.hControl; radius: Theme.rControl
                                             color: root.info.colors[modelData] ?? Theme.controlBg; border.color: Theme.borderStrong; border.width: Theme.hairline }
-                                TextField { Layout.fillWidth: true; text: root.info.colors[modelData]; font.family: Theme.monoFamily
+                                TextField { objectName: "themeColor_" + modelData; Layout.fillWidth: true; text: root.info.colors[modelData]; font.family: Theme.monoFamily
                                             onEditingFinished: backend.setThemeToken(modelData, text, false) }
                             }
                         }
+                        Heading { text: qsTr("TEXT CONTRAST") }
+                        Repeater {
+                            model: root.info.contrast
+                            Label {
+                                required property var modelData
+                                objectName: "themeContrast_" + modelData.token
+                                Layout.fillWidth: true; wrapMode: Text.Wrap
+                                color: modelData.normal ? Theme.textSecondary : Theme.accent
+                                text: !modelData.known ? qsTr("%1: check against the actual background").arg(modelData.token)
+                                    : qsTr("%1 · %2:1 · %3").arg(modelData.token).arg(modelData.ratio.toFixed(2))
+                                        .arg(modelData.normal ? qsTr("body text") : modelData.large ? qsTr("large text only") : qsTr("low contrast"))
+                            }
+                        }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                                text: qsTr("Theme colours against the theme background. Aim for 4.5:1 for body text and 3:1 for large text. Pictures and local slide colours need a separate check.") }
                         Heading { text: qsTr("THEME FONTS") }
                         Repeater {
                             model: ["heading", "body"]
@@ -308,6 +326,38 @@ RowLayout {
                                            onAccepted: backend.setThemeToken(modelData, editText, true) }
                             }
                         }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: inspectorTabs.currentIndex === 2
+                        enabled: !!root.master.id
+                        Heading { text: qsTr("MASTER FIELDS") }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                                text: qsTr("Shared by layouts using %1.").arg(root.master.name ?? "") }
+                        CheckBox { objectName: "masterShowNumber"; text: qsTr("Slide numbers"); checked: root.master.fields?.showNumber ?? false
+                                   onToggled: backend.setMasterField(root.master.id,"showNumber",checked) }
+                        FieldRow {
+                            label: qsTr("Start at")
+                            SpinBox { objectName: "masterFirstNumber"; Layout.fillWidth: true; from: 0; to: 999999; editable: true
+                                      value: root.master.fields?.firstNumber ?? 1
+                                      onValueModified: backend.setMasterField(root.master.id,"firstNumber",value) }
+                        }
+                        CheckBox { objectName: "masterShowDate"; text: qsTr("Date"); checked: root.master.fields?.showDate ?? false
+                                   onToggled: backend.setMasterField(root.master.id,"showDate",checked) }
+                        TextField { objectName: "masterDate"; Layout.fillWidth: true; text: root.master.fields?.date ?? ""; maximumLength: 80
+                                    placeholderText: qsTr("Date as it should appear")
+                                    onEditingFinished: backend.setMasterField(root.master.id,"date",text) }
+                        CheckBox { objectName: "masterShowFooter"; text: qsTr("Footer"); checked: root.master.fields?.showFooter ?? false
+                                   onToggled: backend.setMasterField(root.master.id,"showFooter",checked) }
+                        TextField { objectName: "masterFooter"; Layout.fillWidth: true; text: root.master.fields?.footer ?? ""; maximumLength: 500
+                                    placeholderText: qsTr("Company, event or other footer text")
+                                    onEditingFinished: backend.setMasterField(root.master.id,"footer",text) }
+                        CheckBox { objectName: "masterHideFirst"; text: qsTr("Hide fields on the first slide"); checked: root.master.fields?.hideOnFirst ?? false
+                                   onToggled: backend.setMasterField(root.master.id,"hideOnFirst",checked) }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                                text: qsTr("Numbers follow deck order, including skipped slides. The date is saved as text. Fields use the theme's body font and muted colour along the bottom edge; they follow changes to slide size.") }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                                text: qsTr("To hide fields on an individual slide, deselect objects in Edit and switch off ‘Show numbers, date and footer’.") }
                     }
                 }
             }
