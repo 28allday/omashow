@@ -1,0 +1,176 @@
+#pragma once
+
+// Authored content and shared design definitions. The design resolver applies
+// inheritance before the deterministic animation evaluator produces a frame.
+
+#include <QColor>
+#include <QImage>
+#include <QPicture>
+#include <QRectF>
+#include <QSizeF>
+#include <QString>
+#include <QStringList>
+#include <QMap>
+#include <QVector>
+#include <QVariantList>
+#include <memory>
+
+#include "anim/build.h"
+#include "core/tabledata.h"
+#include "core/chartdata.h"
+#include "core/datasource.h"
+
+enum class ObjectType { Rect, Text, Image, Media, Table, Chart };
+
+// One thing on a slide. This doubles as the *resolved state* of that thing at a
+// given time: the evaluator returns a copy with the animated fields changed, so
+// there is exactly one shape flowing from document to renderer.
+struct SceneObject {
+    QString id;                       // stable across slides — this is what Morph matches on
+    ObjectType type = ObjectType::Rect;
+    QRectF rect;                      // in document coordinates
+    qreal rotation = 0.0;             // degrees
+    qreal opacity = 1.0;
+    QColor fill = QColor(255, 255, 255);
+    qreal cornerRadius = 0.0;
+
+    int linkKind = 0;
+    QString linkTarget;
+    bool connector = false;
+    QString connectorFrom, connectorTo;
+    QPointF connectorStart, connectorEnd;
+    int connectorFromSide = 0, connectorToSide = 0, connectorRoute = 1;
+    bool connectorArrowStart = false, connectorArrowEnd = true;
+    int shapeKind = 0; // Shape::names(), or 99 for editable paths
+    QVariantList pathData;
+    bool pathWinding = false;
+    int fillStyle = 0; // solid, linear, radial, pattern, picture, none
+    QColor fillSecondary = QColor(255,255,255);
+    qreal fillAngle = 0;
+    int patternStyle = 9; // Qt patterns from Dense1 through DiagCross
+    QColor strokeColor = QColor(0,0,0);
+    qreal strokeWidth = 0;
+    int strokeStyle = 0, strokeJoin = 1, strokeCap = 1;
+    bool shadowEnabled = false;
+    QColor shadowColor = QColor(0,0,0,100);
+    qreal shadowX = 8, shadowY = 8;
+
+    // Embedded raster data is implicitly shared between snapshots and duplicates.
+    std::shared_ptr<const SceneObject> imageOriginal;
+    QImage image;
+    QByteArray imageData;
+    QString imageId;
+    QString imageFormat = QStringLiteral("png");
+    QPicture vectorPicture = QPicture();
+    QSizeF vectorSize;
+    QRectF imageCrop = QRectF(0,0,1,1); // normalized source region
+    int imageMode = 0; // fit, fill, stretch
+    qreal imageFocalX = .5, imageFocalY = .5;
+    int imageMask = 0; // rectangle, ellipse, rounded, hexagon, heart
+    qreal imageBrightness = 0, imageContrast = 1, imageSaturation = 1, imageTintAmount = 0;
+    QColor imageTint = QColor(0,0,0);
+
+    // Media bytes are shared by history snapshots. Local read permission and
+    // playback position are derived session state, never written into a deck.
+    std::shared_ptr<const SceneObject> mediaOriginal;
+    QByteArray mediaData;
+    QString mediaId, mediaPath, mediaName, mediaContainer, mediaCodec;
+    qint64 mediaBytes = 0, mediaModified = 0;
+    qreal mediaDuration = 0, mediaTrimStart = 0, mediaTrimEnd = 0;
+    qreal mediaVolume = 1;
+    int mediaLoops = 1;
+    bool mediaVideo = false, mediaAudio = false;
+    qreal mediaPosition = -1;
+    bool mediaActive = false, mediaReadAllowed = false;
+
+    TableData table;
+    ChartData chart;
+    DataSource dataSource;
+
+    // Text only
+    QString text;
+    qreal fontSize = 48.0;
+    int fontWeight = 400;
+    QColor textColor = QColor(255, 255, 255);
+    bool uppercase = false;
+    qreal letterSpacing = 0.0;
+    bool italic = false, underline = false;
+    int textAlign = 0;       // left, centre, right, justify
+    int verticalAlign = 1;   // top, middle, bottom; middle preserves older decks
+    qreal lineHeight = 100;  // percentage
+    qreal paragraphSpacing = 0, textIndent = 0;
+    int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
+    int listStart = 1;
+    int textFit = 0;         // clip with overflow warning, shrink to fit
+    QString fontFamily = QStringLiteral("Inter");
+    QString fillToken, textColorToken, fontToken;
+    QString placeholderId;
+    QStringList overrides;
+    QStringList groups; // outermost to innermost
+    bool locked = false;
+    bool hidden = false;
+};
+
+struct Slide {
+    QString id;
+    QColor background = QColor(12, 16, 24);
+    QVector<SceneObject> objects;
+    Timeline timeline;
+    QString layoutId;
+    QString sectionId;
+    QString notes;
+    bool backgroundOverride = false;
+    bool skipped = false;
+
+    const SceneObject *find(const QString &id) const;
+    SceneObject *find(const QString &id);
+
+    // Topmost object containing the point, or empty. Later objects draw over
+    // earlier ones, so hit testing walks backwards.
+    QString objectAt(const QPointF &point) const;
+};
+
+struct DeckTheme {
+    QString name = QStringLiteral("Midnight");
+    QMap<QString, QColor> colors = {
+        {QStringLiteral("background"), QColor(12, 16, 24)},
+        {QStringLiteral("foreground"), QColor(231, 237, 247)},
+        {QStringLiteral("muted"), QColor(167, 177, 193)},
+        {QStringLiteral("accent"), QColor(39, 194, 255)}
+    };
+    QMap<QString, QString> fonts = {
+        {QStringLiteral("heading"), QStringLiteral("Inter")},
+        {QStringLiteral("body"), QStringLiteral("Inter")}
+    };
+};
+
+struct Master {
+    QString id, name;
+    QColor background = QColor(12, 16, 24);
+    QString backgroundToken = QStringLiteral("background");
+    QVector<SceneObject> objects;
+};
+
+struct SlideLayout {
+    QString id, name, masterId;
+    // Stable ids identify placeholder roles across layouts.
+    QVector<SceneObject> placeholders;
+};
+
+struct Section { QString id, name; };
+
+struct ObjectStyle { QString id, name; SceneObject appearance; };
+
+struct Document {
+    QVector<ObjectStyle> objectStyles;
+    QSizeF size = QSizeF(1920, 1080);
+    QVector<Slide> slides;
+    QVector<Section> sections;
+    DeckTheme theme;
+    QVector<Master> masters;
+    QVector<SlideLayout> layouts;
+
+    // Seconds spent on the cross-slide transition into each slide after the
+    // first. Gate 0 keeps one global value; the real model puts it per slide.
+    qreal transitionDuration = 0.9;
+};

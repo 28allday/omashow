@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=OmaShow
+GenericName=Presentation Editor
+Comment=Make and present slide decks
+Exec=omashow %f
+Icon=omashow
+Terminal=false
+Categories=Office;Presentation;
+Keywords=slides;presentation;deck;omarchy;
+StartupWMClass=omashow

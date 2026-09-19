@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+# Render frames from the deck without a window.
+#
+#   bin/shot [outdir] [times] [width]
+#
+# times is a comma-separated list of seconds; omit it for an even spread across
+# the whole deck. Everything visual in this app is checked through here rather
+# than by watching a window, which is also why the video encoder gets this for
+# free later.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OUT="${1:-$ROOT/build/shots}"
+TIMES="${2:-}"
+WIDTH="${3:-1280}"
+
+if [ ! -x "$ROOT/build/omashow" ]; then
+  "$ROOT/bin/build" >/dev/null
+fi
+
+rm -rf "$OUT"
+mkdir -p "$OUT"
+
+# QT_FORCE_STDERR_LOGGING or an offscreen run swallows every qWarning and you
+# end up debugging blind.
+QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME= QT_QUICK_BACKEND=software QT_FORCE_STDERR_LOGGING=1 \
+  "$ROOT/build/omashow" --shot "$OUT" --width "$WIDTH" \
+  ${TIMES:+--times "$TIMES"}
+
+echo "Frames in $OUT"

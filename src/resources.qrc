@@ -1,0 +1,72 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="StartCentre.qml">StartCentre.qml</file>
+        <file alias="SlideSizeDialog.qml">SlideSizeDialog.qml</file>
+        <file alias="Main.qml">Main.qml</file>
+        <file alias="AudienceWindow.qml">AudienceWindow.qml</file>
+        <file alias="PresenterConsole.qml">PresenterConsole.qml</file>
+        <file alias="PresenterPanel.qml">PresenterPanel.qml</file>
+        <file alias="AnimateWorkspace.qml">AnimateWorkspace.qml</file>
+        <file alias="DesignWorkspace.qml">DesignWorkspace.qml</file>
+        <file alias="Theme.qml">Theme.qml</file>
+        <file alias="EditCanvas.qml">EditCanvas.qml</file>
+        <file alias="Inspector.qml">Inspector.qml</file>
+        <file alias="NumField.qml">NumField.qml</file>
+        <file>SectionLabel.qml</file>
+        <file>FieldRow.qml</file>
+        <file>Card.qml</file>
+        <file alias="SlideNavigator.qml">SlideNavigator.qml</file>
+        <file alias="ShapeGallery.qml">ShapeGallery.qml</file>
+        <file alias="ShapeTools.qml">ShapeTools.qml</file>
+        <file alias="CombineShapesDialog.qml">CombineShapesDialog.qml</file>
+        <file alias="PathTools.qml">PathTools.qml</file>
+        <file alias="PictureAdjustments.qml">PictureAdjustments.qml</file>
+        <file alias="ConnectorTools.qml">ConnectorTools.qml</file>
+        <file alias="LinkDialog.qml">LinkDialog.qml</file>
+        <file alias="CropOverlay.qml">CropOverlay.qml</file>
+        <file>MediaTools.qml</file>
+    <file>MediaPreflight.qml</file>
+    <file>MediaOptimisation.qml</file>
+    <file>TableEditor.qml</file>
+    <file>ChartTools.qml</file>
+    <file>DiagramDialog.qml</file>
+</qresource>
+    <qresource prefix="/qt/qml/OmaShowStyle">
+        <file alias="ApplicationWindow.qml">style/OmaShowStyle/ApplicationWindow.qml</file>
+        <file alias="Button.qml">style/OmaShowStyle/Button.qml</file>
+        <file alias="CheckBox.qml">style/OmaShowStyle/CheckBox.qml</file>
+        <file alias="ComboBox.qml">style/OmaShowStyle/ComboBox.qml</file>
+        <file alias="Dialog.qml">style/OmaShowStyle/Dialog.qml</file>
+        <file alias="DialogButtonBox.qml">style/OmaShowStyle/DialogButtonBox.qml</file>
+        <file alias="Frame.qml">style/OmaShowStyle/Frame.qml</file>
+        <file alias="ItemDelegate.qml">style/OmaShowStyle/ItemDelegate.qml</file>
+        <file alias="Label.qml">style/OmaShowStyle/Label.qml</file>
+        <file alias="Menu.qml">style/OmaShowStyle/Menu.qml</file>
+        <file alias="MenuBar.qml">style/OmaShowStyle/MenuBar.qml</file>
+        <file alias="MenuBarItem.qml">style/OmaShowStyle/MenuBarItem.qml</file>
+        <file alias="MenuItem.qml">style/OmaShowStyle/MenuItem.qml</file>
+        <file alias="MenuSeparator.qml">style/OmaShowStyle/MenuSeparator.qml</file>
+        <file alias="Pane.qml">style/OmaShowStyle/Pane.qml</file>
+        <file alias="Popup.qml">style/OmaShowStyle/Popup.qml</file>
+        <file alias="ProgressBar.qml">style/OmaShowStyle/ProgressBar.qml</file>
+        <file alias="RadioButton.qml">style/OmaShowStyle/RadioButton.qml</file>
+        <file alias="ScrollBar.qml">style/OmaShowStyle/ScrollBar.qml</file>
+        <file alias="ScrollIndicator.qml">style/OmaShowStyle/ScrollIndicator.qml</file>
+        <file alias="ScrollView.qml">style/OmaShowStyle/ScrollView.qml</file>
+        <file alias="Slider.qml">style/OmaShowStyle/Slider.qml</file>
+        <file alias="SpinBox.qml">style/OmaShowStyle/SpinBox.qml</file>
+        <file alias="Switch.qml">style/OmaShowStyle/Switch.qml</file>
+        <file alias="TabBar.qml">style/OmaShowStyle/TabBar.qml</file>
+        <file alias="TabButton.qml">style/OmaShowStyle/TabButton.qml</file>
+        <file alias="TextArea.qml">style/OmaShowStyle/TextArea.qml</file>
+        <file alias="TextField.qml">style/OmaShowStyle/TextField.qml</file>
+        <file alias="ToolButton.qml">style/OmaShowStyle/ToolButton.qml</file>
+        <file alias="ToolSeparator.qml">style/OmaShowStyle/ToolSeparator.qml</file>
+        <file alias="ToolTip.qml">style/OmaShowStyle/ToolTip.qml</file>
+        <file alias="qmldir">style/OmaShowStyle/qmldir</file>
+    </qresource>
+    <qresource prefix="/ui">
+        <file alias="Icon.qml">ui/Icon.qml</file>
+        <file alias="icons/Icons.qml">ui/icons/Icons.qml</file>
+    </qresource>
+</RCC>

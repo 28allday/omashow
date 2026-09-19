@@ -1,0 +1,30 @@
+# Lucide icon names used by OmaShow. Add a name, then run tools/gen-icons.py.
+
+# workspaces
+pencil palette sparkles message-square-text presentation share layout-grid
+
+# file and history
+house folder-open save undo-2 redo-2 copy scissors clipboard-paste trash-2
+
+# insert
+plus square-plus layout-template type shapes image table chart-column workflow
+clapperboard message-square link spline pen-tool pencil-line
+
+# arrange
+layers group ungroup lock lock-open eye eye-off bring-to-front send-to-back
+align-start-vertical align-center-vertical align-end-vertical
+align-start-horizontal align-center-horizontal align-end-horizontal
+align-horizontal-distribute-center align-vertical-distribute-center
+arrow-up arrow-down rotate-cw crop magnet move scan
+
+# navigation and chrome
+chevron-down chevron-right chevron-left chevron-up chevrons-up-down
+menu ellipsis search x check minus settings keyboard info circle-alert
+triangle-alert circle-check list list-tree rows-3 panel-bottom notebook-pen
+
+# animate and present
+play pause square skip-back skip-forward step-back step-forward
+zoom-in zoom-out maximize scan-search route zap timer clock
+monitor arrow-left-right circle-stop rotate-ccw snowflake mouse-pointer-2
+circle-dot eraser mic volume-2 sun moon arrow-left arrow-right radio
+file-text file-image file-play file-output diamond

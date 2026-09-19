@@ -1,0 +1,21 @@
+/build/
+/build-tests/
+/pkg/
+/pkgbuild/pkg/
+/pkgbuild/src/
+*.pkg.tar.*
+*.src.tar.*
+*.o
+*.moc
+moc_*.cpp
+qrc_*.cpp
+.qmake.stash
+Makefile
+
+# Working notes, design sources and local snapshots — never tracked
+*.local.md
+/design-package/
+/.checkpoints/
+*.zip
+*-dev.desktop
+__pycache__/

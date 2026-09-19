@@ -1,0 +1,612 @@
+#include "backend.h"
+#include "mediaplayback.h"
+#include "core/design.h"
+
+#include <QDir>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QFileInfo>
+#include <QImage>
+
+#include "anim/presentation.h"
+#include "core/edit.h"
+#include "core/snap.h"
+#include "filepicker.h"
+#include "fixture.h"
+#include "io/bundle.h"
+#include "io/pdf.h"
+#include "io/recovery.h"
+#include "render/scenerenderer.h"
+
+Backend::Backend(QObject *parent)
+    : QObject(parent), m_chooser(new PortalFileChooser(this)) {
+  connect(this,&Backend::documentChanged,this,&Backend::slideSelectionChanged);
+  connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
+  connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
+  connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
+  connect(m_chooser, &PortalFileChooser::selected, this,
+          [this](const QUrl &url) {
+            const Pending pending = m_pending;
+            m_pending = Pending::None;
+            QString path = url.toLocalFile();
+
+            const auto ensureSuffix = [&path](const QString &suffix) {
+              if (!path.endsWith(suffix, Qt::CaseInsensitive))
+                path += suffix;
+            };
+
+            switch (pending) {
+            case Pending::SaveDeck:
+              ensureSuffix(QStringLiteral(".omashow"));
+              saveTo(path);
+              break;
+            case Pending::ExportPdf:
+              ensureSuffix(QStringLiteral(".pdf"));
+              exportPdf(path, m_pendingPdfStages, m_pendingPdfSkipped);
+              break;
+            case Pending::InsertMedia:
+            case Pending::ReplaceMedia:
+              if(m_mediaPickerGeneration==m_documentGeneration)
+                loadMedia(url,m_mediaPickerEmbed,m_mediaPickerSlide,pending==Pending::ReplaceMedia ? m_mediaPickerTarget : QString());
+              break;
+            case Pending::InsertImage:
+            case Pending::ReplaceImage: {
+              int index=-1;
+              for(int i=0;i<m_document.slides.size();++i) if(m_document.slides.at(i).id==m_imageSlideId) index=i;
+              loadImage(url,pending==Pending::ReplaceImage,index,m_imageTargetId);
+              break;
+            }
+            case Pending::None:
+              open(url);
+              break;
+            }
+          });
+  connect(m_chooser, &PortalFileChooser::canceled, this,
+          [this] {
+            const bool saving = m_pending == Pending::SaveDeck;
+            m_pending = Pending::None;
+            if (saving) emit saveCanceled();
+          });
+  connect(m_chooser, &PortalFileChooser::failed, this,
+          [this](const QString &message) {
+            setStatus(message);
+            emit failed(message);
+          });
+
+  m_comparisonAudio=new MediaPlayback(this);
+  connect(m_comparisonAudio,&MediaPlayback::failed,this,&Backend::failed);
+  m_comparisonTicker.setInterval(40);
+  connect(&m_comparisonTicker,&QTimer::timeout,this,&Backend::syncMediaComparison);
+  m_mediaPlayback=new MediaPlayback(this);
+  connect(m_mediaPlayback,&MediaPlayback::failed,this,&Backend::failed);
+  connect(this,&Backend::timeChanged,this,&Backend::syncMedia);
+  connect(this,&Backend::playingChanged,this,&Backend::syncMedia);
+  connect(this,&Backend::playbackRateChanged,this,&Backend::syncMedia);
+  connect(this,&Backend::documentChanged,this,&Backend::syncMedia);
+  m_mediaProgressTimer.setInterval(100);
+  connect(&m_mediaProgressTimer,&QTimer::timeout,this,&Backend::mediaJobChanged);
+  connect(this,&Backend::documentChanged,this,&Backend::mediaJobChanged);
+
+  // The CLI fixture remains available; the GUI opens the Start centre.
+  resetMediaSession();
+  m_document = Fixture::twoSlideMorph();
+  m_history.reset(m_document);
+  pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
+
+  m_ticker.setInterval(8); // ask often; the monotonic clock decides the time
+  connect(&m_ticker, &QTimer::timeout, this, &Backend::tick);
+
+  // Autosave is debounced rather than periodic: it lands a few seconds after
+  // you stop changing things, so a drag does not write the journal sixty
+  // times and a pause in typing is never more than this far from safe.
+  m_autosave.setSingleShot(true);
+  m_autosave.setInterval(4000);
+  connect(&m_autosave, &QTimer::timeout, this, &Backend::writeJournal);
+  connect(this, &Backend::documentChanged, this, &Backend::scheduleAutosave);
+}
+
+Backend::~Backend() {
+  cancelMediaJob();
+  // A clean exit leaves no journal behind — otherwise every launch would
+  // offer to recover from the last ordinary quit.
+  Recovery::discard();
+}
+
+void Backend::scheduleAutosave() {
+  if (m_modified)
+    m_autosave.start();
+}
+
+void Backend::writeJournal() {
+  if (!m_modified)
+    return;
+  QString error;
+  if (!Recovery::write(m_document, m_fileUrl.toLocalFile(), &error)) {
+    // A journal that cannot be written is worth saying out loud — the user
+    // is working without a net and has no other way to find out.
+    setStatus(tr("Autosave failed: %1").arg(error));
+  }
+}
+
+QVariantList Backend::recoveryCandidates() const {
+  QVariantList list;
+  const QVector<Recovery::Journal> journals = Recovery::orphans();
+  for (const Recovery::Journal &journal : journals) {
+    QVariantMap map;
+    map[QStringLiteral("journalPath")] = journal.journalPath;
+    map[QStringLiteral("originalPath")] = journal.originalPath;
+    map[QStringLiteral("name")] = journal.displayName();
+    map[QStringLiteral("savedAt")] =
+        journal.savedAt.toLocalTime().toString(QStringLiteral("d MMM, HH:mm"));
+    list.append(map);
+  }
+  return list;
+}
+
+void Backend::recoverFrom(const QString &journalPath) {
+  const Bundle::ReadResult result = Bundle::load(journalPath);
+  if (!result.ok) {
+    setStatus(result.error);
+    emit failed(result.error);
+    return;
+  }
+
+  const QVector<Recovery::Journal> journals = Recovery::orphans();
+  QString originalPath;
+  for (const Recovery::Journal &journal : journals) {
+    if (journal.journalPath == journalPath)
+      originalPath = journal.originalPath;
+  }
+
+  resetMediaSession();
+  m_document = result.document;
+  m_history.reset(m_document);
+  pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
+  m_currentSlide = 0;
+  m_collapsedSections.clear();
+  resetSlideSelection();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_time = 0.0;
+  // Recovered work comes back UNSAVED. The last explicit save is still on
+  // disk untouched until the user decides to replace it.
+  m_modified = true;
+  setFileUrl(originalPath.isEmpty() ? QUrl()
+                                    : QUrl::fromLocalFile(originalPath));
+  ++m_revision;
+  emit currentSlideChanged();
+  emit selectionChanged();
+  emit timeChanged();
+  emit documentChanged();
+  emit deckChanged();
+
+  activateDocument();
+  Recovery::forget(journalPath);
+  setStatus(originalPath.isEmpty()
+                ? tr("Recovered unsaved work — not saved anywhere yet")
+                : tr("Recovered — not yet written over %1").arg(fileName()));
+}
+
+void Backend::discardRecovery(const QString &journalPath) {
+  Recovery::forget(journalPath);
+}
+
+QString Backend::displayNameFor(const QUrl &url) {
+  if (url.isEmpty())
+    return QStringLiteral("Untitled");
+  if (url.isLocalFile()) {
+    const QString name = QFileInfo(url.toLocalFile()).fileName();
+    if (!name.isEmpty())
+      return name;
+  }
+  const QString name = url.fileName();
+  return name.isEmpty() ? QStringLiteral("Untitled") : name;
+}
+
+QString Backend::fileName() const { return displayNameFor(m_fileUrl); }
+
+void Backend::openDialog() {
+  m_pending = Pending::None;
+  m_chooser->openFile(tr("Open deck"), tr("OmaShow decks"),
+                      {QStringLiteral("*.omashow")});
+}
+
+void Backend::open(const QUrl &url) {
+  if (!url.isLocalFile()) {
+    setStatus(tr("Only local files can be opened."));
+    return;
+  }
+  const QString path = url.toLocalFile();
+  if (!QFileInfo::exists(path)) {
+    setStatus(tr("%1 is gone.").arg(displayNameFor(url)));
+    emit recentsChanged(); emit failed(status());
+    return;
+  }
+
+  const Bundle::ReadResult result = Bundle::load(path);
+  if (!result.ok) {
+    // Opening a deck never damages it, and a failure never replaces what is
+    // already on screen.
+    setStatus(result.error);
+    emit failed(result.error);
+    return;
+  }
+
+  resetMediaSession();
+  m_document = result.document;
+  m_history.reset(m_document);
+  pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
+  m_currentSlide = 0;
+  m_collapsedSections.clear();
+  resetSlideSelection();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_time = 0.0;
+  m_modified = false;
+  setFileUrl(url);
+  ++m_revision;
+  emit currentSlideChanged();
+  emit selectionChanged();
+  emit timeChanged();
+  emit documentChanged();
+  emit deckChanged();
+  activateDocument();
+  rememberRecent(path);
+  m_autosave.stop(); Recovery::discard();
+  setStatus(tr("Opened %1").arg(fileName()));
+}
+
+void Backend::newDeck() { createDeck(0, 1920, 1080); }
+
+void Backend::save() {
+  if (m_fileUrl.isLocalFile())
+    saveTo(m_fileUrl.toLocalFile());
+  else
+    saveAsDialog();
+}
+
+void Backend::saveAsDialog() {
+  m_pending = Pending::SaveDeck;
+  const QString suggested =
+      m_fileUrl.isLocalFile() ? fileName() : QStringLiteral("Untitled.omashow");
+  m_chooser->saveFile(tr("Save deck"), suggested, tr("OmaShow decks"),
+                      {QStringLiteral("*.omashow")});
+}
+
+bool Backend::saveTo(const QString &path) {
+  QString error;
+  if (!Bundle::save(m_document, path, &error)) {
+    setStatus(tr("Could not save: %1").arg(error));
+    emit failed(error);
+    return false;
+  }
+  m_modified = false;
+  m_autosave.stop();
+  // The deck on disk is now the truth; the journal has nothing left to add.
+  Recovery::discard();
+  setFileUrl(QUrl::fromLocalFile(path));
+  emit documentChanged();
+  rememberRecent(path);
+  setStatus(tr("Saved %1").arg(fileName()));
+  emit saved();
+  return true;
+}
+
+void Backend::setStatus(const QString &status) {
+  if (m_status == status)
+    return;
+  m_status = status;
+  emit statusChanged();
+}
+
+void Backend::setBusy(bool busy) {
+  if (m_busy == busy)
+    return;
+  m_busy = busy;
+  emit busyChanged();
+}
+
+void Backend::setFileUrl(const QUrl &url) {
+  if (m_fileUrl == url)
+    return;
+  m_fileUrl = url;
+  emit fileUrlChanged();
+}
+
+void Backend::setDocument(const Document &document) {
+  activateDocument();
+  pause();
+  resetMediaSession();
+  m_document = document;
+  m_history.reset(m_document);
+  pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
+  m_currentSlide = 0;
+  m_collapsedSections.clear();
+  resetSlideSelection();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_modified = false;
+  m_time = 0;
+  ++m_revision;
+  emit currentSlideChanged();
+  emit selectionChanged();
+  emit timeChanged();
+  emit documentChanged();
+  emit deckChanged();
+}
+
+void Backend::setIncludeSkipped(bool value) {
+  if(m_includeSkipped==value) return;
+  pause(); m_includeSkipped=value; m_time=qMin(m_time,duration());
+  emit deckChanged(); emit timeChanged(); emit selectionChanged();
+}
+qreal Backend::duration() const { return Presentation::duration(m_document,m_includeSkipped); }
+
+int Backend::slideIndex() const {
+  return Presentation::frameAt(m_document, m_time,m_includeSkipped).slideIndex;
+}
+
+bool Backend::inTransition() const {
+  return Presentation::frameAt(m_document, m_time,m_includeSkipped).inTransition;
+}
+
+QString Backend::timecode() const {
+  return QStringLiteral("%1 / %2")
+      .arg(m_time, 0, 'f', 2)
+      .arg(duration(), 0, 'f', 2);
+}
+
+void Backend::setTime(qreal time) {
+  time = qBound(0.0, time, duration());
+  if (qFuzzyCompare(m_time + 1.0, time + 1.0))
+    return;
+  m_time = time;
+  emit timeChanged();
+}
+
+void Backend::play() {
+  m_playTo = -1.0;
+  if (m_playing)
+    return;
+  if (m_time >= duration())
+    m_time = 0.0;
+  m_playFrom = m_time;
+  m_playing = true;
+  emit playingChanged();
+  // Player creation may initialize an audio backend. That setup time is not
+  // presentation time: start the monotonic clock after synchronous listeners.
+  if(m_playing) { m_clock.restart(); m_ticker.start(); }
+}
+
+void Backend::pause() {
+  if (!m_playing)
+    return;
+  m_ticker.stop();
+  m_playing = false;
+  emit playingChanged();
+}
+
+void Backend::togglePlay() { m_playing ? pause() : play(); }
+
+void Backend::restart() {
+  pause();
+  setTime(0.0);
+  play();
+}
+
+void Backend::step(qreal seconds) {
+  pause();
+  setTime(m_time + seconds);
+}
+
+void Backend::tick() {
+  const qreal end = m_playTo >= 0 ? m_playTo : duration();
+  setTime(qMin(end, m_playFrom + m_clock.elapsed() / 1000.0 * m_playbackRate));
+  if (m_time >= end)
+    pause();
+}
+
+bool Backend::renderFrame(qreal time, const QString &path, int width,bool includeSkipped) const {
+  if (Presentation::slideIndices(m_document,includeSkipped).isEmpty() || m_document.size.isEmpty())
+    return false;
+
+  const int height =
+      qRound(width * m_document.size.height() / m_document.size.width());
+  const QColor background = Presentation::backgroundAt(m_document, time, includeSkipped);
+
+  const QImage image =
+      SceneRenderer::render(statesAt(time, includeSkipped),
+                            m_document.size, QSize(width, height), background);
+
+  QDir().mkpath(QFileInfo(path).absolutePath());
+  return image.save(path, "PNG");
+}
+
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+
+void Backend::touch() {
+  ++m_revision;
+  m_modified = true;
+  emit documentChanged();
+  emit deckChanged();
+  emit selectionChanged();
+}
+
+SceneObject *Backend::selectedObject() {
+  if (m_selectedId.isEmpty() || m_currentSlide < 0 ||
+      m_currentSlide >= m_document.slides.size())
+    return nullptr;
+  return m_document.slides[m_currentSlide].find(m_selectedId);
+}
+
+const SceneObject *Backend::selectedObject() const {
+  if (m_selectedId.isEmpty() || m_currentSlide < 0 ||
+      m_currentSlide >= m_document.slides.size())
+    return nullptr;
+  return m_document.slides.at(m_currentSlide).find(m_selectedId);
+}
+
+bool Backend::hasSelection() const { return !selectedIds().isEmpty(); }
+
+qreal Backend::settledTime(int slideIndex) const {
+  if (slideIndex < 0 || slideIndex >= m_document.slides.size())
+    return 0.0;
+  return m_document.slides.at(slideIndex).timeline.duration();
+}
+
+void Backend::setCurrentSlide(int index) {
+  resetSlideSelection();
+  index = qBound(0, index, qMax(0, m_document.slides.size() - 1));
+  if (m_currentSlide == index)
+    return;
+  m_currentSlide = index;
+  m_groupScope.clear();
+  clearSelection();
+  emit selectionChanged();
+  emit currentSlideChanged();
+}
+
+void Backend::addSlide() {
+  m_history.begin(m_document, QStringLiteral("Add slide"));
+  const int at = Edit::addSlide(m_document, m_currentSlide);
+  m_history.commit();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_currentSlide = at;
+  resetSlideSelection();
+  emit currentSlideChanged();
+  touch();
+}
+
+void Backend::duplicateSlide() {
+  m_history.begin(m_document, QStringLiteral("Duplicate slide"));
+  const int at = Edit::duplicateSlide(m_document, m_currentSlide);
+  m_history.commit();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_currentSlide = at;
+  resetSlideSelection();
+  emit currentSlideChanged();
+  touch();
+}
+
+void Backend::deleteSlide() {
+  resetSlideSelection();
+  m_history.begin(m_document, QStringLiteral("Delete slide"));
+  if (!Edit::deleteSlide(m_document, m_currentSlide)) {
+    m_history.abandon();
+    setStatus(QStringLiteral("A deck keeps at least one slide."));
+    return;
+  }
+  m_history.commit();
+  m_selectedId.clear();
+  m_selectedIds.clear();
+  m_groupScope.clear();
+  m_currentSlide = qBound(0, m_currentSlide, m_document.slides.size() - 1);
+  emit currentSlideChanged();
+  touch();
+}
+
+void Backend::moveSlide(int from, int to) {
+  const QString currentId = m_document.slides.isEmpty()
+                                ? QString()
+                                : m_document.slides.at(m_currentSlide).id;
+  m_history.begin(m_document, QStringLiteral("Reorder slides"));
+  if (!Edit::moveSlide(m_document, from, to)) {
+    m_history.abandon();
+    return;
+  }
+  m_history.commit();
+  for (int i = 0; i < m_document.slides.size(); ++i)
+    if (m_document.slides.at(i).id == currentId)
+      m_currentSlide = i;
+  emit currentSlideChanged();
+  touch();
+}
+
+void Backend::addText() {
+  m_history.begin(m_document, QStringLiteral("Add text"));
+  const QString id = Edit::addText(
+      m_document, m_currentSlide,
+      QPointF(m_document.size.width() / 2.0, m_document.size.height() / 2.0));
+  m_history.commit();
+  m_selectedId = id;
+  m_selectedIds = {id};
+  if (auto *o = selectedObject())
+    o->groups = m_groupScope;
+  touch();
+}
+
+void Backend::addRect() { addShape(0); }
+
+void Backend::setSnapEnabled(bool enabled) {
+  if (m_snapEnabled == enabled)
+    return;
+  m_snapEnabled = enabled;
+  emit snapEnabledChanged();
+}
+
+void Backend::undo() {
+  const auto currentId=m_document.slides.value(m_currentSlide).id;
+  if (!m_history.undo(m_document))
+    return;
+  m_currentSlide =
+      qBound(0, m_currentSlide, qMax(0, m_document.slides.size() - 1));
+  restoreCurrentSlide(currentId);
+  m_selectedIds = selectedIds();
+  m_selectedId = m_selectedIds.isEmpty() ? QString() : m_selectedIds.last();
+  if (m_selectedIds.isEmpty())
+    m_groupScope.clear();
+  touch();
+}
+
+void Backend::redo() {
+  const auto currentId=m_document.slides.value(m_currentSlide).id;
+  if (!m_history.redo(m_document))
+    return;
+  m_currentSlide =
+      qBound(0, m_currentSlide, qMax(0, m_document.slides.size() - 1));
+  restoreCurrentSlide(currentId);
+  m_selectedIds = selectedIds();
+  m_selectedId = m_selectedIds.isEmpty() ? QString() : m_selectedIds.last();
+  if (m_selectedIds.isEmpty())
+    m_groupScope.clear();
+  touch();
+}
+
+void Backend::exportPdfDialog(bool pagePerBuildStage,bool includeSkipped) {
+  m_pending = Pending::ExportPdf;
+  m_pendingPdfStages = pagePerBuildStage;
+  m_pendingPdfSkipped = includeSkipped;
+  const QString base =
+      m_fileUrl.isLocalFile()
+          ? QFileInfo(m_fileUrl.toLocalFile()).completeBaseName()
+          : QStringLiteral("Untitled");
+  m_chooser->saveFile(tr("Export PDF"), base + QStringLiteral(".pdf"),
+                      tr("PDF documents"), {QStringLiteral("*.pdf")});
+}
+
+bool Backend::exportPdf(const QString &path, bool pagePerBuildStage,bool includeSkipped) {
+  Pdf::Options options;
+  options.pagePerBuildStage = pagePerBuildStage;
+  options.includeSkipped = includeSkipped;
+
+  QString error;
+  auto exportDocument=m_document;
+  for(auto &slide:exportDocument.slides) for(auto &o:slide.objects)
+    if(o.type==ObjectType::Media) o.mediaReadAllowed=m_mediaPermissions.value(o.mediaPath)==o.mediaId;
+  if (!Pdf::write(exportDocument, path, options, &error)) {
+    setStatus(tr("Could not export: %1").arg(error));
+    emit failed(error);
+    return false;
+  }
+  setStatus(tr("Exported %1").arg(QFileInfo(path).fileName()));
+  return true;
+}

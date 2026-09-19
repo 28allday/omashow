@@ -1,0 +1,33 @@
+# Maintainer: Gavin Nugent
+
+pkgname=omashow
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Keyboard-first presentation editor and presenter for Omarchy'
+arch=('x86_64' 'aarch64')
+url='https://github.com/28allday/omashow'
+license=('GPL-3.0-or-later')
+install='omashow.install'
+options=('!debug')
+depends=('hicolor-icon-theme' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-multimedia'
+         'ffmpeg' 'zlib' 'xdg-desktop-portal')
+makedepends=('gcc' 'make' 'pkgconf')
+source=()
+sha256sums=()
+
+# Builds the working tree — this PKGBUILD exists for ./bin/install only. The
+# release PKGBUILD lives in omarchy-pkgs and builds a tagged tarball instead.
+build() {
+  cd "$startdir/.."
+  ./bin/build
+}
+
+package() {
+  cd "$startdir/.."
+  /usr/bin/install -Dm755 build/omashow "$pkgdir/usr/bin/omashow"
+  /usr/bin/install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  /usr/bin/install -Dm644 THIRD-PARTY-NOTICES.md "$pkgdir/usr/share/licenses/$pkgname/THIRD-PARTY-NOTICES.md"
+  /usr/bin/install -Dm644 src/ui/icons/LICENSE.lucide "$pkgdir/usr/share/licenses/$pkgname/LICENSE.lucide"
+  /usr/bin/install -Dm644 "$startdir/omashow.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omashow.svg"
+  /usr/bin/install -Dm644 "$startdir/omashow.desktop" "$pkgdir/usr/share/applications/omashow.desktop"
+}

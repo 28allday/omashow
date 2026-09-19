@@ -1,0 +1,494 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Omashow 1.0
+
+// Style / Text / Arrange for the selected object. Every control here is backed
+// by a real property on a real object: with nothing selected the panel shows
+// the slide's own settings rather than dead fields.
+Rectangle {
+    id: root
+    color: Theme.panelBg
+
+    property bool stylesExpanded: false
+    readonly property var sel: backend.selection
+    readonly property bool isMedia: backend.hasSelection && sel.type === "media"
+    readonly property bool isImage: backend.hasSelection && sel.type === "image"
+    readonly property bool isText: backend.hasSelection && sel.type === "text"
+    readonly property bool isConnector: backend.selectionCount === 1 && (sel.connector ?? false)
+    // With nothing selected the map is empty, and the panel's bindings still
+    // evaluate even though it is hidden — so the colour reads go through here
+    // rather than handing QColor an undefined.
+    readonly property color swatch: {
+        const value = root.isText ? root.sel.textColor : root.sel.fill
+        return value !== undefined ? value : Theme.controlBg
+    }
+    readonly property string swatchText: {
+        const value = root.isText ? root.sel.textColor : root.sel.fill
+        return value !== undefined ? value : ""
+    }
+
+    Connections {
+        target: backend
+        function onSelectionChanged() { if(tabs.currentIndex === 1 && backend.selection.type !== "text") tabs.currentIndex = 0 }
+    }
+    component Divider: Rectangle {
+        Layout.fillWidth: true
+        Layout.topMargin: Theme.s1
+        Layout.bottomMargin: Theme.s1
+        implicitHeight: Theme.hairline
+        color: Theme.border
+    }
+    // A square icon button for the align / distribute / order rows.
+    component IconAction: Button {
+        property string tip: ""
+        display: AbstractButton.IconOnly
+        implicitWidth: Theme.hControl + Theme.s1
+        implicitHeight: Theme.hControl + Theme.s1
+        ToolTip.visible: hovered && tip !== ""
+        ToolTip.delay: Theme.tooltipDelay
+        ToolTip.text: tip
+        Accessible.name: tip
+    }
+
+    Rectangle {
+        anchors.left: parent.left
+        width: Theme.hairline
+        height: parent.height
+        color: Theme.border
+    }
+
+    TabBar {
+        id: tabs
+        objectName: "inspectorTabs"
+        onCurrentIndexChanged: if (inspectorScroll.contentItem) inspectorScroll.contentItem.contentY = 0
+        anchors.left: parent.left
+        anchors.leftMargin: Theme.hairline
+        anchors.right: parent.right
+        height: Theme.hTab
+        visible: backend.hasSelection
+        TabButton { text: qsTr("Style") }
+        TabButton { text: qsTr("Text"); enabled: root.isText }
+        TabButton { text: qsTr("Arrange") }
+    }
+
+    // ── Nothing selected: the slide itself ──────────────────────────────────
+    ColumnLayout {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: Theme.s4
+        spacing: Theme.s3
+        visible: !backend.hasSelection
+        Label { text: qsTr("Slide"); font.pixelSize: Theme.fsSection; font.weight: Theme.wHeading; Layout.bottomMargin: Theme.s1 }
+        FieldRow {
+            label: qsTr("Layout")
+            ComboBox {
+                Layout.fillWidth: true
+                visible: backend.design.layouts.length > 0
+                model: backend.design.layouts
+                textRole: "name"; valueRole: "id"
+                currentIndex: model.findIndex(l => l.id === backend.slideDesign.layoutId)
+                displayText: currentIndex < 0 ? qsTr("Freeform") : currentText
+                onActivated: backend.applyLayout(currentValue)
+            }
+            Button { visible: backend.design.layouts.length === 0; Layout.fillWidth: true; text: qsTr("Add layouts"); icon.name: "layout-template"; onClicked: backend.setupDesign() }
+        }
+        FieldRow {
+            label: qsTr("Background")
+            Rectangle {
+                implicitWidth: Theme.hControl; implicitHeight: Theme.hControl; radius: Theme.rControl
+                color: backend.slideDesign.background || Theme.controlBg
+                border.color: Theme.borderStrong; border.width: Theme.hairline
+            }
+            TextField { Layout.fillWidth: true; text: backend.slideDesign.background ?? ""; font.family: Theme.monoFamily
+                        placeholderText: qsTr("Master"); onEditingFinished: backend.setSlideBackground(text) }
+        }
+        FieldRow {
+            label: ""
+            Button { Layout.fillWidth: true; text: qsTr("Use master background"); icon.name: "rotate-ccw"
+                     enabled: backend.slideDesign.backgroundOverride ?? false
+                     onClicked: backend.setSlideBackground("", true) }
+        }
+        Divider {}
+        RowLayout {
+            spacing: Theme.s2
+            Icon { name: "info"; color: Theme.textMuted }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    text: qsTr("Select an object to style it. Themes and shared layouts live in Design.") }
+        }
+    }
+
+    ScrollView {
+        id: inspectorScroll
+        objectName: "inspectorScroll"
+        anchors.top: tabs.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: Theme.s4
+        anchors.rightMargin: Theme.s4
+        anchors.topMargin: Theme.s3
+        contentWidth: availableWidth
+        clip: true
+        visible: backend.hasSelection
+        StackLayout {
+            width: inspectorScroll.availableWidth
+            currentIndex: tabs.currentIndex
+
+        // ── Style ───────────────────────────────────────────────────────────
+        ColumnLayout {
+            spacing: Theme.s3
+
+            RowLayout {
+                visible: (root.sel.placeholderId ?? "") !== ""
+                Layout.fillWidth: true
+                spacing: Theme.s2
+                Icon { name: "layout-template"; color: Theme.accent }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    color: Theme.accent
+                    font.pixelSize: Theme.fsLabel
+                    text: (root.sel.overrides ?? []).length > 0 ? qsTr("Layout placeholder · local edits") : qsTr("Inherited from layout")
+                }
+            }
+            RowLayout {
+                visible: (root.sel.placeholderId ?? "") !== ""
+                Layout.fillWidth: true
+                Button { Layout.fillWidth: true; text: qsTr("Reset style"); onClicked: backend.resetPlaceholder(false) }
+                Button { Layout.fillWidth: true; text: qsTr("Reset position"); onClicked: backend.resetPlaceholder(true) }
+            }
+            ChartTools { Layout.fillWidth: true; visible: root.sel.type === "chart"; sel: root.sel }
+            MediaTools { Layout.fillWidth: true; visible: root.isMedia; sel: root.sel }
+            Label { Layout.fillWidth: true; wrapMode: Text.Wrap; visible: root.sel.type === "table" && (root.sel.tableOverflow ?? 0)>0; text: qsTr("%1 cells overflow. Edit the table to adjust text fit, padding or row sizes.").arg(root.sel.tableOverflow ?? 0); color: Theme.warning }
+            Button { objectName: "editTable"; Layout.fillWidth: true; visible: root.sel.type === "table"; icon.name: "table"; text: qsTr("Edit table cells…"); onClicked: backend.editSelectedTable() }
+
+            Button {
+                objectName: "toggleObjectStyles"
+                Layout.fillWidth: true
+                flat: true
+                icon.name: root.stylesExpanded ? "chevron-down" : "chevron-right"
+                text: qsTr("Saved styles") + " · " + backend.objectStyles.length
+                onClicked: root.stylesExpanded = !root.stylesExpanded
+            }
+            ColumnLayout {
+                visible: root.stylesExpanded; Layout.fillWidth: true
+                spacing: Theme.s2
+                ComboBox { id: savedStyle; objectName: "savedObjectStyles"; Layout.fillWidth: true; model: backend.objectStyles; textRole: "name"; valueRole: "id"; displayText: count?currentText:qsTr("No saved styles") }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Button { objectName: "applyObjectStyle"; Layout.fillWidth: true; text: qsTr("Apply"); enabled: savedStyle.count>0; onClicked: backend.applyObjectStyle(savedStyle.currentValue) }
+                    Button { Layout.fillWidth: true; text: qsTr("Remove"); enabled: savedStyle.count>0; onClicked: backend.removeObjectStyle(savedStyle.currentValue) }
+                }
+                TextField { id: styleName; objectName: "objectStyleName"; Layout.fillWidth: true; placeholderText: qsTr("Name this appearance"); Accessible.name: qsTr("Object style name") }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Button { objectName: "saveObjectStyle"; Layout.fillWidth: true; text: qsTr("Save new style"); enabled: backend.selectionCount===1 && styleName.text.trim().length>0; onClicked: { backend.saveObjectStyle(styleName.text); styleName.clear() } }
+                    Button { Layout.fillWidth: true; text: qsTr("Update"); enabled: backend.selectionCount===1 && savedStyle.count>0; onClicked: backend.saveObjectStyle(styleName.text.trim() || savedStyle.currentText,savedStyle.currentValue) }
+                }
+            }
+            Divider {}
+            FieldRow {
+                label: root.isText ? qsTr("Colour") : qsTr("Fill")
+                visible: !root.isImage && !root.isMedia
+                Rectangle {
+                    implicitWidth: Theme.hControl + Theme.s3
+                    implicitHeight: Theme.hControl
+                    radius: Theme.rControl
+                    color: root.swatch
+                    border.color: Theme.borderStrong
+                    border.width: Theme.hairline
+                }
+                TextField {
+                    Layout.fillWidth: true
+                    text: root.swatchText
+                    font.family: Theme.monoFamily
+                    Accessible.name: root.isText ? qsTr("Text colour") : qsTr("Fill colour")
+                    onEditingFinished:
+                        backend.setSelectedProperty(root.isText ? "textColor" : "fill", text)
+                }
+            }
+
+            FieldRow {
+                label: qsTr("Opacity")
+                Slider {
+                    Layout.fillWidth: true
+                    from: 0
+                    to: 1
+                    value: root.sel.opacity ?? 1
+                    onPressedChanged: if (!pressed) backend.setSelectedProperty("opacity", value)
+                    Accessible.name: qsTr("Opacity")
+                }
+                Rectangle {
+                    implicitWidth: Theme.s5 * 2 + Theme.s2
+                    implicitHeight: Theme.hControl
+                    radius: Theme.rControl
+                    color: Theme.controlBg
+                    border.color: Theme.border; border.width: Theme.hairline
+                    Label {
+                        anchors.centerIn: parent
+                        text: Math.round((root.sel.opacity ?? 1) * 100) + "%"
+                        font.family: Theme.monoFamily
+                    }
+                }
+            }
+
+            FieldRow {
+                label: qsTr("Corner radius")
+                visible: !root.isText && !root.isImage && !root.isMedia && !root.isConnector
+                NumField {
+                    Layout.fillWidth: true
+                    suffix: " px"
+                    value: root.sel.cornerRadius ?? 0
+                    onCommitted: (v) => backend.setSelectedProperty("cornerRadius", v)
+                }
+            }
+            Divider { visible: shapeTools.visible || connectorTools.visible }
+            ShapeTools { id: shapeTools; Layout.fillWidth: true; visible: backend.hasSelection && root.sel.type === "rect" && !root.sel.connector }
+            ConnectorTools { id: connectorTools; Layout.fillWidth: true; visible: root.isConnector }
+            ColumnLayout {
+                visible: root.isImage
+                Layout.fillWidth: true
+                spacing: Theme.s3
+                SectionLabel { text: root.sel.imageFormat === "svg" ? qsTr("SVG VECTOR") : qsTr("PICTURE") }
+                FieldRow {
+                    label: qsTr("Fit")
+                    ComboBox {
+                        objectName: "imageFitMode"
+                        Layout.fillWidth: true
+                        model: [qsTr("Fit inside box"),qsTr("Fill box"),qsTr("Stretch to box")]
+                        currentIndex: root.sel.imageMode ?? 0
+                        onActivated: backend.setSelectedProperty("imageMode",currentIndex)
+                    }
+                }
+                Button { objectName: "cropOnSlide"; Layout.fillWidth: true; icon.name: "crop"; text: qsTr("Crop on slide"); onClicked: backend.editSelectedImageCrop() }
+                SectionLabel { text: qsTr("SOURCE CROP (%)") }
+                GridLayout {
+                    columns: 2
+                    columnSpacing: Theme.s2
+                    Layout.fillWidth: true
+                    NumField { objectName: "cropX"; Layout.fillWidth: true; label: qsTr("X"); value: (root.sel.cropX ?? 0)*100; onCommitted: v => backend.setSelectedProperty("cropX",v/100) }
+                    NumField { objectName: "cropY"; Layout.fillWidth: true; label: qsTr("Y"); value: (root.sel.cropY ?? 0)*100; onCommitted: v => backend.setSelectedProperty("cropY",v/100) }
+                    NumField { objectName: "cropW"; Layout.fillWidth: true; label: qsTr("W"); value: (root.sel.cropW ?? 1)*100; onCommitted: v => backend.setSelectedProperty("cropW",v/100) }
+                    NumField { objectName: "cropH"; Layout.fillWidth: true; label: qsTr("H"); value: (root.sel.cropH ?? 1)*100; onCommitted: v => backend.setSelectedProperty("cropH",v/100) }
+                }
+                PictureAdjustments { Layout.fillWidth: true }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Button { Layout.fillWidth: true; text: qsTr("Reset crop"); onClicked: backend.resetImageCrop() }
+                    Button { Layout.fillWidth: true; text: qsTr("Replace…"); onClicked: backend.replaceImageDialog() }
+                }
+            }
+            ColumnLayout {
+                visible: backend.hasSelection && (root.isImage || root.sel.fillStyle===4) && root.sel.imageFormat!=="svg"
+                Layout.fillWidth: true
+                Button { objectName: "optimisePicture"; Layout.fillWidth: true; text: qsTr("Optimise picture…"); onClicked: backend.optimiseSelectedMedia() }
+                Button { objectName: "restoreOriginalPicture"; Layout.fillWidth: true; visible: root.sel.imageHasOriginal??false; text: qsTr("Restore original picture"); onClicked: backend.restoreOriginalMedia() }
+                Button { objectName: "discardOriginalPicture"; Layout.fillWidth: true; visible: root.sel.imageHasOriginal??false; text: qsTr("Discard original to reduce deck size"); onClicked: backend.discardOriginalMedia() }
+            }
+
+            Divider {}
+            Button { objectName: "objectLinkButton"; Layout.fillWidth: true; icon.name: "link"; text: root.sel.linkKind?qsTr("Edit link or action…"):qsTr("Add link or action…"); onClicked: backend.editSelectedLink() }
+            Label { Layout.fillWidth: true; visible: !!root.sel.linkIssue; text: root.sel.linkIssue??""; color: Theme.warning; wrapMode: Text.Wrap }
+
+            Item { Layout.fillHeight: true }
+        }
+
+        // ── Text ────────────────────────────────────────────────────────────
+        ColumnLayout {
+            spacing: Theme.s3
+
+            TextArea {
+                objectName: "textContent"
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.s5 * 4
+                text: root.sel.text ?? ""
+                wrapMode: TextArea.Wrap
+                // Forced plain: AutoText would parse a stray angle bracket or a
+                // pasted filename as rich text.
+                textFormat: TextEdit.PlainText
+                Accessible.name: qsTr("Text content")
+                onEditingFinished: backend.setSelectedProperty("text", text)
+            }
+
+            FieldRow {
+                label: qsTr("Font")
+                ComboBox {
+                    Layout.fillWidth: true
+                    editable: true
+                    model: Qt.fontFamilies()
+                    currentIndex: model.indexOf(root.sel.fontFamily ?? "")
+                    displayText: root.sel.fontFamily ?? Theme.fontFamily
+                    onActivated: backend.setSelectedProperty("fontFamily",currentText)
+                    onAccepted: backend.setSelectedProperty("fontFamily",editText)
+                }
+            }
+            FieldRow {
+                label: qsTr("Size")
+                NumField {
+                    Layout.fillWidth: true
+                    suffix: " pt"
+                    value: root.sel.fontSize ?? Theme.fsBase
+                    onCommitted: (v) => backend.setSelectedProperty("fontSize", v)
+                }
+                ComboBox {
+                    Layout.preferredWidth: Theme.s5 * 5
+                    model: [400, 500, 600, 700]
+                    displayText: [qsTr("Regular"), qsTr("Medium"), qsTr("Semibold"), qsTr("Bold")][currentIndex] ?? currentText
+                    currentIndex: Math.max(0, model.indexOf(root.sel.fontWeight ?? 400))
+                    onActivated: backend.setSelectedProperty("fontWeight", model[currentIndex])
+                }
+            }
+            FieldRow {
+                label: qsTr("Style")
+                Button { checkable: true; text: qsTr("Italic"); checked: root.sel.italic ?? false; onToggled: backend.setSelectedProperty("italic",checked) }
+                Button { checkable: true; text: qsTr("Underline"); checked: root.sel.underline ?? false; onToggled: backend.setSelectedProperty("underline",checked) }
+                Item { Layout.fillWidth: true }
+            }
+            Divider {}
+            FieldRow {
+                label: qsTr("Align")
+                ComboBox {
+                    objectName: "textAlignment"
+                    Layout.fillWidth: true
+                    model: [qsTr("Left"),qsTr("Centre"),qsTr("Right"),qsTr("Justify")]
+                    currentIndex: root.sel.textAlign ?? 0
+                    onActivated: backend.setSelectedProperty("textAlign",currentIndex)
+                }
+                ComboBox {
+                    Layout.fillWidth: true
+                    model: [qsTr("Top"),qsTr("Middle"),qsTr("Bottom")]
+                    currentIndex: root.sel.verticalAlign ?? 1
+                    onActivated: backend.setSelectedProperty("verticalAlign",currentIndex)
+                }
+            }
+            FieldRow {
+                label: qsTr("Line height")
+                NumField { objectName: "textLineHeight"; Layout.fillWidth: true; suffix: "%"; value: root.sel.lineHeight ?? 100; onCommitted: v => backend.setSelectedProperty("lineHeight",v) }
+            }
+            FieldRow {
+                label: qsTr("After ¶")
+                NumField { objectName: "textParagraphSpacing"; Layout.fillWidth: true; value: root.sel.paragraphSpacing ?? 0; onCommitted: v => backend.setSelectedProperty("paragraphSpacing",v) }
+            }
+            FieldRow {
+                label: qsTr("Indent")
+                NumField { Layout.fillWidth: true; value: root.sel.textIndent ?? 0; onCommitted: v => backend.setSelectedProperty("textIndent",v) }
+            }
+            FieldRow {
+                label: qsTr("List")
+                ComboBox {
+                    objectName: "textListStyle"
+                    Layout.fillWidth: true
+                    model: [qsTr("None"),qsTr("Bullets"),qsTr("Numbers")]
+                    currentIndex: root.sel.listStyle ?? 0
+                    onActivated: backend.setSelectedProperty("listStyle",currentIndex)
+                }
+                NumField {
+                    Layout.preferredWidth: Theme.s5 * 3
+                    visible: root.sel.listStyle === 2
+                    label: qsTr("#"); value: root.sel.listStart ?? 1
+                    onCommitted: v => backend.setSelectedProperty("listStart",v)
+                }
+            }
+            Label { visible: (root.sel.listStyle ?? 0) > 0; text: qsTr("Leading tabs nest list items."); color: Theme.textMuted; font.pixelSize: Theme.fsLabel }
+            Divider {}
+            FieldRow {
+                label: qsTr("Text fit")
+                ComboBox {
+                    objectName: "textFitMode"
+                    Layout.fillWidth: true
+                    model: [qsTr("Clip and warn"),qsTr("Shrink to fit")]
+                    currentIndex: root.sel.textFit ?? 0
+                    onActivated: backend.setSelectedProperty("textFit",currentIndex)
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.s2
+                visible: (root.sel.textOverflow ?? false) || (root.sel.textFit === 1 && root.sel.effectiveFontSize < root.sel.fontSize)
+                Icon { name: (root.sel.textOverflow ?? false) ? "triangle-alert" : "info"; color: (root.sel.textOverflow ?? false) ? Theme.warning : Theme.textMuted }
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap
+                    color: (root.sel.textOverflow ?? false) ? Theme.warning : Theme.textSecondary
+                    text: (root.sel.textOverflow ?? false) ? qsTr("Some text is outside this box.") : qsTr("Displayed at %1 to fit.").arg(root.sel.effectiveFontSize)
+                }
+            }
+            Button { objectName: "fitTextBox"; Layout.fillWidth: true; text: qsTr("Resize box to fit text"); onClicked: backend.fitSelectedTextBox() }
+            Item { Layout.fillHeight: true }
+        }
+
+        // ── Arrange ─────────────────────────────────────────────────────────
+        ColumnLayout {
+            spacing: Theme.s3
+
+            FieldRow {
+                label: qsTr("Position")
+                NumField { enabled: !root.isConnector; Layout.fillWidth: true; label: qsTr("X"); value: root.sel.x ?? 0
+                           onCommitted: (v) => backend.setSelectedProperty("x", v) }
+                NumField { enabled: !root.isConnector; Layout.fillWidth: true; label: qsTr("Y"); value: root.sel.y ?? 0
+                           onCommitted: (v) => backend.setSelectedProperty("y", v) }
+            }
+            FieldRow {
+                label: qsTr("Size")
+                NumField { enabled: !root.isConnector; Layout.fillWidth: true; label: qsTr("W"); value: root.sel.w ?? 0
+                           onCommitted: (v) => backend.setSelectedProperty("w", v) }
+                NumField { enabled: !root.isConnector; Layout.fillWidth: true; label: qsTr("H"); value: root.sel.h ?? 0
+                           onCommitted: (v) => backend.setSelectedProperty("h", v) }
+            }
+            FieldRow {
+                label: qsTr("Rotation")
+                visible: backend.selectionCount === 1
+                Icon { name: "rotate-cw"; color: Theme.textMuted }
+                NumField {
+                    enabled: !root.isConnector
+                    Layout.preferredWidth: Theme.s5 * 4
+                    suffix: "°"
+                    value: root.sel.rotation ?? 0
+                    onCommitted: (v) => backend.setSelectedProperty("rotation", v)
+                }
+                Item { Layout.fillWidth: true }
+            }
+            Divider {}
+            FieldRow {
+                label: qsTr("Align to")
+                ComboBox {
+                    id: alignmentReference
+                    Layout.fillWidth: true
+                    model: [qsTr("Selection"), qsTr("Slide"), qsTr("First selected object")]
+                }
+            }
+            FieldRow {
+                label: qsTr("Align")
+                Repeater {
+                    model: [{name:qsTr("Align left"),key:"left",icon:"align-start-vertical"},{name:qsTr("Align centre"),key:"center",icon:"align-center-vertical"},{name:qsTr("Align right"),key:"right",icon:"align-end-vertical"},
+                            {name:qsTr("Align top"),key:"top",icon:"align-start-horizontal"},{name:qsTr("Align middle"),key:"middle",icon:"align-center-horizontal"},{name:qsTr("Align bottom"),key:"bottom",icon:"align-end-horizontal"}]
+                    IconAction { required property var modelData; icon.name: modelData.icon; text: modelData.name; tip: modelData.name
+                                 onClicked: backend.alignSelected(modelData.key,alignmentReference.currentIndex) }
+                }
+                Item { Layout.fillWidth: true }
+            }
+            FieldRow {
+                label: qsTr("Distribute")
+                IconAction { icon.name: "align-horizontal-distribute-center"; text: qsTr("Space across"); tip: qsTr("Space evenly across — three or more objects"); enabled: backend.selectionCount >= 3
+                             onClicked: backend.distributeSelected(true,alignmentReference.currentIndex) }
+                IconAction { icon.name: "align-vertical-distribute-center"; text: qsTr("Space down"); tip: qsTr("Space evenly down — three or more objects"); enabled: backend.selectionCount >= 3
+                             onClicked: backend.distributeSelected(false,alignmentReference.currentIndex) }
+                Item { Layout.fillWidth: true }
+            }
+            Divider {}
+            FieldRow {
+                label: qsTr("Group")
+                Button { objectName: "groupButton"; Layout.fillWidth: true; icon.name: "group"; text: qsTr("Group"); enabled: backend.selectionCount > 1; onClicked: backend.groupSelected() }
+                Button { Layout.fillWidth: true; icon.name: "ungroup"; text: qsTr("Ungroup"); enabled: !!root.sel.groupId; onClicked: backend.ungroupSelected() }
+            }
+            FieldRow {
+                label: qsTr("Order")
+                Button { Layout.fillWidth: true; icon.name: "bring-to-front"; text: qsTr("Forward"); onClicked: backend.raiseSelected(1) }
+                Button { Layout.fillWidth: true; icon.name: "send-to-back"; text: qsTr("Backward"); onClicked: backend.raiseSelected(-1) }
+            }
+            Item { Layout.fillHeight: true }
+        }
+    }
+    }
+}
