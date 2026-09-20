@@ -17,6 +17,17 @@ const Master *Design::master(const Document &d, const QString &id) {
     for (const auto &item : d.masters) if (item.id == id) return &item;
     return nullptr;
 }
+const TextStyle *Design::textStyle(const Document &d, const QString &id) {
+    if (id.isEmpty()) return nullptr;
+    for (const auto &item : d.textStyles) if (item.id == id) return &item;
+    return nullptr;
+}
+QStringList Design::textStyleKeys() {
+    return {"fontFamily","fontSize","fontWeight","italic","underline","textColor","uppercase",
+            "letterSpacing","textAlign","verticalAlign","lineHeight","paragraphSpacing",
+            "textIndent","listStyle","listStart","textFit","tabStop","columns","columnGap",
+            "direction"};
+}
 SceneObject Design::themed(const DeckTheme &theme, SceneObject o) {
     o.fill = theme.colors.value(o.fillToken, o.fill);
     o.textColor = theme.colors.value(o.textColorToken, o.textColor);
@@ -47,13 +58,14 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"italic",o.italic},{"underline",o.underline},{"textAlign",o.textAlign},{"verticalAlign",o.verticalAlign},
             {"lineHeight",o.lineHeight},{"paragraphSpacing",o.paragraphSpacing},{"textIndent",o.textIndent},
             {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},
+            {"tabStop",o.tabStop},{"columns",o.columns},{"columnGap",o.columnGap},{"direction",o.direction},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
             {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
             {"altTitle", o.altTitle}, {"altText", o.altText}, {"runs", TextRuns::encode(o.runs)},
-            {"placeholderId", o.placeholderId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
+            {"placeholderId", o.placeholderId}, {"textStyleId", o.textStyleId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
 }
 bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, bool constrainForEditing) {
-    const QStringList numeric = {"mediaBytes","mediaModified","mediaDuration","mediaTrimStart","mediaTrimEnd","mediaVolume","mediaLoops","x", "y", "w", "h", "rotation", "opacity", "cornerRadius",
+    const QStringList numeric = {"tabStop","columns","columnGap","direction","mediaBytes","mediaModified","mediaDuration","mediaTrimStart","mediaTrimEnd","mediaVolume","mediaLoops","x", "y", "w", "h", "rotation", "opacity", "cornerRadius",
                                  "linkKind", "connectorStartX", "connectorStartY", "connectorEndX", "connectorEndY", "connectorFromSide", "connectorToSide", "connectorRoute", "shapeKind", "fillStyle", "fillAngle", "patternStyle", "strokeWidth", "strokeStyle", "strokeJoin", "strokeCap", "shadowX", "shadowY", "fontSize", "fontWeight", "letterSpacing", "textAlign", "verticalAlign", "lineHeight", "paragraphSpacing", "textIndent", "listStyle", "listStart", "textFit", "imageMask", "imageFocalX", "imageFocalY", "imageBrightness", "imageContrast", "imageSaturation", "imageTintAmount", "imageMode", "cropX", "cropY", "cropW", "cropH"};
     bool ok = false;
     const qreal n = v.toDouble(&ok);
@@ -123,10 +135,11 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
         if(map.isEmpty()) { o.imageOriginal.reset(); return true; }
         if((o.type!=ObjectType::Image && o.type!=ObjectType::Rect) || map.value("type").toString()!="image" || !map.value("mediaOriginal").toMap().isEmpty() || !map.value("imageOriginal").toMap().isEmpty()) return false;
         SceneObject source; source.type=ObjectType::Image;
-        const QSet<QString> structural={"id","type","groups","placeholderId","overrides"};
+        const QSet<QString> structural={"id","type","groups","placeholderId","textStyleId","overrides"};
         for(auto it=map.cbegin();it!=map.cend();++it) if(!structural.contains(it.key())) if(!setProperty(source,it.key(),it.value(),false)) return false;
         source.id=map.value("id").toString(); source.groups=map.value("groups").toStringList();
-        source.placeholderId=map.value("placeholderId").toString(); source.overrides=map.value("overrides").toStringList();
+        source.placeholderId=map.value("placeholderId").toString(); source.textStyleId=map.value("textStyleId").toString();
+        source.overrides=map.value("overrides").toStringList();
         o.imageOriginal=std::make_shared<const SceneObject>(source);
     }
     else if (key == "mediaOriginal") {
@@ -135,10 +148,11 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
         if(map.isEmpty()) { o.mediaOriginal.reset(); return true; }
         if(o.type!=ObjectType::Media || map.value("type").toString()!="media" || (!map.value("mediaOriginal").toMap().isEmpty() || !map.value("imageOriginal").toMap().isEmpty())) return false;
         SceneObject source; source.type=ObjectType::Media;
-        const QSet<QString> structural={"id","type","groups","placeholderId","overrides"};
+        const QSet<QString> structural={"id","type","groups","placeholderId","textStyleId","overrides"};
         for(auto it=map.cbegin();it!=map.cend();++it) if(!structural.contains(it.key())) if(!setProperty(source,it.key(),it.value(),false)) return false;
         source.id=map.value("id").toString(); source.groups=map.value("groups").toStringList();
-        source.placeholderId=map.value("placeholderId").toString(); source.overrides=map.value("overrides").toStringList();
+        source.placeholderId=map.value("placeholderId").toString(); source.textStyleId=map.value("textStyleId").toString();
+        source.overrides=map.value("overrides").toStringList();
         o.mediaOriginal=std::make_shared<const SceneObject>(source);
     }
     else if (key == "mediaId") o.mediaId=v.toString();
@@ -165,6 +179,10 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),2);
     else if (key == "listStart") o.listStart = qBound(1,v.toInt(),9999);
     else if (key == "textFit") o.textFit = qBound(0,v.toInt(),1);
+    else if (key == "tabStop") o.tabStop = qBound(0.0,n,4000.0);
+    else if (key == "columns") o.columns = qBound(1,v.toInt(),6);
+    else if (key == "columnGap") o.columnGap = qBound(0.0,n,4000.0);
+    else if (key == "direction") o.direction = qBound(0,v.toInt(),2);
     else if (key == "locked") o.locked = v.toBool();
     else if (key == "hidden") o.hidden = v.toBool();
     else if (key == "uppercase") o.uppercase = v.toBool();
@@ -215,6 +233,7 @@ Slide Design::resolve(const Document &d, int index) {
                 o = p;
                 o.id = local.id;
                 o.placeholderId = local.placeholderId;
+                o.textStyleId = local.textStyleId;
                 o.overrides = local.overrides;
                 o.groups = local.groups; o.locked = local.locked; o.hidden = local.hidden;
                 const auto values = properties(local);
@@ -227,6 +246,15 @@ Slide Design::resolve(const Document &d, int index) {
                 }
                 break;
             }
+        }
+        if (const auto *style = textStyle(d, o.textStyleId)) {
+            const auto values = properties(style->look);
+            for (const auto &key : textStyleKeys())
+                if (!o.overrides.contains(key)) setProperty(o, key, values.value(key), false);
+            if (!o.overrides.contains(QStringLiteral("textColor")))
+                o.textColorToken = style->look.textColorToken;
+            if (!o.overrides.contains(QStringLiteral("fontFamily")))
+                o.fontToken = style->look.fontToken;
         }
         slide.objects.append(themed(d.theme, o));
     }
@@ -279,7 +307,7 @@ void Design::ensureDefaults(Document &d) {
     d.layouts = {title,body,blank};
 }
 SceneObject Design::detached(SceneObject o) {
-    o.placeholderId.clear(); o.overrides.clear();
+    o.placeholderId.clear(); o.textStyleId.clear(); o.overrides.clear();
     o.fillToken.clear(); o.textColorToken.clear(); o.fontToken.clear();
     if(o.type==ObjectType::Table || o.type==ObjectType::Chart) {o.table.headerFillToken.clear();o.table.borderColorToken.clear();}
     if(o.type==ObjectType::Chart && !o.chart.resolvedColors.isEmpty()) {

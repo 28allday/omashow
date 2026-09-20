@@ -7,6 +7,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QFontDatabase>
+#include <QFontInfo>
 
 namespace {
 
@@ -352,6 +353,14 @@ QVariantList Review::issues(const Document &d) {
                         nameFor(o) + " carries a lot of words",
                         QString("%1 words in one box. Consider splitting it across slides.")
                             .arg(wordsIn(o.text)));
+                if (!o.fontFamily.isEmpty() && !QFontDatabase::hasFamily(o.fontFamily) &&
+                    authoredHere)
+                    add("font/" + o.id, i, authored.id, o.id, "should", "font",
+                        QString("%1 asks for %2, which is not installed")
+                            .arg(nameFor(o), o.fontFamily),
+                        QString("It is being drawn in %1 instead. Install the typeface, or "
+                                "choose one this computer has, before the deck travels.")
+                            .arg(QFontInfo(QFont(o.fontFamily)).family()));
                 if (TextLayout::measure(o).overflow && o.textFit == 0)
                     add("overflow/" + o.id, i, authored.id, o.id, "should", "overflow",
                         nameFor(o) + " does not fit its box",

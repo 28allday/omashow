@@ -122,6 +122,10 @@ struct SceneObject {
     int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
     int listStart = 1;
     int textFit = 0;         // clip with overflow warning, shrink to fit
+    qreal tabStop = 0;       // 0 uses four times the type size
+    int columns = 1;         // text flows down one column, then into the next
+    qreal columnGap = 0;     // 0 uses one line of space between columns
+    int direction = 0;       // 0 follows the words, 1 left to right, 2 right to left
     QString fontFamily = QStringLiteral("Inter");
     QString fillToken, textColorToken, fontToken;
     // Stretches of this text that differ from the box, in authored order.
@@ -129,6 +133,7 @@ struct SceneObject {
     // What a screen reader would be told this is. Never rendered.
     QString altTitle, altText;
     QString placeholderId;
+    QString textStyleId;      // the named look this box follows, if any
     QStringList overrides;
     QStringList groups; // outermost to innermost
     bool locked = false;
@@ -216,8 +221,13 @@ struct Comment {
 
 struct ObjectStyle { QString id, name; SceneObject appearance; };
 
+// A named way for text to look, that boxes can follow. Changing the style
+// changes every box that follows it, except where a box says otherwise.
+struct TextStyle { QString id, name; SceneObject look; };
+
 struct Document {
     QVector<ObjectStyle> objectStyles;
+    QVector<TextStyle> textStyles;
     QSizeF size = QSizeF(1920, 1080);
     QVector<Slide> slides;
     QVector<Section> sections;

@@ -31,7 +31,19 @@ Qt::Alignment alignment(int value) {
 }
 bool legacy(const SceneObject &o) {
     return o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
-           o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0;
+           o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0 &&
+           o.tabStop == 0 && o.columns <= 1 && o.direction == 0;
+}
+
+// How wide one column is, and how far apart the columns sit.
+qreal columnGap(const SceneObject &o, qreal size) {
+    return o.columnGap > 0 ? o.columnGap : size * 0.8;
+}
+qreal columnWidth(const SceneObject &o, qreal size) {
+    const int columns = qBound(1, o.columns, 6);
+    if (columns <= 1) return qMax(1.0, o.rect.width());
+    const qreal gaps = columnGap(o, size) * (columns - 1);
+    return qMax(1.0, (o.rect.width() - gaps) / columns);
 }
 std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     // QTextDocument belongs to its creating thread. Cache per thread, with a
@@ -39,7 +51,8 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     static thread_local QCache<QByteArray, std::shared_ptr<QTextDocument>> cache(16*1024);
     QByteArray key;
     QDataStream stream(&key, QIODevice::WriteOnly);
-    stream << o.text << o.fontFamily << size << o.rect.width() << o.fontWeight
+    stream << o.text << o.fontFamily << size << o.rect.width() << o.rect.height()
+           << o.tabStop << o.columns << o.columnGap << o.direction << o.fontWeight
            << o.italic << o.underline << o.letterSpacing << o.uppercase
            << o.textAlign << o.lineHeight << o.paragraphSpacing << o.textIndent
            << o.listStyle << o.listStart << o.textColor;
@@ -52,10 +65,19 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     doc->setDocumentMargin(0);
     doc->setDefaultFont(fontFor(o, size));
     doc->setIndentWidth(size * 1.2);
-    doc->setTextWidth(qMax(1.0, o.rect.width()));
+    doc->setTextWidth(columnWidth(o, size));
     QTextOption option;
     option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    // Tabs line up on a stop rather than nesting, unless the box is a list,
+    // where a leading tab is what makes a sub-item.
+    if (o.listStyle == 0)
+        option.setTabStopDistance(o.tabStop > 0 ? o.tabStop : size * 4);
+    if (o.direction == 1) option.setTextDirection(Qt::LeftToRight);
+    if (o.direction == 2) option.setTextDirection(Qt::RightToLeft);
     doc->setDefaultTextOption(option);
+    // Columns are pages: the text flows down one and into the next.
+    if (o.columns > 1)
+        doc->setPageSize(QSizeF(columnWidth(o, size), qMax(1.0, o.rect.height())));
     QTextCursor cursor(doc.get());
     const auto paragraphs = o.text.split('\n');
     QMap<int, QTextList *> lists;
@@ -78,6 +100,8 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
         level = qMin(8, level);
         QTextBlockFormat block;
         block.setAlignment(alignment(o.textAlign));
+        if (o.direction != 0)
+            block.setLayoutDirection(o.direction == 2 ? Qt::RightToLeft : Qt::LeftToRight);
         block.setLineHeight(o.lineHeight, QTextBlockFormat::ProportionalHeight);
         block.setBottomMargin(i + 1 < paragraphs.size() ? o.paragraphSpacing : 0);
         block.setLeftMargin(o.textIndent);
@@ -137,6 +161,15 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     return doc;
 }
 QSizeF contentSize(const SceneObject &o, qreal size) {
+    if (o.columns > 1) {
+        // What matters is how many columns the text needs, expressed as height.
+        auto doc = layout(o, size);
+        const int pages = qMax(1, doc->pageCount());
+        const qreal height = qMax(1.0, o.rect.height());
+        const int columns = qBound(1, o.columns, 6);
+        return QSizeF(o.rect.width(), pages <= columns ? height * pages / columns
+                                                       : height * pages / columns);
+    }
     if (legacy(o)) {
         const QFontMetricsF metrics(fontFor(o, size));
         return metrics
@@ -185,13 +218,32 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
     }
     const auto metrics = measure(o);
     auto doc = layout(o, metrics.effectiveSize);
+    QAbstractTextDocumentLayout::PaintContext context;
+    context.palette.setColor(QPalette::Text, o.textColor);
+    if (o.columns > 1) {
+        // Each column is one page of the same document, side by side.
+        const int columns = qBound(1, o.columns, 6);
+        const qreal width = columnWidth(o, metrics.effectiveSize);
+        const qreal gap = columnGap(o, metrics.effectiveSize);
+        const qreal height = qMax(1.0, o.rect.height());
+        painter.save();
+        painter.setClipRect(o.rect, Qt::IntersectClip);
+        for (int column = 0; column < qMin(columns, qMax(1, doc->pageCount())); ++column) {
+            painter.save();
+            painter.translate(o.rect.topLeft() + QPointF(column * (width + gap), 0));
+            painter.setClipRect(QRectF(0, 0, width, height), Qt::IntersectClip);
+            painter.translate(0, -column * height);
+            doc->documentLayout()->draw(&painter, context);
+            painter.restore();
+        }
+        painter.restore();
+        return;
+    }
     const qreal spare = qMax(0.0, o.rect.height() - metrics.renderedHeight);
     const qreal dy = o.verticalAlign == 1 ? spare / 2 : o.verticalAlign == 2 ? spare : 0;
     painter.save();
     painter.setClipRect(o.rect, Qt::IntersectClip);
     painter.translate(o.rect.topLeft() + QPointF(0, dy));
-    QAbstractTextDocumentLayout::PaintContext context;
-    context.palette.setColor(QPalette::Text, o.textColor);
     doc->documentLayout()->draw(&painter, context);
     painter.restore();
 }

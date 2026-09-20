@@ -44,6 +44,7 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList mediaPreflight READ mediaPreflight NOTIFY mediaJobChanged)
     Q_PROPERTY(QVariantList connectorTargets READ connectorTargets NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList objectStyles READ objectStyles NOTIFY documentChanged)
+    Q_PROPERTY(QVariantList textStyles READ textStyles NOTIFY documentChanged)
     Q_PROPERTY(QStringList shapeNames READ shapeNames CONSTANT)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
@@ -333,6 +334,12 @@ public:
     Q_INVOKABLE void saveObjectStyle(const QString &name, const QString &existingId = QString());
     Q_INVOKABLE void applyObjectStyle(const QString &id);
     Q_INVOKABLE void removeObjectStyle(const QString &id);
+    QVariantList textStyles() const;
+    Q_INVOKABLE QString addTextStyle(const QString &name);
+    Q_INVOKABLE bool applyTextStyle(const QString &id);
+    Q_INVOKABLE bool updateTextStyleFromSelection();
+    Q_INVOKABLE bool renameTextStyle(const QString &id, const QString &name);
+    Q_INVOKABLE bool removeTextStyle(const QString &id);
     Q_INVOKABLE void addShape(int kind);
     QVector<SceneObject> combinedShapes(int operation) const;
     Q_INVOKABLE bool combineShapes(int operation);

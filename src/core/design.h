@@ -5,6 +5,9 @@
 namespace Design {
 const SlideLayout *layout(const Document &document, const QString &id);
 const Master *master(const Document &document, const QString &id);
+const TextStyle *textStyle(const Document &document, const QString &id);
+// The text properties a named style carries. Everything else is the box's own.
+QStringList textStyleKeys();
 SceneObject themed(const DeckTheme &theme, SceneObject object);
 Slide resolve(const Document &document, int index);
 DeckTheme preset(int index);

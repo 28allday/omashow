@@ -42,7 +42,7 @@ SceneObject objectFromJson(const QJsonObject &json) {
     const auto type = json.value("type").toString();
     object.type = type == "text" ? ObjectType::Text : type == "image" ? ObjectType::Image : type == "rect" ? ObjectType::Rect : type == "media" ? ObjectType::Media : type == "table" ? ObjectType::Table : type == "chart" ? ObjectType::Chart : ObjectType(-1);
     const auto known=Design::properties(object);
-    const QSet<QString> structural={"id","type","placeholderId","groups","overrides","runs"};
+    const QSet<QString> structural={"id","type","placeholderId","textStyleId","groups","overrides","runs"};
     for (auto it = json.begin(); it != json.end(); ++it) {
         if(structural.contains(it.key())) continue;
         if(!known.contains(it.key()) || !Design::setProperty(object,it.key(),it.value().toVariant(),false)) object.type=ObjectType(-1);
@@ -51,6 +51,7 @@ SceneObject objectFromJson(const QJsonObject &json) {
     object.rect = QRectF(json.value("x").toDouble(), json.value("y").toDouble(),
                          json.value("w").toDouble(), json.value("h").toDouble());
     object.placeholderId = json.value("placeholderId").toString();
+    object.textStyleId = json.value("textStyleId").toString();
     for (const auto &group : json.value("groups").toArray()) object.groups.append(group.toString());
     for (const auto &key : json.value("overrides").toArray()) object.overrides.append(key.toString());
     if (json.contains("runs")) {
@@ -294,7 +295,9 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     }
     QJsonArray styles;
     for(const auto &style:document.objectStyles) styles.append(QJsonObject{{"id",style.id},{"name",style.name},{"appearance",objectToJson(style.appearance)}});
-    entries.append({"styles.json",QJsonDocument(styles).toJson(),true});
+    QJsonArray textStyles;
+    for(const auto &style:document.textStyles) textStyles.append(QJsonObject{{"id",style.id},{"name",style.name},{"look",objectToJson(style.look)}});
+    entries.append({"styles.json",QJsonDocument(QJsonObject{{"objects",styles},{"text",textStyles}}).toJson(),true});
     QJsonArray comments;
     for (const auto &comment : document.comments)
         comments.append(QJsonObject{{"id",comment.id},{"slideId",comment.slideId},
@@ -602,12 +605,40 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
     };
     if(reader.names().contains("styles.json")) {
         QJsonParseError error; const auto json=QJsonDocument::fromJson(reader.read("styles.json"),&error);
-        if(error.error!=QJsonParseError::NoError || !json.isArray() || json.array().size()>1000) { result.error="Invalid object styles."; return result; }
+        if(error.error!=QJsonParseError::NoError) { result.error="Invalid object styles."; return result; }
+        // Format 18 and earlier wrote a bare array of object styles; 19 keeps
+        // object and text styles side by side.
+        const QJsonArray objectRows = json.isArray() ? json.array()
+                                                     : json.object().value("objects").toArray();
+        const QJsonArray textRows = json.isObject() ? json.object().value("text").toArray()
+                                                    : QJsonArray();
+        if((!json.isArray() && !json.isObject()) || objectRows.size()>1000 || textRows.size()>1000) {
+            result.error="Invalid object styles."; return result;
+        }
         QSet<QString> ids;
-        for(const auto &value:json.array()) { const auto row=value.toObject(); ObjectStyle style; style.id=row.value("id").toString(); style.name=row.value("name").toString(); style.appearance=objectFromJson(row.value("appearance").toObject());
+        for(const auto &value:objectRows) { const auto row=value.toObject(); ObjectStyle style; style.id=row.value("id").toString(); style.name=row.value("name").toString(); style.appearance=objectFromJson(row.value("appearance").toObject());
             if(style.id.isEmpty() || style.name.trimmed().isEmpty() || ids.contains(style.id)) { result.error="An object style has an invalid identity."; return result; }
             QVector<SceneObject> objects{style.appearance}; if(!loadAssets(objects)) return result; style.appearance=objects.first(); ids.insert(style.id); document.objectStyles.append(style);
         }
+        QSet<QString> textIds;
+        for(const auto &value:textRows) {
+            const auto row=value.toObject();
+            TextStyle style;
+            style.id=row.value("id").toString();
+            style.name=row.value("name").toString();
+            style.look=objectFromJson(row.value("look").toObject());
+            if(style.id.isEmpty() || style.name.trimmed().isEmpty() || textIds.contains(style.id) ||
+               style.look.type==ObjectType(-1)) {
+                result.error="A text style has an invalid identity."; return result;
+            }
+            textIds.insert(style.id);
+            document.textStyles.append(style);
+        }
+        for(const auto &slide:document.slides)
+            for(const auto &object:slide.objects)
+                if(!object.textStyleId.isEmpty() && !textIds.contains(object.textStyleId)) {
+                    result.error="A text box follows a style the deck does not have."; return result;
+                }
     }
     for (auto &m : document.masters) if (!loadAssets(m.objects)) return result;
     for (auto &l : document.layouts) if (!loadAssets(l.placeholders)) return result;

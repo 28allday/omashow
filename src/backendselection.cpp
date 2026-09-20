@@ -642,3 +642,154 @@ bool Backend::formatSelection(const QString &key, const QVariant &value) {
   emit textFormattingChanged();
   return true;
 }
+
+// --- named text styles -------------------------------------------------------
+QVariantList Backend::textStyles() const {
+  QVariantList rows;
+  for (const auto &style : m_document.textStyles) {
+    int uses = 0;
+    for (const auto &slide : m_document.slides)
+      for (const auto &object : slide.objects)
+        if (object.textStyleId == style.id) ++uses;
+    auto look = Design::properties(Design::themed(m_document.theme, style.look));
+    rows.append(QVariantMap{{"id", style.id},
+                            {"name", style.name},
+                            {"uses", uses},
+                            {"fontFamily", look.value("fontFamily")},
+                            {"fontSize", look.value("fontSize")},
+                            {"textColor", look.value("textColor")}});
+  }
+  return rows;
+}
+
+QString Backend::addTextStyle(const QString &name) {
+  const auto *source = static_cast<const Backend *>(this)->selectedObject();
+  const auto trimmed = name.trimmed();
+  if (!source || source->type != ObjectType::Text || trimmed.isEmpty() ||
+      trimmed.size() > 120 || m_document.textStyles.size() >= 200)
+    return {};
+  TextStyle style;
+  style.id = Edit::newId("textstyle");
+  style.name = trimmed;
+  // The style keeps the look as it is seen, so it carries the layout's values
+  // as well as the box's own.
+  const auto shown = Design::resolve(m_document, m_currentSlide);
+  style.look = shown.find(source->id) ? *shown.find(source->id) : *source;
+  style.look.text.clear();
+  style.look.runs.clear();
+  m_history.begin(m_document, tr("Keep a text style"));
+  m_document.textStyles.append(style);
+  // The box that made it follows it, so changing the style changes it too.
+  for (auto &object : m_document.slides[m_currentSlide].objects)
+    if (object.id == source->id) {
+      object.textStyleId = style.id;
+      for (const auto &key : Design::textStyleKeys()) object.overrides.removeAll(key);
+    }
+  m_history.commit();
+  touch();
+  return style.id;
+}
+
+bool Backend::applyTextStyle(const QString &id) {
+  if (!id.isEmpty() && !Design::textStyle(m_document, id)) return false;
+  const auto ids = selectedIds();
+  if (ids.isEmpty()) return false;
+  m_history.begin(m_document, id.isEmpty() ? tr("Unlink the text style")
+                                           : tr("Use a text style"));
+  bool changed = false;
+  for (const auto &objectId : ids) {
+    auto *object = m_document.slides[m_currentSlide].find(objectId);
+    if (!object || object->type != ObjectType::Text) continue;
+    if (object->textStyleId == id) continue;
+    if (id.isEmpty()) {
+      // Unlinking keeps what is on screen: the values are written in.
+      const auto shown = Design::resolve(m_document, m_currentSlide);
+      if (const auto *visible = shown.find(objectId)) {
+        const auto values = Design::properties(*visible);
+        for (const auto &key : Design::textStyleKeys()) {
+          Design::setProperty(*object, key, values.value(key), false);
+          // Written in as this box's own, so a layout cannot take it back.
+          Design::markOverride(*object, key);
+        }
+      }
+    } else {
+      for (const auto &key : Design::textStyleKeys()) object->overrides.removeAll(key);
+    }
+    object->textStyleId = id;
+    changed = true;
+  }
+  if (!changed) {
+    m_history.abandon();
+    return false;
+  }
+  m_history.commit();
+  touch();
+  return true;
+}
+
+bool Backend::updateTextStyleFromSelection() {
+  const auto *source = static_cast<const Backend *>(this)->selectedObject();
+  if (!source || source->type != ObjectType::Text || source->textStyleId.isEmpty()) return false;
+  const auto shown = Design::resolve(m_document, m_currentSlide);
+  const auto *visible = shown.find(source->id);
+  if (!visible) return false;
+  m_history.begin(m_document, tr("Update the text style"));
+  for (auto &style : m_document.textStyles) {
+    if (style.id != source->textStyleId) continue;
+    const auto values = Design::properties(*visible);
+    for (const auto &key : Design::textStyleKeys())
+      Design::setProperty(style.look, key, values.value(key), false);
+    style.look.textColorToken = visible->textColorToken;
+    style.look.fontToken = visible->fontToken;
+  }
+  // What was a local difference is now what the style says.
+  for (auto &object : m_document.slides[m_currentSlide].objects)
+    if (object.id == source->id)
+      for (const auto &key : Design::textStyleKeys()) object.overrides.removeAll(key);
+  m_history.commit();
+  touch();
+  return true;
+}
+
+bool Backend::renameTextStyle(const QString &id, const QString &name) {
+  const auto trimmed = name.trimmed();
+  if (trimmed.isEmpty() || trimmed.size() > 120) return false;
+  for (int i = 0; i < m_document.textStyles.size(); ++i) {
+    if (m_document.textStyles.at(i).id != id) continue;
+    if (m_document.textStyles.at(i).name == trimmed) return true;
+    m_history.begin(m_document, tr("Rename a text style"));
+    m_document.textStyles[i].name = trimmed;
+    m_history.commit();
+    touch();
+    return true;
+  }
+  return false;
+}
+
+bool Backend::removeTextStyle(const QString &id) {
+  if (!Design::textStyle(m_document, id)) return false;
+  m_history.begin(m_document, tr("Remove a text style"));
+  // Boxes that followed it keep the look they had.
+  for (int i = 0; i < m_document.slides.size(); ++i) {
+    const auto shown = Design::resolve(m_document, i);
+    for (auto &object : m_document.slides[i].objects) {
+      if (object.textStyleId != id) continue;
+      if (const auto *visible = shown.find(object.id)) {
+        const auto values = Design::properties(*visible);
+        for (const auto &key : Design::textStyleKeys()) {
+          Design::setProperty(object, key, values.value(key), false);
+          Design::markOverride(object, key);
+        }
+      }
+      object.textStyleId.clear();
+    }
+  }
+  for (int i = 0; i < m_document.textStyles.size(); ++i)
+    if (m_document.textStyles.at(i).id == id) {
+      m_document.textStyles.removeAt(i);
+      break;
+    }
+  m_history.commit();
+  touch();
+  return true;
+}

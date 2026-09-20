@@ -28,8 +28,15 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   follow their letters when the words are rewritten, and survive saving,
   reopening, export and text builds. Horizontal
   and vertical alignment, line/paragraph spacing, indent, bullets and numbering.
-  Leading tabs nest list items. Clip with an overflow warning, shrink to fit,
-  or resize the box to fit its text.
+  Leading tabs nest list items; a tab stop distance can be set per box. Text can
+  run in up to six columns with its own gap, and reading direction can follow the
+  words or be forced left-to-right or right-to-left. Clip with an overflow
+  warning, shrink to fit, or resize the box to fit its text.
+- **Text styles:** keep the look of a text box as a named style and other boxes
+  can follow it — typeface, size, weight, colour, alignment, spacing, lists,
+  tabs, columns and direction, but never the words. Update the style and every
+  box following it changes, except where a box was given its own value, which
+  stays. Unlinking keeps the look the box had.
 - **Shapes:** 24 basic shapes, arrows, callouts, flowchart shapes and symbols;
   solid, linear/radial gradient, pattern and picture fills; stroke width, dash,
   join and cap; opacity and offset shadows. Saved object styles copy appearance
@@ -146,7 +153,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   with whole-word, case and scope options, and refuses a match whose words have
   changed since it was found. Findings cover missing descriptions, text contrast
   below WCAG 2.2, type that is too small, text that does not fit, slides with no
-  title, links that do not say where they go and a reading order that disagrees
+  title, typefaces this computer has not got (with what is being drawn instead),
+  links that do not say where they go and a reading order that disagrees
   with the layout; each can be gone to, or set aside as not a problem — a
   decision the deck remembers. Reading order and alternative text are editable
   per slide, and statistics count slides, words, pictures, film, typefaces and
@@ -198,13 +206,10 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
   says so — advice, not a lock.
 
-Recording, interchange with other applications and other release features remain
-on the roadmap. Tab stops, columns, text
-direction, reusable text styles, spell-checking and text on a path are not
-built yet. Exported PDFs carry real text but
-not clickable link annotations. Notes are plain
-text, and reading order is not yet carried into exported PDF. Text formatting applies to whole
-boxes; per-character styles and advanced typography remain planned.
+Screen recording, interchange with other applications and other release features
+remain on the roadmap. Spell-checking, text on a path and equations are not built
+yet. Exported PDFs carry real text but not clickable link annotations. Notes are
+plain text, and reading order is not yet carried into exported PDF.
 
 ## Shared design and time
 

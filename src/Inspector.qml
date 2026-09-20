@@ -400,6 +400,76 @@ Rectangle {
                       ? qsTr("The selected text is not all the same. Changing something here settles it.")
                       : qsTr("These apply to the selected text, not the whole box.")
             }
+            FieldRow {
+                label: qsTr("Tab stop")
+                NumField { objectName: "textTabStop"; Layout.fillWidth: true; suffix: " pt"
+                           value: root.sel.tabStop ?? 0
+                           onCommitted: v => backend.setSelectedProperty("tabStop", v) }
+            }
+            FieldRow {
+                label: qsTr("Columns")
+                SpinBox { objectName: "textColumns"; Layout.fillWidth: true; from: 1; to: 6
+                          value: root.sel.columns ?? 1
+                          onValueModified: backend.setSelectedProperty("columns", value) }
+                NumField { objectName: "textColumnGap"; Layout.fillWidth: true; suffix: " pt"
+                           visible: (root.sel.columns ?? 1) > 1
+                           value: root.sel.columnGap ?? 0
+                           onCommitted: v => backend.setSelectedProperty("columnGap", v) }
+            }
+            FieldRow {
+                label: qsTr("Direction")
+                ComboBox {
+                    objectName: "textDirection"
+                    Layout.fillWidth: true
+                    model: [qsTr("Follow the words"), qsTr("Left to right"), qsTr("Right to left")]
+                    currentIndex: root.sel.direction ?? 0
+                    onActivated: backend.setSelectedProperty("direction", currentIndex)
+                }
+            }
+            Divider {}
+            FieldRow {
+                label: qsTr("Style")
+                ComboBox {
+                    objectName: "textStyleChoice"
+                    Layout.fillWidth: true
+                    textRole: "name"
+                    valueRole: "id"
+                    model: [{ id: "", name: qsTr("No style"), uses: 0 }].concat(backend.textStyles)
+                    currentIndex: Math.max(0, model.findIndex(style => style.id === (root.sel.textStyleId ?? "")))
+                    onActivated: backend.applyTextStyle(currentValue)
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Button { objectName: "keepTextStyle"; Layout.fillWidth: true; text: qsTr("Keep as style…")
+                         onClicked: textStyleName.open() }
+                Button { objectName: "updateTextStyle"; Layout.fillWidth: true; text: qsTr("Update style")
+                         enabled: (root.sel.textStyleId ?? "").length > 0
+                         onClicked: backend.updateTextStyleFromSelection() }
+            }
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                visible: (root.sel.textStyleId ?? "").length > 0
+                text: qsTr("This box follows a style. Changing something here is its own, and stays when the style changes.")
+            }
+            Dialog {
+                id: textStyleName
+                objectName: "textStyleDialog"
+                parent: Overlay.overlay; anchors.centerIn: parent
+                width: Math.min(parent.width - Theme.s5 * 2, 460)
+                modal: true; title: qsTr("Keep this look as a style")
+                standardButtons: Dialog.Save | Dialog.Cancel
+                onOpened: { textStyleField.text = ""; textStyleField.forceActiveFocus() }
+                onAccepted: backend.addTextStyle(textStyleField.text)
+                ColumnLayout {
+                    width: parent.width
+                    TextField { id: textStyleField; objectName: "textStyleNameField"; Layout.fillWidth: true
+                                placeholderText: qsTr("Name for the style") }
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                            font.pixelSize: Theme.fsLabel
+                            text: qsTr("Typeface, size, weight, colour, alignment, spacing, lists, tabs, columns and direction. Not the words.") }
+                }
+            }
             Divider {}
             FieldRow {
                 label: qsTr("Align")

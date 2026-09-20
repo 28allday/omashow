@@ -40,7 +40,8 @@ namespace Bundle {
 // Format 16 adds builds that travel along another object's outline.
 // Format 17 adds character formatting over stretches of a text box.
 // Format 18 adds named custom shows: an order of slides, never copies of them.
-constexpr int kFormatVersion = 18;
+// Format 19 adds tab stops, columns and text direction.
+constexpr int kFormatVersion = 19;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 
