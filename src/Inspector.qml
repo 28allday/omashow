@@ -336,6 +336,67 @@ Rectangle {
             }
 
             FieldRow {
+                label: qsTr("Content")
+                ComboBox {
+                    objectName: "textKind"
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: Theme.s5 * 5
+                    model: [qsTr("Words"), qsTr("An equation")]
+                    currentIndex: root.sel.textKind ?? 0
+                    onActivated: backend.setSelectedProperty("textKind", currentIndex)
+                }
+            }
+            Button {
+                objectName: "equationHelp"
+                Layout.fillWidth: true
+                visible: (root.sel.textKind ?? 0) === 1
+                text: qsTr("What can I type?")
+                onClicked: equationHelp.open()
+            }
+            Label {
+                objectName: "equationProblem"
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warning
+                visible: (root.sel.equationError ?? "").length > 0
+                text: root.sel.equationError ?? ""
+            }
+            Dialog {
+                id: equationHelp
+                objectName: "equationHelpDialog"
+                parent: Overlay.overlay; anchors.centerIn: parent
+                width: Math.min(parent.width - Theme.s5 * 2, 520)
+                modal: true; title: qsTr("Writing an equation")
+                standardButtons: Dialog.Close
+                ColumnLayout {
+                    width: parent.width
+                    spacing: Theme.s2
+                    Label {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                        text: qsTr("Type it the way it is written by hand. Everything else is ordinary text, drawn in the box's own typeface and colour.")
+                    }
+                    Repeater {
+                        model: [
+                            { what: qsTr("Above and below"), how: "x^2   a_n   x_i^2" },
+                            { what: qsTr("Fractions"), how: "\\frac{a}{b}" },
+                            { what: qsTr("Roots"), how: "\\sqrt{x}   \\sqrt[3]{x}" },
+                            { what: qsTr("Sums and integrals"), how: "\\sum_{i=1}^{n}   \\int_0^1   \\lim_{x \\to 0}" },
+                            { what: qsTr("Greek"), how: "\\alpha \\beta \\pi \\Omega" },
+                            { what: qsTr("Signs"), how: "\\times \\div \\pm \\leq \\geq \\neq \\approx \\infty" },
+                            { what: qsTr("Brackets that grow"), how: "\\left( \\frac{a}{b} \\right)" },
+                            { what: qsTr("Marks and words"), how: "\\bar{x}   \\hat{y}   \\vec{v}   \\text{where}" },
+                            { what: qsTr("Space and new lines"), how: "\\, \\quad   \\\\" }
+                        ]
+                        RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: Theme.s3
+                            Label { Layout.preferredWidth: Theme.wFieldLabel * 1.4; text: modelData.what; color: Theme.textMuted }
+                            Label { Layout.fillWidth: true; text: modelData.how; font.family: Theme.monoFamily; wrapMode: Text.Wrap }
+                        }
+                    }
+                }
+            }
+
+            FieldRow {
                 label: qsTr("Font")
                 ComboBox {
                     Layout.fillWidth: true

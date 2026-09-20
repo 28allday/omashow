@@ -57,7 +57,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"text", o.text}, {"fontSize", o.fontSize}, {"fontWeight", o.fontWeight},
             {"italic",o.italic},{"underline",o.underline},{"textAlign",o.textAlign},{"verticalAlign",o.verticalAlign},
             {"lineHeight",o.lineHeight},{"paragraphSpacing",o.paragraphSpacing},{"textIndent",o.textIndent},
-            {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},
+            {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},{"textKind",o.textKind},
             {"tabStop",o.tabStop},{"columns",o.columns},{"columnGap",o.columnGap},{"direction",o.direction},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
             {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
@@ -65,7 +65,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"placeholderId", o.placeholderId}, {"textStyleId", o.textStyleId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
 }
 bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, bool constrainForEditing) {
-    const QStringList numeric = {"tabStop","columns","columnGap","direction","mediaBytes","mediaModified","mediaDuration","mediaTrimStart","mediaTrimEnd","mediaVolume","mediaLoops","x", "y", "w", "h", "rotation", "opacity", "cornerRadius",
+    const QStringList numeric = {"textKind","tabStop","columns","columnGap","direction","mediaBytes","mediaModified","mediaDuration","mediaTrimStart","mediaTrimEnd","mediaVolume","mediaLoops","x", "y", "w", "h", "rotation", "opacity", "cornerRadius",
                                  "linkKind", "connectorStartX", "connectorStartY", "connectorEndX", "connectorEndY", "connectorFromSide", "connectorToSide", "connectorRoute", "shapeKind", "fillStyle", "fillAngle", "patternStyle", "strokeWidth", "strokeStyle", "strokeJoin", "strokeCap", "shadowX", "shadowY", "fontSize", "fontWeight", "letterSpacing", "textAlign", "verticalAlign", "lineHeight", "paragraphSpacing", "textIndent", "listStyle", "listStart", "textFit", "imageMask", "imageFocalX", "imageFocalY", "imageBrightness", "imageContrast", "imageSaturation", "imageTintAmount", "imageMode", "cropX", "cropY", "cropW", "cropH"};
     bool ok = false;
     const qreal n = v.toDouble(&ok);
@@ -179,6 +179,7 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),2);
     else if (key == "listStart") o.listStart = qBound(1,v.toInt(),9999);
     else if (key == "textFit") o.textFit = qBound(0,v.toInt(),1);
+    else if (key == "textKind") o.textKind = qBound(0,v.toInt(),1);
     else if (key == "tabStop") o.tabStop = qBound(0.0,n,4000.0);
     else if (key == "columns") o.columns = qBound(1,v.toInt(),6);
     else if (key == "columnGap") o.columnGap = qBound(0.0,n,4000.0);

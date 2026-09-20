@@ -37,6 +37,13 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   tabs, columns and direction, but never the words. Update the style and every
   box following it changes, except where a box was given its own value, which
   stays. Unlinking keeps the look the box had.
+- **Equations:** a text box can hold maths instead of words, written the way it
+  is written by hand — `^` and `_`, `\frac`, `\sqrt`, `\sum`, `\int`, `\lim`,
+  Greek letters, brackets that grow with what is inside them, accents and
+  `\text{...}`. It is drawn as glyphs and rules in the box's own typeface and
+  colour, so it is sharp in an exported PDF and editable as the letters that
+  made it. What cannot be read is named in the inspector and in review, and the
+  box falls back to showing what was typed.
 - **Shapes:** 24 basic shapes, arrows, callouts, flowchart shapes and symbols;
   solid, linear/radial gradient, pattern and picture fills; stroke width, dash,
   join and cap; opacity and offset shadows. Saved object styles copy appearance
@@ -154,6 +161,7 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   changed since it was found. Findings cover missing descriptions, text contrast
   below WCAG 2.2, type that is too small, text that does not fit, slides with no
   title, typefaces this computer has not got (with what is being drawn instead),
+  equations that cannot be read,
   links that do not say where they go and a reading order that disagrees
   with the layout; each can be gone to, or set aside as not a problem — a
   decision the deck remembers. Reading order and alternative text are editable
@@ -207,8 +215,9 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   says so — advice, not a lock.
 
 Screen recording, interchange with other applications and other release features
-remain on the roadmap. Spell-checking, text on a path and equations are not built
-yet. Exported PDFs carry real text but not clickable link annotations. Notes are
+remain on the roadmap. Spell-checking and text on a path are not built yet.
+Shapes from other applications' plug-ins cannot arrive, because nothing is
+imported from them. Exported PDFs carry real text but not clickable link annotations. Notes are
 plain text, and reading order is not yet carried into exported PDF.
 
 ## Shared design and time

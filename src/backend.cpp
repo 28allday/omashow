@@ -699,6 +699,28 @@ void Backend::addText() {
   touch();
 }
 
+void Backend::addEquation() {
+  m_history.begin(m_document, QStringLiteral("Add equation"));
+  const QString id = Edit::addText(
+      m_document, m_currentSlide,
+      QPointF(m_document.size.width() / 2.0, m_document.size.height() / 2.0));
+  if (auto *o = m_document.slides[m_currentSlide].find(id)) {
+    o->textKind = 1;
+    // Something that reads as maths straight away, so the box is not a puzzle.
+    o->text = QStringLiteral("e^{i\\pi} + 1 = 0");
+    o->textAlign = 1;
+    Design::markOverride(*o, QStringLiteral("textKind"));
+    Design::markOverride(*o, QStringLiteral("text"));
+    Design::markOverride(*o, QStringLiteral("textAlign"));
+  }
+  m_history.commit();
+  m_selectedId = id;
+  m_selectedIds = {id};
+  if (auto *o = selectedObject())
+    o->groups = m_groupScope;
+  touch();
+}
+
 void Backend::addRect() { addShape(0); }
 
 void Backend::setSnapEnabled(bool enabled) {

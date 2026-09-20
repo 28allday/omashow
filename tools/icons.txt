@@ -28,3 +28,6 @@ zoom-in zoom-out maximize scan-search route zap timer clock
 monitor arrow-left-right circle-stop rotate-ccw snowflake mouse-pointer-2
 circle-dot eraser mic volume-2 sun moon arrow-left arrow-right radio
 file-text file-image file-play file-output diamond
+
+# maths
+sigma

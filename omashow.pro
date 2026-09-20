@@ -73,6 +73,8 @@ SOURCES += src/core/objectcopy.cpp src/backendclipboard.cpp
 
 HEADERS += src/render/textlayout.h
 SOURCES += src/render/textlayout.cpp
+HEADERS += src/render/mathlayout.h
+SOURCES += src/render/mathlayout.cpp
 
 HEADERS += src/core/imageasset.h
 SOURCES += src/core/imageasset.cpp src/backendimage.cpp

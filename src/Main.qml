@@ -247,6 +247,7 @@ ApplicationWindow {
             { group: qsTr("Slides"), name: qsTr("Skip this slide in the show"), also: "hide omit", enabled: !backend.startVisible, run: () => backend.setSlidesSkipped(true) },
             { group: qsTr("Slides"), name: qsTr("Change the slide size"), also: "aspect ratio widescreen portrait", enabled: !backend.startVisible, run: () => slideSizeDialog.open() },
             { group: qsTr("Insert"), name: qsTr("Text"), also: "words box type", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addText() } },
+            { group: qsTr("Insert"), name: qsTr("An equation"), also: "maths math formula latex fraction", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addEquation() } },
             { group: qsTr("Insert"), name: qsTr("A shape"), also: "rectangle circle arrow", enabled: !backend.startVisible, run: () => { win.workspace = 0; shapeGallery.open() } },
             { group: qsTr("Insert"), name: qsTr("A picture"), also: "image photo png", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertImageDialog() } },
             { group: qsTr("Insert"), name: qsTr("Film or sound"), also: "video audio movie clip", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertMediaDialog() } },
@@ -434,6 +435,7 @@ ApplicationWindow {
                     Menu {
                         title: qsTr("Insert")
                         MenuItem { text: qsTr("Text"); icon.name: "type"; onTriggered: { win.workspace = 0; backend.addText() } }
+                        MenuItem { objectName: "insertEquation"; text: qsTr("Equation"); icon.name: "sigma"; onTriggered: { win.workspace = 0; win.commitEditors(); backend.addEquation() } }
                         MenuItem { text: qsTr("Shape…"); icon.name: "shapes"; onTriggered: { win.workspace = 0; win.commitEditors(); shapeGallery.open() } }
                         MenuItem { text: qsTr("Picture…"); icon.name: "image"; onTriggered: { win.workspace = 0; win.commitEditors(); backend.insertImageDialog() } }
                         MenuSeparator {}

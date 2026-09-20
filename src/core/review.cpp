@@ -3,6 +3,7 @@
 #include "core/design.h"
 #include "core/edit.h"
 #include "render/textlayout.h"
+#include "render/mathlayout.h"
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QSet>
@@ -210,7 +211,7 @@ QString Review::validate(const Document &d) {
 QVariantMap Review::statistics(const Document &d) {
     int words = 0, characters = 0, pictures = 0, films = 0, sounds = 0, tables = 0,
         charts = 0, shapes = 0, textBoxes = 0, notes = 0, builds = 0, skipped = 0,
-        noteWords = 0, missingAlt = 0;
+        noteWords = 0, missingAlt = 0, equations = 0;
     qint64 assetBytes = 0;
     QSet<QString> fonts, countedAssets;
     for (int i = 0; i < d.slides.size(); ++i) {
@@ -227,6 +228,7 @@ QVariantMap Review::statistics(const Document &d) {
             switch (o.type) {
             case ObjectType::Text:
                 ++textBoxes;
+                if (o.textKind == 1) ++equations;
                 words += wordsIn(o.text);
                 characters += o.text.size();
                 fonts.insert(o.fontFamily);
@@ -263,6 +265,7 @@ QVariantMap Review::statistics(const Document &d) {
     return QVariantMap{{"slides", d.slides.size()}, {"skipped", skipped},
                        {"sections", d.sections.size()}, {"words", words},
                        {"characters", characters}, {"textBoxes", textBoxes},
+                       {"equations", equations},
                        {"pictures", pictures}, {"films", films}, {"sounds", sounds},
                        {"tables", tables}, {"charts", charts}, {"shapes", shapes},
                        {"builds", builds}, {"notes", notes}, {"noteWords", noteWords},
@@ -361,6 +364,15 @@ QVariantList Review::issues(const Document &d) {
                         QString("It is being drawn in %1 instead. Install the typeface, or "
                                 "choose one this computer has, before the deck travels.")
                             .arg(QFontInfo(QFont(o.fontFamily)).family()));
+                if (o.textKind == 1 && authoredHere) {
+                    const auto equation = MathLayout::build(o.text, QFont(o.fontFamily),
+                                                            o.fontSize, o.textAlign);
+                    if (!equation.ok)
+                        add("equation/" + o.id, i, authored.id, o.id, "should", "equation",
+                            nameFor(o) + " is not read as maths",
+                            equation.error + QStringLiteral(" Until then the box shows what was "
+                                                            "typed, as ordinary text."));
+                }
                 if (TextLayout::measure(o).overflow && o.textFit == 0)
                     add("overflow/" + o.id, i, authored.id, o.id, "should", "overflow",
                         nameFor(o) + " does not fit its box",

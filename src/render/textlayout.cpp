@@ -8,6 +8,7 @@
 #include <QTextList>
 #include <QCache>
 #include "core/textruns.h"
+#include "render/mathlayout.h"
 #include <QDataStream>
 #include <memory>
 namespace {
@@ -29,8 +30,13 @@ Qt::Alignment alignment(int value) {
            : value == 3 ? Qt::AlignJustify
                         : Qt::AlignLeft;
 }
+bool maths(const SceneObject &o) { return o.textKind == 1; }
+// An equation drawn from the words that made it, at the box's own type size.
+MathLayout::Rendered equation(const SceneObject &o, qreal size) {
+    return MathLayout::build(o.text, fontFor(o, size), size, o.textAlign);
+}
 bool legacy(const SceneObject &o) {
-    return o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
+    return !maths(o) && o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
            o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0 &&
            o.tabStop == 0 && o.columns <= 1 && o.direction == 0;
 }
@@ -161,6 +167,17 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     return doc;
 }
 QSizeF contentSize(const SceneObject &o, qreal size) {
+    if (maths(o)) {
+        const auto rendered = equation(o, size);
+        // What could not be read is drawn as the words it was typed as, so the
+        // box is measured that way too.
+        if (!rendered.ok) {
+            auto words = o;
+            words.textKind = 0;
+            return contentSize(words, size);
+        }
+        return rendered.size;
+    }
     if (o.columns > 1) {
         // What matters is how many columns the text needs, expressed as height.
         auto doc = layout(o, size);
@@ -179,9 +196,6 @@ QSizeF contentSize(const SceneObject &o, qreal size) {
     }
     return layout(o, size)->documentLayout()->documentSize();
 }
-qreal height(const SceneObject &o, qreal size) {
-    return contentSize(o, size).height();
-}
 } // namespace
 TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     Metrics m;
@@ -191,11 +205,18 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     auto dimensions = contentSize(o, o.fontSize);
     m.naturalHeight = dimensions.height();
     m.renderedHeight = m.naturalHeight;
-    if (o.textFit == 1 && m.renderedHeight > o.rect.height()) {
+    // Words only ever run out of height, because they wrap. An equation does not
+    // wrap, so shrinking it has to watch its width too.
+    const auto fits = [&o](qreal size) {
+        const auto room = contentSize(o, size);
+        return room.height() <= o.rect.height() &&
+               (!maths(o) || room.width() <= o.rect.width());
+    };
+    if (o.textFit == 1 && !fits(o.fontSize)) {
         int lo = 4, hi = qMax(4, int(o.fontSize));
         while (lo < hi) {
             int mid = (lo + hi + 1) / 2;
-            if (height(o, mid) <= o.rect.height())
+            if (fits(mid))
                 lo = mid;
             else
                 hi = mid - 1;
@@ -209,6 +230,28 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     return m;
 }
 void TextLayout::paint(QPainter &painter, const SceneObject &o) {
+    if (maths(o)) {
+        const auto metrics = measure(o);
+        const auto rendered = equation(o, metrics.effectiveSize);
+        if (!rendered.ok) {
+            // The fallback is honest: the source, as ordinary text, and the
+            // review says what stopped it.
+            auto words = o;
+            words.textKind = 0;
+            paint(painter, words);
+            return;
+        }
+        const qreal spare = qMax(0.0, o.rect.height() - rendered.size.height());
+        const qreal dy = o.verticalAlign == 1 ? spare / 2 : o.verticalAlign == 2 ? spare : 0;
+        const qreal room = qMax(0.0, o.rect.width() - rendered.size.width());
+        const qreal dx = o.textAlign == 1 ? room / 2 : o.textAlign == 2 ? room : 0;
+        painter.save();
+        painter.setClipRect(o.rect, Qt::IntersectClip);
+        MathLayout::paint(painter, rendered, o.rect.topLeft() + QPointF(dx, dy),
+                          fontFor(o, metrics.effectiveSize), o.textColor);
+        painter.restore();
+        return;
+    }
     if (legacy(o)) {
         painter.setFont(fontFor(o, o.fontSize));
         painter.setPen(o.textColor);
@@ -251,5 +294,7 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
 QString TextLayout::editorHtml(const SceneObject &object) {
     auto content = object;
     content.uppercase = false;
+    // An equation is edited as what was typed, not as what it draws.
+    content.textKind = 0;
     return layout(content, measure(object).effectiveSize)->toHtml();
 }

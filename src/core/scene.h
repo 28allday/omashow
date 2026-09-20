@@ -122,6 +122,7 @@ struct SceneObject {
     int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
     int listStart = 1;
     int textFit = 0;         // clip with overflow warning, shrink to fit
+    int textKind = 0;        // 0 the words as typed, 1 an equation
     qreal tabStop = 0;       // 0 uses four times the type size
     int columns = 1;         // text flows down one column, then into the next
     qreal columnGap = 0;     // 0 uses one line of space between columns

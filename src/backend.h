@@ -323,6 +323,7 @@ public:
     Q_INVOKABLE void editSelectedTable();
     bool applyTable(const QString &slideId,const QString &objectId,const TableData &table,const QString &label,const DataSource *source=nullptr);
     Q_INVOKABLE void addText();
+    Q_INVOKABLE void addEquation();
     Q_INVOKABLE void addRect();
     Q_INVOKABLE QString setObjectLink(int kind, const QString &target);
     Q_INVOKABLE void editSelectedLink() { if(hasSelection()) emit linkEditorRequested(); }

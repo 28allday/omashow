@@ -6,6 +6,7 @@
 #include "core/edit.h"
 #include "core/snap.h"
 #include "render/textlayout.h"
+#include "render/mathlayout.h"
 #include <QQuickTextDocument>
 #include <QTextDocument>
 #include <QTextBlock>
@@ -46,6 +47,12 @@ QVariantMap Backend::selection() const {
     values["textNaturalHeight"] = metrics.naturalHeight;
     values["effectiveFontSize"] = metrics.effectiveSize;
     values["editHtml"] = TextLayout::editorHtml(*primary);
+    // An equation says what stopped it, so the box can explain itself.
+    if (primary->textKind == 1)
+      values["equationError"] =
+          MathLayout::build(primary->text, QFont(primary->fontFamily), primary->fontSize,
+                            primary->textAlign)
+              .error;
   }
   if(primary->type==ObjectType::Chart) {const auto layout=Chart::layout(*primary);values["chartIssues"]=layout.issues;values["chartWarnings"]=layout.warnings;QVariantList series;const bool circular=primary->chart.kind==7 || primary->chart.kind==8;for(int i=0;i<(circular?primary->table.rows.size()-1:primary->table.columns.size()-1);++i) {const auto &cell=primary->table.cells[circular?(i+1)*primary->table.columns.size():i+1];const auto fallback=primary->chart.resolvedColors.value(i%8,primary->textColor);series.append(QVariantMap{{"id",cell.id},{"name",cell.text},{"color",primary->chart.seriesColors.value(cell.id,fallback).name()}});}values["chartSeries"]=series;}
   if(primary->type==ObjectType::Table) values["tableOverflow"]=Table::overflowCount(*primary);
