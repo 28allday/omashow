@@ -304,7 +304,10 @@ calls at all, and recovery journals never leave this computer.
 
 Requirements: Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-multimedia`),
 FFmpeg development libraries (`libavformat`, `libavcodec`, `libavutil`,
-`libswscale`), zlib, a C++17 compiler, make, pkg-config and `qmake6`. Tests also
+`libswscale`), zlib, Hunspell (`hunspell`), a C++17 compiler, make, pkg-config
+and `qmake6`. Spelling also wants a dictionary for the language you write in
+(`hunspell-en_gb` and the like); with none installed, OmaShow says so rather
+than guessing. Tests also
 use the `ffmpeg` executable and `pdftotext`, `pdfimages` and `pdftoppm` from Poppler. WebP
 requires its Qt image handler. Media optimisation also needs `ffmpeg` with
 H.264 (`libx264`) and AAC encoders.
@@ -371,24 +374,43 @@ Display routing and swapping pass a two-screen Qt simulation. Native rendering
 has been checked on one physical ASUS 4K display. Two physical outputs, mixed
 monitor scaling and unplug/reconnect still need hardware acceptance.
 
-## Headless export
+## Without a window
+
+Six verbs run with no window and no display, each answering with JSON and
+exiting 0 or 1 — enough to make a deck, change it, read back what was made and
+export it, from a script or from something that cannot see the screen at all.
+
+```sh
+omashow new talk.omashow --theme 1 --size 16:9 --slides 4
+omashow inspect talk.omashow --slide 0
+omashow apply talk.omashow ops.json
+omashow review talk.omashow
+omashow export talk.omashow --kind pdf --out talk.pdf
+omashow ops --filter text
+```
+
+`apply` takes a list of operations — the same ones the interface calls — and
+writes nothing unless every one of them ran. `omashow ops` lists them all, with
+their arguments, by asking the app what it can do. The full reference is
+[docs/cli.md](docs/cli.md), and `skills/omashow/SKILL.md` is a Claude skill for
+driving it:
+
+```sh
+ln -s "$PWD/skills/omashow" ~/.claude/skills/omashow
+```
+
+The older render flags still work, and without a positional deck they use the
+built-in Morph fixture:
 
 ```sh
 ./build/omashow talk.omashow --shot build/frames --times "0,0.5,1.0" --width 1920
-./build/omashow talk.omashow --pdf build/talk.pdf
 ./build/omashow talk.omashow --pdf build/handout.pdf --stages
-./build/omashow talk.omashow --pdf build/all-slides.pdf --include-skipped
-./build/omashow talk.omashow --write build/copy.omashow
 ./build/omashow --at 3.05
 ```
 
-Without a positional deck, headless exports use the built-in Morph fixture.
-
-The native format is version 12, adding master number/date/footer fields and
-per-slide artwork/field visibility to the existing local CSV links and cached
-data, picture, media, shape and playback fields. Versions 1–11 still
-open; versions 1 and 2 retain their original text appearance. Older app builds
-refuse version 12 to preserve its features.
+The native format is version 23. Versions 1–22 still open; versions 1 and 2
+retain their original text appearance, and an older build of the app refuses a
+newer format rather than half-reading it.
 Identical image assets are stored once under `assets/`, named by a content hash;
 moving the original files cannot break a deck. PDF images use lossless encoding.
 

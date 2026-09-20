@@ -130,6 +130,16 @@ $ omashow review talk.omashow
 Spelling is checked only when a Hunspell dictionary for the deck's language is
 installed; `dictionaries` says which ones this computer has.
 
+## Driving it from an agent
+
+`skills/omashow/SKILL.md` is a Claude skill for this command line — the working
+loop, the operations worth knowing and the things that bite. Link it into the
+skills directory on any machine that should have it:
+
+```sh
+ln -s "$PWD/skills/omashow" ~/.claude/skills/omashow
+```
+
 ## Finding the operation you want
 
 ```
