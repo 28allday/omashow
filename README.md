@@ -225,6 +225,12 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   makes a show arrive at each moment instead of travelling to it; "Stronger
   contrast" firms up edges and quiet text. Both are yours, not the deck's: a
   file saved with them on is the same file.
+- **A command line that is the whole app:** `omashow new`, `inspect`, `apply`,
+  `export`, `review` and `ops` run with no window and no display, answering in
+  JSON. `apply` takes a list of operations — the same ones the interface calls,
+  listed by `omashow ops` — so a script can build a deck, change it, read back
+  what it made and export it. Nothing is written until every operation has run.
+  See `docs/cli.md`.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
   rendering from the command line. A deck whose file is read-only, missing or
   changed by something else says so in a bar across the top, with the way out of

@@ -21,6 +21,7 @@
 #include "theme.h"
 
 #include <QCommandLineOption>
+#include "cli/cli.h"
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QQmlEngine>
@@ -134,6 +135,12 @@ int captureInterface(QQmlApplicationEngine &engine, Backend &backend, Presenter 
 }
 
 int main(int argc, char *argv[]) {
+    // A verb means there is nobody watching: no window, no graphics device, and
+    // no reason to need a display. Everything else keeps the behaviour it had.
+    const bool headless = argc > 1 && Cli::isVerb(QString::fromLocal8Bit(argv[1]));
+    if (headless && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+
     // FBO-backed QPainter is supported on Qt's OpenGL renderer. Honour explicit
     // platform/backend choices, including the software screenshot harness.
     if (qEnvironmentVariableIsEmpty("QSG_RHI_BACKEND") &&
@@ -156,6 +163,14 @@ int main(int argc, char *argv[]) {
     // default qt/qml import path): the Oma suite look, falling back to Basic
     // for anything it does not restyle.
     QQuickStyle::setStyle(QStringLiteral("OmaShowStyle"));
+
+    if (headless) {
+        // The same Backend the interface drives, with nothing drawing it.
+        Backend backend;
+        QStringList words;
+        for (int i = 1; i < argc; ++i) words.append(QString::fromLocal8Bit(argv[i]));
+        return Cli::run(backend, words);
+    }
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("OmaShow — presentations for Omarchy."));

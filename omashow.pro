@@ -112,6 +112,12 @@ HEADERS += src/core/spelling.h
 SOURCES += src/core/spelling.cpp
 HEADERS += src/core/punctuation.h
 SOURCES += src/core/punctuation.cpp
+HEADERS += src/cli/operations.h
+SOURCES += src/cli/operations.cpp
+HEADERS += src/cli/describe.h
+SOURCES += src/cli/describe.cpp
+HEADERS += src/cli/cli.h
+SOURCES += src/cli/cli.cpp
 HEADERS += src/core/mediaasset.h
 SOURCES += src/core/mediaasset.cpp
 
