@@ -9,6 +9,9 @@ SceneObject themed(const DeckTheme &theme, SceneObject object);
 Slide resolve(const Document &document, int index);
 DeckTheme preset(int index);
 QVariantList themeContrast(const DeckTheme &theme);
+// WCAG 2.2 contrast, unrounded, with any foreground alpha composited over the
+// background. 0 when either colour is unknown or the background is not opaque.
+qreal contrastRatio(QColor foreground, const QColor &background);
 QVariantMap fieldProperties(const MasterFields &fields);
 bool setFieldProperty(MasterFields &fields, const QString &key, const QVariant &value);
 QVector<SceneObject> fields(const Document &document, int index, const Master &master);

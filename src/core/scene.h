@@ -104,6 +104,8 @@ struct SceneObject {
     int textFit = 0;         // clip with overflow warning, shrink to fit
     QString fontFamily = QStringLiteral("Inter");
     QString fillToken, textColorToken, fontToken;
+    // What a screen reader would be told this is. Never rendered.
+    QString altTitle, altText;
     QString placeholderId;
     QStringList overrides;
     QStringList groups; // outermost to innermost
@@ -119,6 +121,9 @@ struct Slide {
     QString layoutId;
     QString sectionId;
     QString notes;
+    // Object ids in the order they should be read. Anything not listed keeps
+    // its place in the stacking order, after those that are.
+    QStringList readingOrder;
     bool backgroundOverride = false;
     bool showMasterObjects = true;
     bool showMasterFields = true;
@@ -168,6 +173,15 @@ struct SlideLayout {
 
 struct Section { QString id, name; };
 
+// A note on a slide, or on one object, or a reply to either. Replies are one
+// level deep: a thread is a comment and the replies under it.
+struct Comment {
+    QString id, slideId, objectId, parentId;
+    QString author, created;   // ISO-8601, exactly as it was written
+    QString text;
+    bool resolved = false;
+};
+
 struct ObjectStyle { QString id, name; SceneObject appearance; };
 
 struct Document {
@@ -178,6 +192,9 @@ struct Document {
     DeckTheme theme;
     QVector<Master> masters;
     QVector<SlideLayout> layouts;
+    QVector<Comment> comments;
+    // Review findings the author has looked at and does not want raised again.
+    QStringList dismissedIssues;
 
     // Seconds spent on the cross-slide transition into each slide after the
     // first. Gate 0 keeps one global value; the real model puts it per slide.

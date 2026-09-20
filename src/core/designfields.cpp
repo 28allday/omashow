@@ -48,27 +48,29 @@ QVector<SceneObject> Design::fields(const Document &d, int index, const Master &
     return result;
 }
 
-QVariantList Design::themeContrast(const DeckTheme &theme) {
+qreal Design::contrastRatio(QColor color, const QColor &background) {
     // WCAG 2.2 SC 1.4.3, sRGB relative luminance; compare the unrounded ratio.
     // https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html
     const auto luminance = [](const QColor &color) {
         const auto linear = [](qreal c) { return c <= .04045 ? c/12.92 : std::pow((c+.055)/1.055,2.4); };
         return .2126*linear(color.redF())+.7152*linear(color.greenF())+.0722*linear(color.blueF());
     };
+    if (!color.isValid() || !background.isValid() || background.alpha() != 255) return 0;
+    if (color.alpha() < 255) {
+        const qreal alpha = color.alphaF();
+        color = QColor::fromRgbF(color.redF()*alpha+background.redF()*(1-alpha),
+                                 color.greenF()*alpha+background.greenF()*(1-alpha),
+                                 color.blueF()*alpha+background.blueF()*(1-alpha));
+    }
+    const qreal foreground = luminance(color), back = luminance(background);
+    return (qMax(foreground,back)+.05)/(qMin(foreground,back)+.05);
+}
+QVariantList Design::themeContrast(const DeckTheme &theme) {
     const auto background = theme.colors.value("background");
-    const bool known = background.isValid() && background.alpha() == 255;
     QVariantList result;
     for (const QString &token : {"foreground","muted","accent"}) {
-        auto color = theme.colors.value(token);
-        const bool valid = known && color.isValid();
-        if (valid && color.alpha() < 255) {
-            const qreal alpha = color.alphaF();
-            color = QColor::fromRgbF(color.redF()*alpha+background.redF()*(1-alpha),
-                                     color.greenF()*alpha+background.greenF()*(1-alpha),
-                                     color.blueF()*alpha+background.blueF()*(1-alpha));
-        }
-        const qreal foreground = luminance(color), back = luminance(background);
-        const qreal ratio = valid ? (qMax(foreground,back)+.05)/(qMin(foreground,back)+.05) : 0;
+        const qreal ratio = contrastRatio(theme.colors.value(token), background);
+        const bool valid = ratio > 0;
         result.append(QVariantMap{{"token",token},{"known",valid},{"ratio",ratio},
                                   {"normal",valid && ratio >= 4.5},{"large",valid && ratio >= 3.0}});
     }

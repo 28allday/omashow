@@ -48,6 +48,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
             {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
+            {"altTitle", o.altTitle}, {"altText", o.altText},
             {"placeholderId", o.placeholderId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
 }
 bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, bool constrainForEditing) {
@@ -173,6 +174,11 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "fillToken") o.fillToken = v.toString();
     else if (key == "textColorToken") o.textColorToken = v.toString();
     else if (key == "fontToken") o.fontToken = v.toString();
+    else if (key == "altTitle" || key == "altText") {
+        const auto text = v.toString();
+        if (text.size() > (key == "altTitle" ? 200 : 2000)) return false;
+        (key == "altTitle" ? o.altTitle : o.altText) = text;
+    }
     else return false;
     return true;
 }

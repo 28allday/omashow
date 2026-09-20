@@ -94,6 +94,13 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantMap slideDesign READ slideDesign NOTIFY selectionChanged)
     Q_PROPERTY(QVariantMap deckImport READ deckImport NOTIFY deckImportChanged)
     Q_PROPERTY(QVariantMap designAudit READ designAudit NOTIFY documentChanged)
+    Q_PROPERTY(QVariantList comments READ comments NOTIFY documentChanged)
+    Q_PROPERTY(QVariantMap statistics READ statistics NOTIFY documentChanged)
+    Q_PROPERTY(QVariantList reviewIssues READ reviewIssues NOTIFY documentChanged)
+    Q_PROPERTY(QVariantList readingOrder READ readingOrder NOTIFY selectionChanged)
+    Q_PROPERTY(QVariantList outline READ outline NOTIFY documentChanged)
+    Q_PROPERTY(QVariantMap findState READ findState NOTIFY findChanged)
+    Q_PROPERTY(QString reviewAuthor READ reviewAuthor WRITE setReviewAuthor NOTIFY reviewAuthorChanged)
 
 public:
     explicit Backend(QObject *parent = nullptr);
@@ -396,10 +403,41 @@ public:
     QVariantMap designAudit() const;
     Q_INVOKABLE bool removeUnusedDesign(const QStringList &ids);
 
+    // --- review -------------------------------------------------------------
+    QString reviewAuthor() const;
+    void setReviewAuthor(const QString &author);
+    QVariantList comments() const;
+    QVariantMap statistics() const;
+    QVariantList reviewIssues() const;
+    QVariantList readingOrder() const;
+    QVariantList outline() const;
+    QVariantMap findState() const;
+    Q_INVOKABLE bool setOutlineText(const QString &slideId, const QString &objectId, const QString &text);
+    Q_INVOKABLE QString addComment(const QString &text, bool onSelection = true);
+    Q_INVOKABLE QString replyToComment(const QString &parentId, const QString &text);
+    Q_INVOKABLE bool setCommentText(const QString &id, const QString &text);
+    Q_INVOKABLE bool resolveComment(const QString &id, bool resolved);
+    Q_INVOKABLE bool removeComment(const QString &id);
+    Q_INVOKABLE void goToComment(const QString &id);
+    Q_INVOKABLE bool moveReadingOrder(const QString &objectId, int delta);
+    Q_INVOKABLE bool resetReadingOrder();
+    Q_INVOKABLE bool describeObject(const QString &objectId, const QString &title, const QString &text);
+    Q_INVOKABLE bool dismissIssue(const QString &key, bool dismissed);
+    Q_INVOKABLE void goToIssue(const QString &key);
+    Q_INVOKABLE void exportReviewDialog();
+    Q_INVOKABLE bool exportReview(const QString &path, bool includeDismissed = false);
+    Q_INVOKABLE void findText(const QString &needle, const QVariantMap &options);
+    Q_INVOKABLE void goToMatch(int index);
+    Q_INVOKABLE bool replaceMatch(int index, const QString &replacement);
+    Q_INVOKABLE int replaceAllMatches(const QString &replacement);
+    Q_INVOKABLE void clearFind();
+
 signals:
     void opened();
     void importReady();
     void deckImportChanged();
+    void findChanged();
+    void reviewAuthorChanged();
     void operationChanged();
     void layoutPreviewChanged();
     void diagramPreviewChanged();
@@ -497,7 +535,7 @@ private:
     // The portal answers `selected` for every dialog, so the intent behind the
     // one in flight has to be remembered — otherwise a save would open the file
     // it was about to write, or a PDF export would overwrite the deck.
-    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck };
+    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck, ExportReview };
     QString m_imageTargetId, m_imageSlideId;
     bool loadImage(const QUrl &url, bool replace, int index, const QString &target);
     Pending m_pending = Pending::None;
@@ -531,6 +569,8 @@ private:
     QVariantMap m_importPlan, m_importOptions;
     QList<int> m_importSlides;
     QStringList m_importSlideIds;
+    QString m_reviewAuthor, m_findNeedle;
+    QVariantMap m_findOptions, m_findState;
     QString m_importName;
     int m_importBaseRevision = -1, m_importRevision = 0, m_importPreviewSerial = 0;
     QVariantMap m_layoutPreview;

@@ -145,6 +145,8 @@ HEADERS += src/core/layoutapply.h
 SOURCES += src/core/layoutapply.cpp src/backendlayout.cpp
 HEADERS += src/core/deckimport.h src/core/deckaudit.h
 SOURCES += src/core/deckimport.cpp src/core/deckaudit.cpp src/backenddesignimport.cpp
+HEADERS += src/core/review.h src/core/findreplace.h
+SOURCES += src/core/review.cpp src/core/findreplace.cpp src/backendreview.cpp
 SOURCES += src/core/designfields.cpp
 
 HEADERS += src/anim/presentationcache.h src/render/liveframes.h

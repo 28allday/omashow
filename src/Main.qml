@@ -396,7 +396,7 @@ ApplicationWindow {
                         { name: qsTr("EDIT"), icon: "pencil", on: true },
                         { name: qsTr("DESIGN"), icon: "palette", on: true },
                         { name: qsTr("ANIMATE"), icon: "sparkles", on: true },
-                        { name: qsTr("REVIEW"), icon: "message-square-text", on: false },
+                        { name: qsTr("REVIEW"), icon: "message-square-text", on: true },
                         { name: qsTr("PRESENT"), icon: "presentation", on: true },
                         { name: qsTr("EXPORT"), icon: "share", on: true },
                         { name: qsTr("SORTER"), icon: "layout-grid", on: true }
@@ -657,6 +657,12 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: win.workspace === 2
+            }
+
+            ReviewWorkspace {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                visible: win.workspace === 3
             }
 
             PresenterPanel {

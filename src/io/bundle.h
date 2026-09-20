@@ -8,6 +8,7 @@
 //   masters/design.json  masters and named placeholder layouts
 //   assets/<hash>.png/svg deduplicated embedded pictures and vectors
 //   styles.json         reusable object appearances
+//   review.json          comments, replies and dismissed review findings
 //
 // JSON with sorted keys, one member per slide, and a deterministic container,
 // so a deck is diffable in git and a script can write one. Picture data is
@@ -33,7 +34,8 @@ namespace Bundle {
 // Format 10 adds native charts with embedded data and axis/series settings.
 // Format 11 adds explicit local CSV links with cached data. Opening never reads them.
 // Format 12 adds master number/date/footer fields and per-slide artwork/field visibility.
-constexpr int kFormatVersion = 12;
+// Format 13 adds review comments, alternative text, reading order and dismissed findings.
+constexpr int kFormatVersion = 13;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

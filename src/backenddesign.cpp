@@ -400,7 +400,9 @@ QVariantList Backend::navigator() const {
       if (section.id == s.sectionId)
         name = section.name;
     QStringList outline;
-    int pictures=0,media=0;
+    int pictures=0,media=0,openComments=0;
+    for(const auto &comment:m_document.comments)
+      if(comment.slideId==s.id && comment.parentId.isEmpty() && !comment.resolved) ++openComments;
     for(const auto &o:Design::resolve(m_document,i).objects) {
       if(o.hidden || o.id.startsWith("@field/")) continue;
       if(o.type==ObjectType::Text && !o.text.trimmed().isEmpty()) outline.append(o.text);
@@ -414,7 +416,7 @@ QVariantList Backend::navigator() const {
                     {"skipped",s.skipped},
                     {"notes",!s.notes.trimmed().isEmpty()},
                     {"buildCount",s.timeline.steps.size()},
-                    {"imageCount",pictures},{"mediaCount",media},
+                    {"imageCount",pictures},{"mediaCount",media},{"commentCount",openComments},
                     {"id", s.id},
                     {"sectionId", s.sectionId},
                     {"sectionName", name},

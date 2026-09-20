@@ -118,6 +118,19 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Skip slides:** Slides → Actions → Skip in show keeps slides editable while
   presentation, PNG and PDF exports omit them. PDF's Include skipped slides
   checkbox and the CLI's `--include-skipped` explicitly include them.
+- **Review:** the deck as words rather than pictures. The outline edits each
+  slide's title and body in place; comments attach to a slide or to one object,
+  take replies, resolve and reopen, and travel inside the deck with who wrote
+  them and when. Find and replace covers slides, tables, chart data and notes,
+  with whole-word, case and scope options, and refuses a match whose words have
+  changed since it was found. Findings cover missing descriptions, text contrast
+  below WCAG 2.2, type that is too small, text that does not fit, slides with no
+  title, links that do not say where they go and a reading order that disagrees
+  with the layout; each can be gone to, or set aside as not a problem — a
+  decision the deck remembers. Reading order and alternative text are editable
+  per slide, and statistics count slides, words, pictures, film, typefaces and
+  how long the deck runs. The findings and open comments export as a plain-text
+  review.
 - **Present:** separate audience and presenter windows, current/next previews,
   speaker notes, slide navigator, click-group navigation, elapsed/countdown,
   black/white and freeze. Named display routing, swapping and windowed rehearsal.
@@ -125,7 +138,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   text, build-stage handouts and headless PNG frame rendering.
 
 Template-pack installation, recording, interchange imports from other
-applications and other release features remain on the roadmap. Text formatting applies to whole
+applications and other release features remain on the roadmap. Notes are plain
+text, and reading order is not yet carried into exported PDF. Text formatting applies to whole
 boxes; per-character styles and advanced typography remain planned.
 
 ## Shared design and time

@@ -4,6 +4,7 @@
 #include "core/table.h"
 #include "core/chart.h"
 #include "core/link.h"
+#include "core/review.h"
 #include <QRegularExpression>
 #include <cmath>
 #include <QSet>
@@ -109,6 +110,9 @@ QByteArray slideToJson(const Slide &slide) {
     json["backgroundOverride"] = slide.backgroundOverride;
     json["showMasterObjects"] = slide.showMasterObjects;
     json["showMasterFields"] = slide.showMasterFields;
+    QJsonArray reading;
+    for (const auto &id : slide.readingOrder) reading.append(id);
+    json["readingOrder"] = reading;
 
     QJsonArray objects;
     for (const SceneObject &object : slide.objects)
@@ -134,9 +138,15 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
 
     const QJsonObject json = document.object();
     if ((json.contains("showMasterObjects") && !json.value("showMasterObjects").isBool()) ||
-        (json.contains("showMasterFields") && !json.value("showMasterFields").isBool())) {
+        (json.contains("showMasterFields") && !json.value("showMasterFields").isBool()) ||
+        (json.contains("readingOrder") && !json.value("readingOrder").isArray())) {
         if (ok) *ok = false;
         return slide;
+    }
+    for (const auto &value : json.value("readingOrder").toArray()) {
+        const auto id = value.toString();
+        if (id.isEmpty() || slide.readingOrder.contains(id)) { if (ok) *ok = false; return slide; }
+        slide.readingOrder.append(id);
     }
     slide.id = json.value(QStringLiteral("id")).toString();
     slide.layoutId = json.value("layoutId").toString();
@@ -214,6 +224,16 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     QJsonArray styles;
     for(const auto &style:document.objectStyles) styles.append(QJsonObject{{"id",style.id},{"name",style.name},{"appearance",objectToJson(style.appearance)}});
     entries.append({"styles.json",QJsonDocument(styles).toJson(),true});
+    QJsonArray comments;
+    for (const auto &comment : document.comments)
+        comments.append(QJsonObject{{"id",comment.id},{"slideId",comment.slideId},
+                                    {"objectId",comment.objectId},{"parentId",comment.parentId},
+                                    {"author",comment.author},{"created",comment.created},
+                                    {"text",comment.text},{"resolved",comment.resolved}});
+    QJsonArray dismissed;
+    for (const auto &key : document.dismissedIssues) dismissed.append(key);
+    entries.append({"review.json",QJsonDocument(QJsonObject{{"comments",comments},
+                                                           {"dismissed",dismissed}}).toJson(),true});
     QMap<QString,QByteArray> assets;
     std::function<void(const QVector<SceneObject>&)> collect;
     collect = [&assets,&collect](const QVector<SceneObject> &objects) {
@@ -376,12 +396,56 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
                 if (p.id == o.placeholderId && p.type == o.type) found = true;
             if (!found) { result.error = QStringLiteral("Slide %1 has a missing placeholder.").arg(id); return result; }
         }
+        for (const auto &object : slide.readingOrder)
+            if (!slide.find(object)) {
+                result.error = QStringLiteral("Slide %1 reads an object it does not have.").arg(id);
+                return result;
+            }
         document.slides.append(slide);
     }
 
     if (document.slides.isEmpty()) {
         result.error = QStringLiteral("The deck has no slides.");
         return result;
+    }
+
+    // Review notes travel with the deck. One that points at a slide or object
+    // that is not there is a damaged deck, not something to drop quietly.
+    if (version >= 13 && reader.contains("review.json")) {
+        QJsonParseError error;
+        const auto parsed = QJsonDocument::fromJson(reader.read("review.json"), &error);
+        if (error.error != QJsonParseError::NoError || !parsed.isObject()) {
+            result.error = QStringLiteral("The deck's review notes are damaged."); return result;
+        }
+        const auto json = parsed.object();
+        if (!json.value("comments").isArray() || !json.value("dismissed").isArray()) {
+            result.error = QStringLiteral("The deck's review notes are damaged."); return result;
+        }
+        for (const auto &value : json.value("comments").toArray()) {
+            const auto row = value.toObject();
+            if (row.contains("resolved") && !row.value("resolved").isBool()) {
+                result.error = QStringLiteral("A review comment is damaged."); return result;
+            }
+            Comment comment;
+            comment.id = row.value("id").toString();
+            comment.slideId = row.value("slideId").toString();
+            comment.objectId = row.value("objectId").toString();
+            comment.parentId = row.value("parentId").toString();
+            comment.author = row.value("author").toString();
+            comment.created = row.value("created").toString();
+            comment.text = row.value("text").toString();
+            comment.resolved = row.value("resolved").toBool();
+            document.comments.append(comment);
+        }
+        const auto invalid = Review::validate(document);
+        if (!invalid.isEmpty()) { result.error = invalid; return result; }
+        for (const auto &value : json.value("dismissed").toArray()) {
+            const auto key = value.toString();
+            if (key.isEmpty() || document.dismissedIssues.contains(key)) {
+                result.error = QStringLiteral("A dismissed review finding is damaged."); return result;
+            }
+            document.dismissedIssues.append(key);
+        }
     }
 
     QMap<QString,SceneObject> decoded;

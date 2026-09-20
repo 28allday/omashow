@@ -10,6 +10,7 @@
         <file alias="PresenterPanel.qml">PresenterPanel.qml</file>
         <file alias="AnimateWorkspace.qml">AnimateWorkspace.qml</file>
         <file alias="DesignWorkspace.qml">DesignWorkspace.qml</file>
+        <file alias="ReviewWorkspace.qml">ReviewWorkspace.qml</file>
         <file alias="Theme.qml">Theme.qml</file>
         <file alias="EditCanvas.qml">EditCanvas.qml</file>
         <file alias="Inspector.qml">Inspector.qml</file>
