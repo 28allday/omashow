@@ -66,6 +66,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool startVisible READ startVisible NOTIFY startChanged)
     Q_PROPERTY(bool hasDocument READ hasDocument NOTIFY startChanged)
     Q_PROPERTY(QVariantList recentFiles READ recentFiles NOTIFY recentsChanged)
+    Q_PROPERTY(QVariantList templates READ templates NOTIFY templatesChanged)
     // --- editing ---
     Q_PROPERTY(int currentSlide READ currentSlide WRITE setCurrentSlide NOTIFY currentSlideChanged)
     Q_PROPERTY(QString selectedId READ selectedId NOTIFY selectionChanged)
@@ -194,6 +195,13 @@ public:
     Q_INVOKABLE void showStart();
     Q_INVOKABLE void resumeDeck();
     Q_INVOKABLE bool createDeck(int theme, qreal width, qreal height, int layout = 0);
+    QVariantList templates() const;
+    Q_INVOKABLE void refreshTemplates();
+    Q_INVOKABLE bool createFromTemplate(const QString &id);
+    Q_INVOKABLE void installTemplateDialog();
+    Q_INVOKABLE bool installTemplate(const QUrl &url);
+    Q_INVOKABLE bool saveAsTemplate(const QString &name);
+    Q_INVOKABLE bool removeTemplate(const QString &id);
     QVariantList recentFiles() const;
     Q_INVOKABLE void pinRecent(const QString &path, bool pinned);
     Q_INVOKABLE void removeRecent(const QString &path);
@@ -511,6 +519,7 @@ signals:
     void clipboardChanged();
     void startChanged();
     void recentsChanged();
+    void templatesChanged();
     void saved();
     void saveCanceled();
     void playbackRateChanged();
@@ -595,7 +604,7 @@ private:
     // The portal answers `selected` for every dialog, so the intent behind the
     // one in flight has to be remembered — otherwise a save would open the file
     // it was about to write, or a PDF export would overwrite the deck.
-    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck, ExportReview, ExportFile };
+    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck, ExportReview, ExportFile, InstallTemplate };
     QString m_imageTargetId, m_imageSlideId;
     bool loadImage(const QUrl &url, bool replace, int index, const QString &target);
     Pending m_pending = Pending::None;

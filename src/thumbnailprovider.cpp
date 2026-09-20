@@ -1,6 +1,7 @@
 #include "core/design.h"
 #include "core/shape.h"
 #include "core/starter.h"
+#include "core/templates.h"
 #include "core/deckresize.h"
 #include "thumbnailprovider.h"
 
@@ -9,6 +10,7 @@
 #include "core/scene.h"
 #include "render/scenerenderer.h"
 #include <QMutexLocker>
+#include <QUrl>
 #include <QDeadlineTimer>
 
 SlideThumbnailProvider::SlideThumbnailProvider(Backend *backend)
@@ -102,6 +104,25 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         if ((arriving && !snapshot.importOk) || index < 0 || index >= document.slides.size()) return blank();
         const auto slide = Design::resolve(document, index);
         const int width = requestedSize.width() > 0 ? requestedSize.width() : 640;
+        const QSize pixels(width, qMax(1, qRound(width * document.size.height() / document.size.width())));
+        if (size) *size = pixels;
+        return SceneRenderer::render(slide.objects, document.size, pixels, slide.background);
+    }
+    // "template/<id>" draws a template's opening slide. The id is a file path
+    // or a built-in name, and the deck is read here rather than through Backend
+    // — this thread must never touch the live document.
+    if (id.startsWith("template/")) {
+        Document document;
+        QString error;
+        // Everything after the first slash is the id, so a template path with
+        // slashes in it survives whether or not the URL arrived decoded.
+        const auto templateId = QUrl::fromPercentEncoding(
+            id.mid(QStringLiteral("template/").size()).toUtf8());
+        if (!Templates::open(templateId, &document, &error) ||
+            document.slides.isEmpty())
+            return blank();
+        const auto slide = Design::resolve(document, 0);
+        const int width = requestedSize.width() > 0 ? requestedSize.width() : 480;
         const QSize pixels(width, qMax(1, qRound(width * document.size.height() / document.size.width())));
         if (size) *size = pixels;
         return SceneRenderer::render(slide.objects, document.size, pixels, slide.background);

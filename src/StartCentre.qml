@@ -16,6 +16,24 @@ Rectangle {
     signal createRequested()
     signal openRequested()
     signal recentRequested(string path)
+    signal templateRequested(string id)
+    property string chosenTemplate: ""
+    readonly property var chosen: backend.templates.find(row => row.id === chosenTemplate) ?? ({})
+    // Search matches the name, where it came from and the typefaces it asks for.
+    readonly property var shownTemplates: {
+        const needle = templateSearch.text.trim().toLowerCase()
+        const shape = templateAspect.currentIndex
+        return backend.templates.filter(row => {
+            if (shape === 1 && row.aspect !== "16:9") return false
+            if (shape === 2 && row.aspect !== "4:3") return false
+            if (shape === 3 && row.aspect !== qsTr("Square")) return false
+            if (shape === 4 && row.aspect !== qsTr("Portrait")) return false
+            if (needle.length === 0) return true
+            const hay = (row.name + " " + row.source + " " + (row.fonts ?? []).join(" ")
+                         + " " + (row.layouts ?? []).join(" ")).toLowerCase()
+            return needle.split(/\s+/).every(word => hay.indexOf(word) >= 0)
+        })
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -118,6 +136,128 @@ Rectangle {
                         Layout.fillWidth: true; wrapMode: Text.Wrap
                         text: qsTr("Original built-in themes · stored locally as .omashow decks")
                         color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    }
+
+                    // ── Templates: decks kept to start from ──────────────────
+                    Rectangle { Layout.fillWidth: true; implicitHeight: Theme.hairline; color: Theme.border }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label { text: qsTr("Templates"); font.pixelSize: Theme.fsTitle; font.weight: Theme.wHeading }
+                        Item { Layout.fillWidth: true }
+                        TextField {
+                            id: templateSearch
+                            objectName: "templateSearch"
+                            Layout.preferredWidth: 220
+                            placeholderText: qsTr("Search templates")
+                        }
+                        ComboBox {
+                            id: templateAspect
+                            objectName: "templateAspect"
+                            Layout.preferredWidth: 150
+                            model: [qsTr("Any shape"), "16:9", "4:3", qsTr("Square"), qsTr("Portrait")]
+                        }
+                        Button { objectName: "installTemplate"; text: qsTr("Install…")
+                                 onClicked: backend.installTemplateDialog() }
+                    }
+                    Label {
+                        objectName: "templateNothing"
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                        visible: root.shownTemplates.length === 0
+                        text: qsTr("Nothing matches that. Install a deck as a template, or keep the one you are working on from File ▸ Keep as template.")
+                    }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: Math.max(2, Math.floor(templateScroll.availableWidth / 260))
+                        columnSpacing: Theme.s3
+                        rowSpacing: Theme.s3
+                        Repeater {
+                            model: root.shownTemplates
+                            Rectangle {
+                                id: templateCard
+                                required property var modelData
+                                required property int index
+                                objectName: "template" + index
+                                Layout.fillWidth: true
+                                implicitHeight: templateBody.implicitHeight + Theme.s3 * 2
+                                radius: Theme.rCard
+                                color: chosen ? Theme.panelRaised : Theme.panelBg
+                                border.width: chosen ? Theme.selectionRing : Theme.hairline
+                                border.color: chosen ? Theme.accent : Theme.border
+                                readonly property bool chosen: root.chosenTemplate === modelData.id
+                                TapHandler { onTapped: root.chosenTemplate = templateCard.modelData.id }
+                                ColumnLayout {
+                                    id: templateBody
+                                    anchors.fill: parent
+                                    anchors.margins: Theme.s3
+                                    spacing: Theme.s1
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: width * 9 / 16
+                                        radius: Theme.rControl
+                                        color: Theme.showBg
+                                        clip: true
+                                        Image {
+                                            anchors.fill: parent
+                                            fillMode: Image.PreserveAspectFit
+                                            cache: false
+                                            sourceSize.width: 360
+                                            source: templateCard.modelData.broken ? ""
+                                                    : "image://slides/template/" + encodeURIComponent(templateCard.modelData.id)
+                                        }
+                                        Label {
+                                            anchors.centerIn: parent
+                                            visible: templateCard.modelData.broken ?? false
+                                            text: qsTr("Will not open"); color: Theme.accent
+                                        }
+                                    }
+                                    Label { Layout.fillWidth: true; elide: Text.ElideRight
+                                            text: templateCard.modelData.name; font.weight: Theme.wHeading }
+                                    Label {
+                                        Layout.fillWidth: true; elide: Text.ElideRight
+                                        color: Theme.textSecondary; font.pixelSize: Theme.fsLabel
+                                        text: templateCard.modelData.broken
+                                              ? templateCard.modelData.error
+                                              : qsTr("%1 · %2 · %3 layouts")
+                                                .arg(templateCard.modelData.source)
+                                                .arg(templateCard.modelData.aspect)
+                                                .arg((templateCard.modelData.layouts ?? []).length)
+                                    }
+                                    Label {
+                                        Layout.fillWidth: true; wrapMode: Text.Wrap
+                                        color: Theme.accent; font.pixelSize: Theme.fsLabel
+                                        visible: (templateCard.modelData.missingFonts ?? []).length > 0
+                                        text: qsTr("Not installed here: %1")
+                                              .arg((templateCard.modelData.missingFonts ?? []).join(", "))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: !!root.chosenTemplate
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Label { text: root.chosen.name ?? ""; font.weight: Theme.wHeading }
+                            Label {
+                                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                                font.pixelSize: Theme.fsLabel
+                                text: qsTr("%1 · %2 masters · %3 · typefaces: %4")
+                                      .arg(root.chosen.size ?? "").arg(root.chosen.masters ?? 0)
+                                      .arg((root.chosen.layouts ?? []).join(", "))
+                                      .arg((root.chosen.fonts ?? []).join(", "))
+                            }
+                        }
+                        Button { objectName: "removeTemplate"; text: qsTr("Remove")
+                                 visible: (root.chosen.source ?? "") === "installed"
+                                 onClicked: { backend.removeTemplate(root.chosenTemplate); root.chosenTemplate = "" } }
+                        Button {
+                            objectName: "useTemplate"
+                            text: qsTr("Use this template"); highlighted: true
+                            enabled: !(root.chosen.broken ?? false)
+                            onClicked: root.templateRequested(root.chosenTemplate)
+                        }
                     }
                 }
             }

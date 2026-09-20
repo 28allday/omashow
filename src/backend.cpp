@@ -85,6 +85,9 @@ Backend::Backend(QObject *parent)
               queueExport(options);
               break;
             }
+            case Pending::InstallTemplate:
+              installTemplate(url);
+              break;
             case Pending::None:
               openAsync(url);
               break;

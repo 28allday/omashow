@@ -225,7 +225,9 @@ ApplicationWindow {
             { group: qsTr("File"), name: qsTr("Import slides from another deck"), also: "borrow steal reuse", enabled: !backend.startVisible, run: () => backend.importDeckDialog() },
             { group: qsTr("File"), name: qsTr("Save"), also: "write keep", shortcut: "Ctrl+S", run: () => { win.commitEditors(); backend.save() } },
             { group: qsTr("File"), name: qsTr("Save as"), also: "copy elsewhere", shortcut: "Ctrl+Shift+S", run: () => { win.commitEditors(); backend.saveAsDialog() } },
-            { group: qsTr("File"), name: qsTr("Start centre"), also: "home recent", run: () => { win.commitEditors(); backend.showStart() } },
+            { group: qsTr("File"), name: qsTr("Start centre"), also: "home recent templates", run: () => { win.commitEditors(); backend.showStart() } },
+            { group: qsTr("File"), name: qsTr("Keep this deck as a template"), also: "template reuse starting point", enabled: !backend.startVisible, run: () => { win.commitEditors(); templateName.open() } },
+            { group: qsTr("File"), name: qsTr("Install a template"), also: "template add pack", run: () => backend.installTemplateDialog() },
             { group: qsTr("Export"), name: qsTr("Export a PDF"), also: "document handout print pages", shortcut: "Ctrl+E", run: () => { win.commitEditors(); backend.exportDialog({ kind: 0 }) } },
             { group: qsTr("Export"), name: qsTr("Export pictures"), also: "png jpeg images slides", run: () => { win.workspace = 5 } },
             { group: qsTr("Export"), name: qsTr("Export film"), also: "video movie mp4 record", run: () => { win.workspace = 5 } },
@@ -322,6 +324,25 @@ ApplicationWindow {
         }
     }
     CombineShapesDialog { id: combineShapesDialog }
+    Dialog {
+        id: templateName
+        objectName: "keepTemplateDialog"
+        parent: Overlay.overlay; anchors.centerIn: parent
+        width: Math.min(parent.width - Theme.s5 * 2, 520)
+        modal: true; title: qsTr("Keep this deck as a template")
+        standardButtons: Dialog.Save | Dialog.Cancel
+        onOpened: { field.text = backend.fileName.replace(/\.omashow$/, ""); field.forceActiveFocus() }
+        onAccepted: backend.saveAsTemplate(field.text)
+        ColumnLayout {
+            width: parent.width
+            TextField { id: field; objectName: "templateNameField"; Layout.fillWidth: true
+                        placeholderText: qsTr("Name for the template") }
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                text: qsTr("The whole deck is kept, so whatever is on the slides becomes the starting point. Linked pictures and film stay linked and are not carried.")
+            }
+        }
+    }
     AudienceWindow { id: audienceWindow }
     PresenterConsole { id: consoleWindow }
 
@@ -332,6 +353,7 @@ ApplicationWindow {
         onCreateRequested: win.confirmThenNew()
         onOpenRequested: win.confirmThenOpen()
         onRecentRequested: path => win.guard(() => backend.openRecent(path))
+        onTemplateRequested: id => win.guard(() => { if (backend.createFromTemplate(id)) win.workspace = 0 })
     }
     ColumnLayout {
         anchors.fill: parent
@@ -371,6 +393,9 @@ ApplicationWindow {
                         MenuSeparator {}
                         MenuItem { text: qsTr("Save"); icon.name: "save"; onTriggered: { win.commitEditors(); backend.save() } }
                         MenuItem { text: qsTr("Save as…"); onTriggered: { win.commitEditors(); backend.saveAsDialog() } }
+                        MenuItem { objectName: "keepAsTemplate"; text: qsTr("Keep as template…")
+                                   enabled: !backend.startVisible
+                                   onTriggered: { win.commitEditors(); templateName.open() } }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Export PDF…"); icon.name: "file-output"; onTriggered: { win.commitEditors(); backend.exportDialog({ kind: 0 }) } }
                         MenuItem { text: qsTr("Export…"); icon.name: "share"; onTriggered: { win.commitEditors(); win.workspace = 5 } }

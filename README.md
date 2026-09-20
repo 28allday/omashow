@@ -8,6 +8,12 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Start:** Midnight, Paper and Grove previews; widescreen, standard, portrait,
   square and custom sizes; title, body or blank first slide. Recent decks can be
   pinned, revealed or removed, with missing files clearly marked.
+- **Templates:** a template is just a deck. The Start centre lists the built-in
+  themes, whatever you have kept (File ▸ Keep as template…), and the examples
+  that ship with OmaShow — searchable, filtered by shape, each showing its
+  first slide, its layouts and the typefaces it asks for, with any that are not
+  installed here called out. Installing one checks it opens first; using one
+  makes a new unsaved deck, so the template is never written over.
 - **Edit:** text, native shapes and pictures; on-slide text editing, snap guides,
   resize, rotation handles (Shift snaps to 15°), numeric properties, undo/redo, multi-selection, nested groups,
   alignment/distribution, layer order, lock and hide. Presenter notes are edited
@@ -192,8 +198,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
   says so — advice, not a lock.
 
-Template-pack installation, recording, interchange with other applications and
-other release features remain on the roadmap. Tab stops, columns, text
+Recording, interchange with other applications and other release features remain
+on the roadmap. Tab stops, columns, text
 direction, reusable text styles, spell-checking and text on a path are not
 built yet. Exported PDFs carry real text but
 not clickable link annotations. Notes are plain

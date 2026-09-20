@@ -30,4 +30,8 @@ package() {
   /usr/bin/install -Dm644 src/ui/icons/LICENSE.lucide "$pkgdir/usr/share/licenses/$pkgname/LICENSE.lucide"
   /usr/bin/install -Dm644 "$startdir/omashow.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/omashow.svg"
   /usr/bin/install -Dm644 "$startdir/omashow.desktop" "$pkgdir/usr/share/applications/omashow.desktop"
+  for example in examples/*.omashow; do
+    [ -e "$example" ] || continue
+    /usr/bin/install -Dm644 "$example" "$pkgdir/usr/share/omashow/examples/$(basename "$example")"
+  done
 }
