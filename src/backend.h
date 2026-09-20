@@ -17,6 +17,8 @@
 #include "core/scene.h"
 #include "anim/presentationcache.h"
 #include "core/workers.h"
+#include "io/exports.h"
+#include <atomic>
 
 class PortalFileChooser;
 class MediaPlayback;
@@ -101,6 +103,8 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList outline READ outline NOTIFY documentChanged)
     Q_PROPERTY(QVariantMap findState READ findState NOTIFY findChanged)
     Q_PROPERTY(QVariantMap slideTransition READ slideTransition NOTIFY selectionChanged)
+    Q_PROPERTY(QVariantList exportQueue READ exportQueue NOTIFY exportQueueChanged)
+    Q_PROPERTY(bool encoderAvailable READ encoderAvailable CONSTANT)
     Q_PROPERTY(QString reviewAuthor READ reviewAuthor WRITE setReviewAuthor NOTIFY reviewAuthorChanged)
 
 public:
@@ -433,6 +437,13 @@ public:
     Q_INVOKABLE int replaceAllMatches(const QString &replacement);
     Q_INVOKABLE void clearFind();
     QVariantMap slideTransition() const;
+    QVariantList exportQueue() const;
+    bool encoderAvailable() const;
+    Q_INVOKABLE void exportDialog(const QVariantMap &options);
+    Q_INVOKABLE int queueExport(const QVariantMap &options);
+    Q_INVOKABLE void cancelExport(int id);
+    Q_INVOKABLE bool retryExport(int id);
+    Q_INVOKABLE void clearFinishedExports();
     Q_INVOKABLE bool setSlideTransition(const QString &key, const QVariant &value,
                                         bool everySlide = false);
 
@@ -442,6 +453,7 @@ signals:
     void deckImportChanged();
     void findChanged();
     void reviewAuthorChanged();
+    void exportQueueChanged();
     void operationChanged();
     void layoutPreviewChanged();
     void diagramPreviewChanged();
@@ -539,7 +551,7 @@ private:
     // The portal answers `selected` for every dialog, so the intent behind the
     // one in flight has to be remembered — otherwise a save would open the file
     // it was about to write, or a PDF export would overwrite the deck.
-    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck, ExportReview };
+    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck, ExportReview, ExportFile };
     QString m_imageTargetId, m_imageSlideId;
     bool loadImage(const QUrl &url, bool replace, int index, const QString &target);
     Pending m_pending = Pending::None;
@@ -574,6 +586,22 @@ private:
     QVariantMap m_importPlan, m_importOptions;
     QList<int> m_importSlides;
     QStringList m_importSlideIds;
+    // One export at a time, each against the deck as it was when it was queued.
+    struct ExportEntry {
+        int id = 0;
+        Exports::Request request;
+        QString state, message;
+        QStringList log;
+        int progress = 0;
+        Document document;
+        std::shared_ptr<Workers::Job> job;
+        std::shared_ptr<std::atomic_int> percent;
+    };
+    QVector<ExportEntry> m_exports;
+    QVariantMap m_pendingExport;
+    QTimer m_exportTicker;
+    int m_exportSerial = 0;
+    void startNextExport();
     QString m_reviewAuthor, m_findNeedle;
     QVariantMap m_findOptions, m_findState;
     QString m_importName;

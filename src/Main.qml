@@ -85,7 +85,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+Shift+N"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running
                onActivated: { win.commitEditors(); backend.showStart() } }
     Shortcut { sequence: "Ctrl+E"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible
-               onActivated: { win.commitEditors(); backend.exportPdfDialog(false) } }
+               onActivated: { win.commitEditors(); backend.exportDialog({ kind: 0 }) } }
     Shortcut { sequence: "Ctrl+Z"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.undo() }
     Shortcut { sequence: "Ctrl+Shift+Z"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: backend.redo() }
     Shortcut { sequence: "Ctrl+N"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible; onActivated: backend.addSlide() }
@@ -268,7 +268,8 @@ ApplicationWindow {
                         MenuItem { text: qsTr("Save"); icon.name: "save"; onTriggered: { win.commitEditors(); backend.save() } }
                         MenuItem { text: qsTr("Save as…"); onTriggered: { win.commitEditors(); backend.saveAsDialog() } }
                         MenuSeparator {}
-                        MenuItem { text: qsTr("Export PDF…"); icon.name: "file-output"; onTriggered: { win.commitEditors(); backend.exportPdfDialog(false) } }
+                        MenuItem { text: qsTr("Export PDF…"); icon.name: "file-output"; onTriggered: { win.commitEditors(); backend.exportDialog({ kind: 0 }) } }
+                        MenuItem { text: qsTr("Export…"); icon.name: "share"; onTriggered: { win.commitEditors(); win.workspace = 5 } }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Quit"); onTriggered: win.close() }
                     }
@@ -672,92 +673,10 @@ ApplicationWindow {
                 onStarting: win.commitEditors()
             }
 
-            // Export — PDF is real; the other targets are listed as not built
-            // rather than offered and then failing.
-            Item {
+            ExportWorkspace {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: win.workspace === 5
-
-                ColumnLayout {
-                    anchors.top: parent.top
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.topMargin: Theme.s5 * 2
-                    width: Math.min(parent.width - Theme.s5 * 2, Theme.wInspector * 2.4)
-                    spacing: Theme.s3
-
-                    Label { text: qsTr("Export"); font.pixelSize: Theme.fsStartHeading; font.weight: Theme.wHeading }
-                    Label { text: qsTr("%1 · %2 slides").arg(backend.fileName).arg(backend.slideCount); color: Theme.textSecondary; Layout.bottomMargin: Theme.s3 }
-
-                    Card {
-                        Layout.fillWidth: true
-                        implicitHeight: pdfCard.implicitHeight + Theme.s4 * 2
-                        ColumnLayout {
-                            id: pdfCard
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.margins: Theme.s2
-                            spacing: Theme.s3
-                            RowLayout {
-                                spacing: Theme.s3
-                                Rectangle {
-                                    implicitWidth: Theme.hToolTile - Theme.s3; implicitHeight: implicitWidth; radius: Theme.rCard
-                                    color: Theme.withAlpha(Theme.accent, 0.12); border.color: Theme.withAlpha(Theme.accent, 0.4)
-                                    Icon { anchors.centerIn: parent; name: "file-text"; size: Theme.szIconLarge + 4; color: Theme.accent }
-                                }
-                                ColumnLayout {
-                                    spacing: 2
-                                    Label { text: qsTr("PDF document"); font.pixelSize: Theme.fsSection; font.weight: Theme.wHeading }
-                                    Label { text: qsTr("Real text, not outlines — searchable and quotable."); color: Theme.textSecondary }
-                                }
-                            }
-                            Rectangle { Layout.fillWidth: true; implicitHeight: Theme.hairline; color: Theme.border }
-                            CheckBox { id: stagePages; text: qsTr("A page per build stage (handout)") }
-                            CheckBox { id: includeSkipped; text: qsTr("Include skipped slides") }
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Item { Layout.fillWidth: true }
-                                Button {
-                                    icon.name: "file-output"
-                                    text: qsTr("Export PDF…")
-                                    highlighted: true
-                                    onClicked: backend.exportPdfDialog(stagePages.checked,includeSkipped.checked)
-                                    ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Export PDF  Ctrl+E")
-                                }
-                            }
-                        }
-                    }
-
-                    SectionLabel { text: qsTr("NOT BUILT YET"); Layout.topMargin: Theme.s3 }
-                    Repeater {
-                        model: [
-                            { name: qsTr("Images"), icon: "file-image", why: qsTr("bin/shot renders frames; a slide-range export is not built") },
-                            { name: qsTr("Video"), icon: "file-play", why: qsTr("the evaluator makes it frame-exact; no encoder is wired in yet") },
-                            { name: qsTr("Office presentation (.pptx)"), icon: "presentation", why: qsTr("Gate 3") },
-                            { name: qsTr("OpenDocument (.odp)"), icon: "presentation", why: qsTr("Gate 3") }
-                        ]
-                        Rectangle {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            implicitHeight: Theme.hRow + Theme.s3
-                            color: "transparent"
-                            border.color: Theme.border
-                            border.width: Theme.hairline
-                            radius: Theme.rCard
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: Theme.s4
-                                anchors.rightMargin: Theme.s4
-                                spacing: Theme.s3
-                                Icon { name: modelData.icon; color: Theme.textMuted }
-                                Label { text: modelData.name; color: Theme.textSecondary }
-                                Item { Layout.fillWidth: true }
-                                Label { text: modelData.why; color: Theme.textMuted; font.pixelSize: Theme.fsLabel; elide: Text.ElideRight; Layout.maximumWidth: parent.width * 0.6 }
-                            }
-                        }
-                    }
-                }
             }
 
             Inspector {

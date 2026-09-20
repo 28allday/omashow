@@ -2,6 +2,8 @@
 #include "mediaplayback.h"
 #include "core/design.h"
 #include "core/review.h"
+#include "io/exports.h"
+#include <QFileInfo>
 
 #include <QDir>
 #include <QClipboard>
@@ -68,6 +70,17 @@ Backend::Backend(QObject *parent)
               ensureSuffix(QStringLiteral(".txt"));
               exportReview(path);
               break;
+            case Pending::ExportFile: {
+              auto options = m_pendingExport;
+              m_pendingExport.clear();
+              const auto request = Exports::Request::fromMap(options);
+              ensureSuffix(QFileInfo(request.suggestedName(QStringLiteral("x"))).suffix().isEmpty()
+                               ? QString()
+                               : '.' + QFileInfo(request.suggestedName(QStringLiteral("x"))).suffix());
+              options["path"] = path;
+              queueExport(options);
+              break;
+            }
             case Pending::None:
               openAsync(url);
               break;
@@ -87,6 +100,12 @@ Backend::Backend(QObject *parent)
 
   m_comparisonAudio=new MediaPlayback(this);
   connect(m_comparisonAudio,&MediaPlayback::failed,this,&Backend::failed);
+  m_exportTicker.setInterval(200);
+  connect(&m_exportTicker, &QTimer::timeout, this, [this] {
+    for (const auto &entry : m_exports)
+      if (entry.state == QLatin1String("running")) { emit exportQueueChanged(); return; }
+    m_exportTicker.stop();
+  });
   m_comparisonTicker.setInterval(40);
   connect(&m_comparisonTicker,&QTimer::timeout,this,&Backend::syncMediaComparison);
   m_mediaPlayback=new MediaPlayback(this);
