@@ -42,7 +42,9 @@ namespace Bundle {
 // Format 18 adds named custom shows: an order of slides, never copies of them.
 // Format 19 adds tab stops, columns, text direction and named text styles.
 // Format 20 adds text boxes whose content is an equation.
-constexpr int kFormatVersion = 20;
+// Format 21 adds the rest of the list markers: circles, squares, letters and
+// roman numerals.
+constexpr int kFormatVersion = 21;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

@@ -11,6 +11,10 @@ Rectangle {
     id: root
     color: Theme.windowBg
     signal starting()
+    // On a narrow window the show controls keep their icons and drop their
+    // words rather than running off the end of the bar.
+    readonly property bool tightBar: width < 1040
+    readonly property int barDisplay: tightBar ? AbstractButton.IconOnly : AbstractButton.TextBesideIcon
     property int notesSize: Theme.fsPresenterNotes
     property string wallClock: Qt.formatTime(new Date(), "hh:mm")
     function clockText(value) {
@@ -68,12 +72,17 @@ Rectangle {
                 Icon { name: "monitor"; color: Theme.textSecondary }
                 ComboBox {
                     Layout.preferredWidth: Theme.wInspector * 0.75
+                    Layout.maximumWidth: Theme.wInspector * 0.75
+                    Layout.minimumWidth: Theme.s5 * 4
+                    Layout.fillWidth: true
                     model: presenter.displays; textRole: "label"; currentIndex: presenter.audienceIndex
                     onActivated: presenter.audienceIndex = currentIndex
                     Accessible.name: qsTr("Audience display")
                     ToolTip.visible: hovered && !popup.visible; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Where the audience sees the show")
                 }
-                Button { icon.name: "arrow-left-right"; text: qsTr("Swap Displays"); enabled: presenter.displays.length > 1; onClicked: presenter.swapDisplays() }
+                Button { icon.name: "arrow-left-right"; text: qsTr("Swap Displays"); display: root.barDisplay
+                         enabled: presenter.displays.length > 1; onClicked: presenter.swapDisplays()
+                         ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: text }
                 Button {
                     objectName: "endShowButton"; visible: presenter.running
                     icon.name: "circle-stop"; text: qsTr("End Show"); onClicked: presenter.stop()
@@ -90,10 +99,12 @@ Rectangle {
                     }
                     ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("End the show  Esc")
                 }
-                Button { objectName: "rehearseButton"; visible: !presenter.running; icon.name: "timer"; text: qsTr("Rehearse"); onClicked: { root.starting(); presenter.start(true,true) }
+                Button { objectName: "rehearseButton"; visible: !presenter.running; icon.name: "timer"; text: qsTr("Rehearse"); display: root.barDisplay; onClicked: { root.starting(); presenter.start(true,true) }
                          ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Run the show in windows, with the clock") }
-                Button { visible: !presenter.running; text: qsTr("From This Slide"); onClicked: { root.starting(); presenter.start(true,false) } }
-                Button { visible: !presenter.running; icon.name: "play"; text: qsTr("Start Show"); highlighted: true; onClicked: { root.starting(); presenter.start(false,false) }
+                Button { visible: !presenter.running; icon.name: "step-forward"; text: qsTr("From This Slide"); display: root.barDisplay
+                         onClicked: { root.starting(); presenter.start(true,false) }
+                         ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: text }
+                Button { visible: !presenter.running; icon.name: "play"; text: qsTr("Start Show"); display: root.barDisplay; highlighted: true; onClicked: { root.starting(); presenter.start(false,false) }
                          ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Present from the first slide  F5") }
                 BarRule {}
                 Label { text: root.wallClock; font.pixelSize: Theme.fsSection; font.family: Theme.monoFamily; color: Theme.textPrimary }

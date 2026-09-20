@@ -176,7 +176,7 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "lineHeight") o.lineHeight = qBound(50.0,n,300.0);
     else if (key == "paragraphSpacing") o.paragraphSpacing = constrainForEditing ? qBound(0.0,n,1000.0) : qMax(0.0,n);
     else if (key == "textIndent") o.textIndent = constrainForEditing ? qBound(0.0,n,1000.0) : qMax(0.0,n);
-    else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),2);
+    else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),8);
     else if (key == "listStart") o.listStart = qBound(1,v.toInt(),9999);
     else if (key == "textFit") o.textFit = qBound(0,v.toInt(),1);
     else if (key == "textKind") o.textKind = qBound(0,v.toInt(),1);

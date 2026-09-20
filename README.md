@@ -28,7 +28,9 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   follow their letters when the words are rewritten, and survive saving,
   reopening, export and text builds. Horizontal
   and vertical alignment, line/paragraph spacing, indent, bullets and numbering.
-  Leading tabs nest list items; a tab stop distance can be set per box. Text can
+  Bullets can be discs, circles or squares, and numbering can be 1., a., A.,
+  i. or I., from any starting number. Leading tabs nest list items, stepping
+  disc → circle → square as they go; a tab stop distance can be set per box. Text can
   run in up to six columns with its own gap, and reading direction can follow the
   words or be forced left-to-right or right-to-left. Clip with an overflow
   warning, shrink to fit, or resize the box to fit its text.

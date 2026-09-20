@@ -194,7 +194,9 @@ FocusScope {
             Accessible.description: [modelData.skipped ? qsTr("skipped") : "",
                                      modelData.notes ? qsTr("has notes") : "",
                                      modelData.commentCount ? qsTr("has comments") : "",
-                                     modelData.buildCount ? qsTr("has builds") : ""]
+                                     modelData.buildCount ? qsTr("has builds") : "",
+                                     modelData.transitionOwn ? qsTr("arrives its own way") : "",
+                                     modelData.undescribed ? qsTr("something here needs a description") : ""]
                                     .filter(part => part.length > 0).join(", ")
             Accessible.selectable: true
             Accessible.selected: selected
@@ -267,18 +269,21 @@ FocusScope {
                     source: "image://slides/"+row.slide+"/"+backend.revision; sourceSize.width: root.sorter ? 640 : 320; cache: false
                     opacity: row.modelData.skipped ? .4 : 1
                 }
-                // What the thumbnail cannot show: skipped, builds, notes, media, comments.
+                // What the thumbnail cannot show: skipped, builds, notes, media,
+                // comments, how the show arrives, and anything undescribed.
                 Row {
                     visible: !row.modelData.collapsed && (root.sorter || root.mode === 0)
                     anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: Theme.s1 + 2
                     spacing: Theme.s1
                     Repeater {
-                        model: [row.modelData.buildCount ? "sparkles" : "", row.modelData.notes ? "notebook-pen" : "", row.modelData.mediaCount ? "clapperboard" : "", row.modelData.commentCount ? "message-square-text" : ""].filter(x => x.length)
+                        model: [row.modelData.buildCount ? "sparkles" : "", row.modelData.notes ? "notebook-pen" : "", row.modelData.mediaCount ? "clapperboard" : "", row.modelData.commentCount ? "message-square-text" : "", row.modelData.transitionOwn ? "arrow-left-right" : "", row.modelData.undescribed ? "triangle-alert" : ""].filter(x => x.length)
                         Rectangle {
                             required property string modelData
+                            objectName: "slideBadge_" + modelData
                             width: Theme.szIcon + Theme.s1; height: width; radius: Theme.rHandle
                             color: Theme.withAlpha(Theme.showBg, 0.65)
-                            Icon { anchors.centerIn: parent; name: parent.modelData; size: Theme.szIcon - 4; color: Theme.textPrimary }
+                            Icon { anchors.centerIn: parent; name: parent.modelData; size: Theme.szIcon - 4
+                                   color: parent.modelData === "triangle-alert" ? Theme.warning : Theme.textPrimary }
                         }
                     }
                 }

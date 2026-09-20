@@ -542,6 +542,7 @@ ApplicationWindow {
         // ── Workspaces ──────────────────────────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
+            objectName: "workspaceBar"
             implicitHeight: Theme.hWorkspaceBar
             color: Theme.windowBg
             Hairline { anchors.top: parent.top; width: parent.width }
@@ -758,6 +759,7 @@ ApplicationWindow {
                 visible: win.editing
 
                 Rectangle {
+                    id: canvasArea
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     color: Theme.pasteboard
@@ -778,6 +780,10 @@ ApplicationWindow {
                             checked: backend.snapEnabled
                             icon.name: "magnet"
                             text: qsTr("Snap to guides")
+                            // On a narrow canvas the label would sit on top of
+                            // the drawing tools in the other corner.
+                            display: canvasArea.width < 640 ? AbstractButton.IconOnly
+                                                            : AbstractButton.TextBesideIcon
                             onToggled: backend.snapEnabled = checked
                             ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay
                             ToolTip.text: backend.snapEnabled ? qsTr("Snapping to edges, centres and guides") : qsTr("Snapping is off")
@@ -928,6 +934,7 @@ ApplicationWindow {
 
         // ── Footer ──────────────────────────────────────────────────────────
         Rectangle {
+            objectName: "statusBar"
             Layout.fillWidth: true
             implicitHeight: Theme.hStatusBar
             color: Theme.windowBg

@@ -566,13 +566,15 @@ Rectangle {
                 ComboBox {
                     objectName: "textListStyle"
                     Layout.fillWidth: true
-                    model: [qsTr("None"),qsTr("Bullets"),qsTr("Numbers")]
+                    model: [qsTr("None"), qsTr("Bullets"), qsTr("Numbers"), qsTr("Circles"),
+                            qsTr("Squares"), qsTr("a. b. c."), qsTr("A. B. C."),
+                            qsTr("i. ii. iii."), qsTr("I. II. III.")]
                     currentIndex: root.sel.listStyle ?? 0
                     onActivated: backend.setSelectedProperty("listStyle",currentIndex)
                 }
                 NumField {
                     Layout.preferredWidth: Theme.s5 * 3
-                    visible: root.sel.listStyle === 2
+                    visible: [2,5,6,7,8].indexOf(root.sel.listStyle ?? 0) >= 0
                     label: qsTr("#"); value: root.sel.listStart ?? 1
                     onCommitted: v => backend.setSelectedProperty("listStart",v)
                 }

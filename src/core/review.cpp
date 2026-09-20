@@ -56,10 +56,7 @@ QString nameFor(const SceneObject &o) {
     return QStringLiteral("Shape");
 }
 
-bool needsDescription(const SceneObject &o) {
-    return o.type == ObjectType::Image || o.type == ObjectType::Media ||
-           o.type == ObjectType::Chart || o.type == ObjectType::Table;
-}
+using Review::needsDescription;
 
 int wordsIn(const QString &text) {
     return text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).size();
@@ -206,6 +203,11 @@ QString Review::validate(const Document &d) {
             return QStringLiteral("A reply belongs to a different slide than its comment.");
     }
     return {};
+}
+
+bool Review::needsDescription(const SceneObject &o) {
+    return o.type == ObjectType::Image || o.type == ObjectType::Media ||
+           o.type == ObjectType::Chart || o.type == ObjectType::Table;
 }
 
 QVariantMap Review::statistics(const Document &d) {

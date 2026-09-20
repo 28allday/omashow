@@ -30,6 +30,24 @@ Qt::Alignment alignment(int value) {
            : value == 3 ? Qt::AlignJustify
                         : Qt::AlignLeft;
 }
+// 0 none, 1 bullets, 2 numbers, then the rest of the markers people ask for.
+// Bullets nest the way they do on paper: disc, then circle, then square.
+QTextListFormat::Style listStyleFor(int style, int level) {
+    switch (style) {
+    case 1: return level <= 1   ? QTextListFormat::ListDisc
+                   : level == 2 ? QTextListFormat::ListCircle
+                                : QTextListFormat::ListSquare;
+    case 2: return QTextListFormat::ListDecimal;
+    case 3: return QTextListFormat::ListCircle;
+    case 4: return QTextListFormat::ListSquare;
+    case 5: return QTextListFormat::ListLowerAlpha;
+    case 6: return QTextListFormat::ListUpperAlpha;
+    case 7: return QTextListFormat::ListLowerRoman;
+    case 8: return QTextListFormat::ListUpperRoman;
+    }
+    return QTextListFormat::ListDisc;
+}
+bool numbered(int style) { return style == 2 || style >= 5; }
 bool maths(const SceneObject &o) { return o.textKind == 1; }
 // An equation drawn from the words that made it, at the box's own type size.
 MathLayout::Rendered equation(const SceneObject &o, qreal size) {
@@ -124,10 +142,9 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
         if (o.listStyle && !text.isEmpty()) {
             if (!lists.contains(level)) {
                 QTextListFormat list;
-                list.setStyle(o.listStyle == 1 ? QTextListFormat::ListDisc
-                                               : QTextListFormat::ListDecimal);
+                list.setStyle(listStyleFor(o.listStyle, level));
                 list.setIndent(level);
-                list.setStart(level == 1 ? o.listStart : 1);
+                if (numbered(o.listStyle)) list.setStart(level == 1 ? o.listStart : 1);
                 lists[level] = cursor.createList(list);
             } else
                 lists[level]->add(cursor.block());

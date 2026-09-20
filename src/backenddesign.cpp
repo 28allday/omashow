@@ -1,6 +1,8 @@
 #include "backend.h"
 #include "core/design.h"
 #include "core/edit.h"
+#include "core/review.h"
+#include "anim/presentation.h"
 #include <QDate>
 
 QVariantMap Backend::design() const {
@@ -403,11 +405,15 @@ QVariantList Backend::navigator() const {
     int pictures=0,media=0,openComments=0;
     for(const auto &comment:m_document.comments)
       if(comment.slideId==s.id && comment.parentId.isEmpty() && !comment.resolved) ++openComments;
+    int undescribed = 0;
     for(const auto &o:Design::resolve(m_document,i).objects) {
       if(o.hidden || o.id.startsWith("@field/")) continue;
       if(o.type==ObjectType::Text && !o.text.trimmed().isEmpty()) outline.append(o.text);
       if(o.type==ObjectType::Image) ++pictures;
       if(o.type==ObjectType::Media) ++media;
+      // The one finding cheap enough to say for every slide at once; the rest
+      // of the review is a workspace away.
+      if(Review::needsDescription(o) && o.altText.trimmed().isEmpty()) ++undescribed;
     }
     list.append(
         QVariantMap{{"index", i},
@@ -417,6 +423,13 @@ QVariantList Backend::navigator() const {
                     {"notes",!s.notes.trimmed().isEmpty()},
                     {"buildCount",s.timeline.steps.size()},
                     {"imageCount",pictures},{"mediaCount",media},{"commentCount",openComments},
+                    {"undescribed",undescribed},
+                    // How the show arrives here, once the deck's own choice is
+                    // taken into account: 0 cut, 1 fade, 2 push, 3 morph. The
+                    // badge is for a slide that arrives its own way, since a
+                    // deck-wide choice is true of every row and says nothing.
+                    {"transition",Presentation::transitionKind(m_document,i)},
+                    {"transitionOwn",s.transition>=0 && s.transition!=m_document.transition},
                     {"id", s.id},
                     {"sectionId", s.sectionId},
                     {"sectionName", name},

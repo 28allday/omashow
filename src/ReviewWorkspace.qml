@@ -27,7 +27,13 @@ RowLayout {
 
     // --- the deck, as words --------------------------------------------------
     Rectangle {
+        // The three columns have to fit the smallest window the app allows, so
+        // they are allowed to shrink: without fillWidth a column is fixed at its
+        // preferred width and the shell would be wider than the window.
         Layout.preferredWidth: Theme.wNavigator + Theme.s5 * 2
+        Layout.minimumWidth: Theme.wNavigatorMin
+        Layout.maximumWidth: Theme.wNavigator + Theme.s5 * 2
+        Layout.fillWidth: true
         Layout.fillHeight: true
         color: Theme.panelBg
         Rectangle { anchors.right: parent.right; width: Theme.hairline; height: parent.height; color: Theme.border }
@@ -100,7 +106,7 @@ RowLayout {
     ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        Layout.minimumWidth: Theme.wInspector
+        Layout.minimumWidth: Theme.wInspectorMin
         Layout.margins: Theme.s4
         spacing: Theme.s3
         TabBar {
@@ -350,7 +356,9 @@ RowLayout {
     // --- this slide -------------------------------------------------------------
     Rectangle {
         Layout.preferredWidth: Theme.wInspector
-        Layout.minimumWidth: Theme.wInspector
+        Layout.minimumWidth: Theme.wInspectorMin
+        Layout.maximumWidth: Theme.wInspector
+        Layout.fillWidth: true
         Layout.fillHeight: true
         color: Theme.panelBg
         Rectangle { anchors.left: parent.left; width: Theme.hairline; height: parent.height; color: Theme.border; z: 1 }

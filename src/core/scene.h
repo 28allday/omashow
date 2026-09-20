@@ -120,7 +120,7 @@ struct SceneObject {
     qreal lineHeight = 100;  // percentage
     qreal paragraphSpacing = 0, textIndent = 0;
     int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
-    int listStart = 1;
+    int listStart = 1;   // where a numbered list starts counting
     int textFit = 0;         // clip with overflow warning, shrink to fit
     int textKind = 0;        // 0 the words as typed, 1 an equation
     qreal tabStop = 0;       // 0 uses four times the type size
