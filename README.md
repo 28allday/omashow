@@ -329,6 +329,7 @@ in the app launcher, opens `.omashow` files, and uninstalls with
 git clone https://github.com/28allday/omashow.git
 cd omashow
 ./bin/install
+omashow skill --link   # optional: the Claude skill for the command line
 ```
 
 ## Keys
@@ -392,11 +393,15 @@ omashow ops --filter text
 `apply` takes a list of operations — the same ones the interface calls — and
 writes nothing unless every one of them ran. `omashow ops` lists them all, with
 their arguments, by asking the app what it can do. The full reference is
-[docs/cli.md](docs/cli.md), and `skills/omashow/SKILL.md` is a Claude skill for
-driving it:
+[docs/cli.md](docs/cli.md).
+
+A Claude skill for driving all this ships with the app. Installing OmaShow does
+not put it in your home directory — a package has no business writing there —
+so ask for it when you want it:
 
 ```sh
-ln -s "$PWD/skills/omashow" ~/.claude/skills/omashow
+omashow skill          # where it is, and whether Claude has it
+omashow skill --link   # put it where Claude looks
 ```
 
 The older render flags still work, and without a positional deck they use the

@@ -133,12 +133,21 @@ installed; `dictionaries` says which ones this computer has.
 ## Driving it from an agent
 
 `skills/omashow/SKILL.md` is a Claude skill for this command line — the working
-loop, the operations worth knowing and the things that bite. Link it into the
-skills directory on any machine that should have it:
+loop, the operations worth knowing and the things that bite. It ships with the
+app, packaged to `/usr/share/omashow/skills/`, but installing OmaShow does not
+put anything in your home directory. Ask for it:
 
 ```sh
-ln -s "$PWD/skills/omashow" ~/.claude/skills/omashow
+$ omashow skill
+{ "ok": true, "skill": "/usr/share/omashow/skills/omashow/SKILL.md",
+  "linksTo": "/home/you/.claude/skills/omashow", "linked": false,
+  "advice": "Run `omashow skill --link` to put it where Claude looks." }
+
+$ omashow skill --link
+{ "ok": true, …, "linked": true, "advice": "Claude will find it in a new session." }
 ```
+
+Something already at that name is not replaced unless you say `--force`.
 
 ## Finding the operation you want
 

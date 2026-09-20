@@ -162,8 +162,21 @@ const QStringList &verbs() {
     static const QStringList list{QStringLiteral("new"),    QStringLiteral("inspect"),
                                   QStringLiteral("apply"),  QStringLiteral("export"),
                                   QStringLiteral("review"), QStringLiteral("ops"),
-                                  QStringLiteral("help")};
+                                  QStringLiteral("skill"),  QStringLiteral("help")};
     return list;
+}
+
+// Where the agent skill ended up: beside a build, or in the package's share.
+QString skillFolder() {
+    const QStringList places{
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../skills/omashow"),
+        QCoreApplication::applicationDirPath() + QStringLiteral("/skills/omashow"),
+        QStringLiteral("/usr/share/omashow/skills/omashow"),
+        QStringLiteral("/usr/local/share/omashow/skills/omashow")};
+    for (const auto &place : places)
+        if (QFileInfo::exists(place + QStringLiteral("/SKILL.md")))
+            return QFileInfo(place).canonicalFilePath();
+    return {};
 }
 
 void usage() {
@@ -179,6 +192,7 @@ void usage() {
                         [--printer NAME] [--copies N] [--approve-media]
   omashow review <file> [--include-dismissed]
   omashow ops [--filter <text>]
+  omashow skill [--link] [--force]
 
 Everything answers with JSON on standard output and exits 0 or 1.
 
@@ -195,6 +209,44 @@ An operations file is a list of what to do, in order:
 `omashow ops` lists every operation there is, with its arguments: they are the
 same ones the interface calls, so anything the app can do is in that list.
 )") << Qt::flush;
+}
+
+// The skill is a file in the app; putting it where Claude Code looks is a link
+// the person asks for, never something an install does to their home directory.
+int offerSkill(const Flags &flags) {
+    const auto folder = skillFolder();
+    if (folder.isEmpty())
+        return refuse(QStringLiteral("the skill is not beside this copy of OmaShow; it lives in "
+                                     "skills/omashow in the source."));
+    const auto home = QDir::homePath() + QStringLiteral("/.claude/skills");
+    const auto target = home + QStringLiteral("/omashow");
+    QVariantMap payload{{QStringLiteral("skill"), folder + QStringLiteral("/SKILL.md")},
+                        {QStringLiteral("linksTo"), target}};
+    const QFileInfo already(target);
+    const bool linked = already.exists() &&
+                        already.canonicalFilePath() == QFileInfo(folder).canonicalFilePath();
+    payload[QStringLiteral("linked")] = linked;
+    if (!flags.has(QStringLiteral("link"))) {
+        payload[QStringLiteral("advice")] =
+            linked ? QStringLiteral("Claude already has it.")
+                   : QStringLiteral("Run `omashow skill --link` to put it where Claude looks.");
+        return say(payload);
+    }
+    if (linked) return say(payload);
+    if (already.exists() || already.isSymLink()) {
+        if (!flags.has(QStringLiteral("force")))
+            return refuse(QStringLiteral("%1 is already something else; --force replaces it.")
+                              .arg(target),
+                          payload);
+        if (already.isSymLink() ? !QFile::remove(target) : !QDir(target).removeRecursively())
+            return refuse(QStringLiteral("%1 could not be replaced.").arg(target), payload);
+    }
+    if (!QDir().mkpath(home)) return refuse(QStringLiteral("%1 could not be made.").arg(home));
+    if (!QFile::link(folder, target))
+        return refuse(QStringLiteral("%1 could not be linked to %2.").arg(target, folder), payload);
+    payload[QStringLiteral("linked")] = true;
+    payload[QStringLiteral("advice")] = QStringLiteral("Claude will find it in a new session.");
+    return say(payload);
 }
 
 int describeOps(const Flags &flags) {
@@ -412,10 +464,12 @@ int Cli::run(Backend &backend, const QStringList &arguments) {
         QStringLiteral("full"),           QStringLiteral("dry-run"),
         QStringLiteral("keep-going"),     QStringLiteral("stages"),
         QStringLiteral("include-skipped"), QStringLiteral("transparent"),
-        QStringLiteral("include-dismissed"), QStringLiteral("approve-media")};
+        QStringLiteral("include-dismissed"), QStringLiteral("approve-media"),
+        QStringLiteral("link"), QStringLiteral("force")};
     const auto flags = Flags::read(rest, taking, alone);
     if (!flags.complaint.isEmpty()) return refuse(flags.complaint);
 
+    if (verb == QStringLiteral("skill")) return offerSkill(flags);
     if (verb == QStringLiteral("ops")) return describeOps(flags);
     if (verb == QStringLiteral("new")) return makeDeck(backend, flags);
     if (verb == QStringLiteral("inspect")) return inspectDeck(backend, flags);
