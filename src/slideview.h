@@ -52,6 +52,9 @@ public:
 
     // Item point -> document point, for hit testing and dragging.
     Q_INVOKABLE QPointF toDocument(qreal x, qreal y) const;
+    // The other way: a place on the slide, in this view's pixels.
+    Q_INVOKABLE QPointF fromDocument(qreal x, qreal y) const;
+    Q_INVOKABLE qreal documentScale() const { return m_scale; }
 
     QString cropObject() const { return m_cropObject; }
     void setCropObject(const QString &id) { if(m_cropObject==id) return; m_cropObject=id; emit cropObjectChanged(); polish(); update(); }

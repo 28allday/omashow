@@ -88,6 +88,8 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList selectedSlides READ selectedSlides NOTIFY slideSelectionChanged)
     Q_PROPERTY(QVariantMap slideSelectionState READ slideSelectionState NOTIFY slideSelectionChanged)
     Q_PROPERTY(QVariantList navigator READ navigator NOTIFY documentChanged)
+    Q_PROPERTY(QVariantList customShows READ customShows NOTIFY documentChanged)
+    Q_PROPERTY(QString activeShow READ activeShow WRITE setActiveShow NOTIFY documentChanged)
     Q_PROPERTY(QVariantList browserSlides READ browserSlides NOTIFY browserChanged)
     Q_PROPERTY(QStringList collapsedSections READ collapsedSections NOTIFY browserChanged)
     Q_PROPERTY(QVariantList builds READ builds NOTIFY selectionChanged)
@@ -252,6 +254,14 @@ public:
     Q_INVOKABLE void moveSelectedSlides(int target, bool after = false);
     Q_INVOKABLE void nudgeSelectedSlides(int direction);
     Q_INVOKABLE void setSlidesSkipped(bool skipped);
+    QVariantList customShows() const;
+    QString activeShow() const { return m_activeShow; }
+    void setActiveShow(const QString &id);
+    Q_INVOKABLE QString addCustomShow(const QString &name);
+    Q_INVOKABLE bool renameCustomShow(const QString &id, const QString &name);
+    Q_INVOKABLE bool removeCustomShow(const QString &id);
+    Q_INVOKABLE bool setCustomShowSlides(const QString &id, const QStringList &slideIds);
+    Q_INVOKABLE bool moveCustomShowSlide(const QString &id, int from, int to);
     Q_INVOKABLE bool resizeDeck(qreal width, qreal height, bool scaleContent = true);
     Q_INVOKABLE QRectF selectionVisualBounds() const;
     Q_INVOKABLE void rotateSelection(qreal degrees, bool snap = false);
@@ -456,6 +466,7 @@ public:
     Q_INVOKABLE int replaceAllMatches(const QString &replacement);
     Q_INVOKABLE void clearFind();
     QVariantMap slideTransition() const;
+    Q_INVOKABLE bool applyRehearsedTimings(const QVariantList &timings);
     QVariantList exportQueue() const;
     bool encoderAvailable() const;
     QVariantList printers() const;
@@ -604,6 +615,8 @@ private:
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);
+    QString m_activeShow;
+    void applyActiveShow();
     QStringList m_slideSelection;
     QStringList m_collapsedSections;
     QString m_slideAnchor;

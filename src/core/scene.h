@@ -202,6 +202,9 @@ struct SlideLayout {
 
 struct Section { QString id, name; };
 
+// A named order of slides that already exist — never a copy of them.
+struct CustomShow { QString id, name; QStringList slideIds; };
+
 // A note on a slide, or on one object, or a reply to either. Replies are one
 // level deep: a thread is a comment and the replies under it.
 struct Comment {
@@ -222,6 +225,10 @@ struct Document {
     QVector<Master> masters;
     QVector<SlideLayout> layouts;
     QVector<Comment> comments;
+    QVector<CustomShow> shows;
+    // Which slides are being shown right now, in order. Session state: it is
+    // never written to a file, and an empty list means the whole deck.
+    QStringList activeShow;
     // Review findings the author has looked at and does not want raised again.
     QStringList dismissedIssues;
 

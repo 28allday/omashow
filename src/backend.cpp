@@ -286,6 +286,8 @@ void Backend::acceptOpen(const Document &document, const QUrl &url) {
   resetMediaSession();
   m_document = document;
   Review::prune(m_document);
+  m_activeShow.clear();
+  applyActiveShow();
   m_history.reset(m_document);
   pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
   m_currentSlide = 0;
@@ -443,6 +445,8 @@ void Backend::setDocument(const Document &document) {
   resetMediaSession();
   m_document = document;
   Review::prune(m_document);
+  m_activeShow.clear();
+  applyActiveShow();
   m_history.reset(m_document);
   pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
   m_currentSlide = 0;
@@ -563,6 +567,7 @@ bool Backend::renderFrame(qreal time, const QString &path, int width,bool includ
 void Backend::touch() {
   // Notes and reading orders never outlive what they point at.
   Review::prune(m_document);
+  applyActiveShow();
   ++m_revision;
   m_modified = true;
   emit documentChanged();

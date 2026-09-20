@@ -53,6 +53,15 @@ qreal Presentation::slideDuration(const Document &document, int slideIndex) {
 QVector<int> Presentation::slideIndices(const Document &document,
                                         bool includeSkipped) {
   QVector<int> indices;
+  // A custom show is the deck in a different order, not a different deck.
+  if (!document.activeShow.isEmpty()) {
+    for (const auto &id : document.activeShow)
+      for (int i = 0; i < document.slides.size(); ++i)
+        if (document.slides.at(i).id == id &&
+            (includeSkipped || !document.slides.at(i).skipped))
+          indices.append(i);
+    return indices;
+  }
   for (int i = 0; i < document.slides.size(); ++i)
     if (includeSkipped || !document.slides.at(i).skipped)
       indices.append(i);
@@ -63,10 +72,11 @@ qreal Presentation::slideStart(const Document &document, int index,
   qreal start = 0;
   const auto indices = slideIndices(document, includeSkipped);
   for (int n = 0; n < indices.size(); ++n) {
-    const int i = indices.at(n);
-    if (i >= index)
+    // A custom show can put the slides in any order, so this looks for the
+    // slide rather than assuming it comes after the ones already counted.
+    if (indices.at(n) == index || (document.activeShow.isEmpty() && indices.at(n) >= index))
       return start;
-    start += slideDuration(document, i);
+    start += slideDuration(document, indices.at(n));
     if (n + 1 < indices.size()) start += transitionSeconds(document, indices.at(n + 1));
   }
   return duration(document, includeSkipped);

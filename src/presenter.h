@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
+#include <QHash>
 #include <QVariantList>
 #include <QWindow>
 
@@ -29,6 +30,12 @@ class Presenter : public QObject {
   Q_PROPERTY(int buildNumber READ buildNumber NOTIFY timeChanged)
   Q_PROPERTY(int nextSlideIndex READ nextSlideIndex NOTIFY timeChanged)
   Q_PROPERTY(int buildCount READ buildCount NOTIFY timeChanged)
+  // Drawing over the show: 0 nothing, 1 pointer, 2 spotlight, 3 ink.
+  Q_PROPERTY(int annotation READ annotation WRITE setAnnotation NOTIFY annotationChanged)
+  Q_PROPERTY(QVariantList ink READ ink NOTIFY annotationChanged)
+  Q_PROPERTY(QPointF pointer READ pointer NOTIFY pointerChanged)
+  Q_PROPERTY(bool pointerVisible READ pointerVisible NOTIFY pointerChanged)
+  Q_PROPERTY(QVariantList timings READ timings NOTIFY timingsChanged)
 public:
   Presenter(Backend *backend, ShowGuard *guard, QObject *parent = nullptr);
   ~Presenter() override;
@@ -70,12 +77,34 @@ public:
   Q_INVOKABLE void restartClock();
   Q_INVOKABLE void swapDisplays();
   Q_INVOKABLE void refreshDisplays();
+
+  int annotation() const { return m_annotation; }
+  void setAnnotation(int mode);
+  QVariantList ink() const;
+  QPointF pointer() const { return m_pointer; }
+  bool pointerVisible() const { return m_pointerVisible; }
+  Q_INVOKABLE void movePointer(qreal x, qreal y);
+  Q_INVOKABLE void hidePointer();
+  Q_INVOKABLE void beginStroke(qreal x, qreal y);
+  Q_INVOKABLE void extendStroke(qreal x, qreal y);
+  Q_INVOKABLE void endStroke();
+  Q_INVOKABLE void undoInk();
+  Q_INVOKABLE void clearInk();
+  // Ink is the speaker's, not the deck's: it is only ever written into a slide
+  // when they ask for it, and then it is an ordinary editable path.
+  Q_INVOKABLE bool keepInkOnSlide();
+  QVariantList timings() const;
+  Q_INVOKABLE void clearTimings();
+  Q_INVOKABLE bool applyTimings();
 signals:
   void externalLinkRequested(const QUrl &url);
   void stateChanged();
   void displaysChanged();
   void timeChanged();
   void clockChanged();
+  void annotationChanged();
+  void pointerChanged();
+  void timingsChanged();
 
 private:
   QVector<qreal> clickBoundaries() const;
@@ -95,4 +124,14 @@ private:
   // A slide that moves on by itself: armed when its builds finish, and stopped
   // by anything that takes the show out of the speaker's hands.
   QTimer m_advance;
+  int m_annotation = 0;
+  struct Stroke { int slide = -1; QVector<QPointF> points; };
+  QVector<Stroke> m_ink;
+  bool m_drawing = false, m_pointerVisible = false;
+  QPointF m_pointer;
+  // Seconds spent on each slide while rehearsing, in the order they were shown.
+  QHash<int, qreal> m_timings;
+  int m_timedSlide = -1;
+  QElapsedTimer m_slideClock;
+  void recordSlideTime();
 };

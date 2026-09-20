@@ -14,6 +14,7 @@
 #include <QProcess>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -26,6 +27,10 @@ QSize pixels(const QSizeF &slide, int width) {
 }
 
 QVector<int> slidesIn(const Document &document, const Exports::Request &request) {
+    // A custom show is already a choice of slides, in an order: exporting one
+    // exports that, whole, rather than a range cut out of the deck.
+    if (!document.activeShow.isEmpty())
+        return Presentation::slideIndices(document, request.includeSkipped);
     QVector<int> indices;
     const int from = request.from < 0 ? 0 : request.from;
     const int to = request.to < 0 ? document.slides.size() - 1 : request.to;
@@ -144,8 +149,8 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
 
     if (request.kind == Pdf || request.kind == Print) {
         Pdf::Options options;
-        options.from = indices.first();
-        options.to = indices.last();
+        options.from = *std::min_element(indices.cbegin(), indices.cend());
+        options.to = *std::max_element(indices.cbegin(), indices.cend());
         options.pagePerBuildStage = request.stages;
         options.includeSkipped = request.includeSkipped;
         options.layout = request.layout;

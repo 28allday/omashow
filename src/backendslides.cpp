@@ -1,5 +1,6 @@
 #include "anim/presentation.h"
 #include "backend.h"
+#include "core/edit.h"
 #include "core/deckresize.h"
 #include "core/design.h"
 #include "core/slides.h"
@@ -300,4 +301,127 @@ void Backend::moveSection(const QString &id, int direction) {
   m_history.commit();
   restoreCurrentSlide(current);
   touch();
+}
+
+// --- custom shows ------------------------------------------------------------
+QVariantList Backend::customShows() const {
+  QVariantList rows;
+  for (const auto &show : m_document.shows) {
+    QVariantList slides;
+    for (const auto &id : show.slideIds)
+      for (int i = 0; i < m_document.slides.size(); ++i)
+        if (m_document.slides.at(i).id == id)
+          slides.append(QVariantMap{{"id", id}, {"index", i}});
+    rows.append(QVariantMap{{"id", show.id},
+                            {"name", show.name},
+                            {"slides", slides},
+                            {"count", slides.size()},
+                            {"active", show.id == m_activeShow}});
+  }
+  return rows;
+}
+
+QString Backend::addCustomShow(const QString &name) {
+  const auto trimmed = name.trimmed();
+  if (trimmed.isEmpty() || trimmed.size() > 120 || m_document.shows.size() >= 64) return {};
+  CustomShow show;
+  show.id = Edit::newId("show");
+  show.name = trimmed;
+  // A new show starts as whatever is selected, or the whole deck.
+  const auto chosen = selectedSlides();
+  for (const auto &slide : m_document.slides)
+    if (chosen.isEmpty() || chosen.contains(slide.id)) show.slideIds.append(slide.id);
+  m_history.begin(m_document, tr("Add a custom show"));
+  m_document.shows.append(show);
+  m_history.commit();
+  touch();
+  return show.id;
+}
+
+bool Backend::renameCustomShow(const QString &id, const QString &name) {
+  const auto trimmed = name.trimmed();
+  if (trimmed.isEmpty() || trimmed.size() > 120) return false;
+  for (int i = 0; i < m_document.shows.size(); ++i) {
+    if (m_document.shows.at(i).id != id) continue;
+    if (m_document.shows.at(i).name == trimmed) return true;
+    m_history.begin(m_document, tr("Rename a custom show"));
+    m_document.shows[i].name = trimmed;
+    m_history.commit();
+    touch();
+    return true;
+  }
+  return false;
+}
+
+bool Backend::removeCustomShow(const QString &id) {
+  for (int i = 0; i < m_document.shows.size(); ++i) {
+    if (m_document.shows.at(i).id != id) continue;
+    m_history.begin(m_document, tr("Remove a custom show"));
+    m_document.shows.removeAt(i);
+    m_history.commit();
+    if (m_activeShow == id) setActiveShow(QString());
+    touch();
+    return true;
+  }
+  return false;
+}
+
+bool Backend::setCustomShowSlides(const QString &id, const QStringList &slideIds) {
+  QStringList kept;
+  for (const auto &slide : slideIds) {
+    bool exists = false;
+    for (const auto &known : m_document.slides)
+      if (known.id == slide) exists = true;
+    if (!exists || kept.contains(slide)) return false;
+    kept.append(slide);
+  }
+  for (int i = 0; i < m_document.shows.size(); ++i) {
+    if (m_document.shows.at(i).id != id) continue;
+    if (m_document.shows.at(i).slideIds == kept) return true;
+    m_history.begin(m_document, tr("Change a custom show"));
+    m_document.shows[i].slideIds = kept;
+    m_history.commit();
+    if (m_activeShow == id) applyActiveShow();
+    touch();
+    return true;
+  }
+  return false;
+}
+
+bool Backend::moveCustomShowSlide(const QString &id, int from, int to) {
+  for (const auto &show : m_document.shows) {
+    if (show.id != id) continue;
+    if (from < 0 || from >= show.slideIds.size() || to < 0 || to >= show.slideIds.size() ||
+        from == to)
+      return false;
+    auto slides = show.slideIds;
+    slides.move(from, to);
+    return setCustomShowSlides(id, slides);
+  }
+  return false;
+}
+
+// Which slides the show, the preview and an export are about. This is a view
+// on the deck, not an edit of it, so it is never part of undo or of a file.
+void Backend::setActiveShow(const QString &id) {
+  if (m_activeShow == id) return;
+  bool known = id.isEmpty();
+  for (const auto &show : m_document.shows)
+    if (show.id == id) known = true;
+  if (!known) return;
+  m_activeShow = id;
+  applyActiveShow();
+  pause();
+  setTime(0);
+  ++m_revision;
+  emit documentChanged();
+  emit deckChanged();
+  emit selectionChanged();
+}
+
+void Backend::applyActiveShow() {
+  QStringList order;
+  for (const auto &show : m_document.shows)
+    if (show.id == m_activeShow) order = show.slideIds;
+  m_document.activeShow = order;
 }

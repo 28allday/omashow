@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTransform>
+#include <algorithm>
 
 Presenter::Presenter(Backend *backend, ShowGuard *guard, QObject *parent)
     : QObject(parent), m_backend(backend), m_guard(guard) {
@@ -172,6 +173,7 @@ bool Presenter::start(bool fromCurrent, bool rehearsal) {
   }
   m_backend->setIncludeSkipped(false);
   m_rehearsal = rehearsal;
+  if (rehearsal) clearTimings();
   m_running = true;
   m_blank = 0;
   m_backend->setMediaSuppressed(false);
@@ -201,6 +203,13 @@ void Presenter::stop() {
   m_guard->release();
   m_frozen = false;
   m_blank = 0;
+  recordSlideTime();
+  m_timedSlide = -1;
+  m_annotation = 0;
+  m_drawing = false;
+  m_ink.clear();
+  hidePointer();
+  emit annotationChanged();
   m_advance.stop();
   m_backend->setMediaSuppressed(false);
   if (m_audience)
@@ -255,6 +264,9 @@ void Presenter::jump(int index) {
   if (!m_running || index < 0 || index >= m_backend->slideCount() ||
       m_backend->document().slides.at(index).skipped)
     return;
+  recordSlideTime();
+  m_timedSlide = index;
+  m_slideClock.start();
   m_backend->pause();
   m_backend->setCurrentSlide(index);
   m_backend->setTime(m_backend->slideStart());
@@ -287,6 +299,9 @@ void Presenter::next() {
   }
   const qreal transitionStart =
       m_backend->slideStart() + m_backend->slideDuration();
+  recordSlideTime();
+  m_timedSlide = next;
+  m_slideClock.start();
   m_backend->setCurrentSlide(next);
   m_backend->setTime(transitionStart);
   m_consumedClicks = 0;
@@ -461,4 +476,154 @@ void Presenter::cancelPendingLink() {
   m_pendingExternalLink = QUrl();
   m_status = tr("Link dismissed · resume when ready");
   emit stateChanged();
+}
+
+// --- drawing over the show ---------------------------------------------------
+void Presenter::setAnnotation(int mode) {
+  const int wanted = qBound(0, mode, 3);
+  if (wanted == m_annotation) return;
+  m_annotation = wanted;
+  if (m_annotation != 3) endStroke();
+  if (m_annotation == 0) hidePointer();
+  m_status = m_annotation == 1   ? tr("Pointer")
+             : m_annotation == 2 ? tr("Spotlight")
+             : m_annotation == 3 ? tr("Drawing")
+                                 : m_status;
+  emit annotationChanged();
+  emit stateChanged();
+}
+
+QVariantList Presenter::ink() const {
+  QVariantList strokes;
+  const int slide = m_backend->currentSlide();
+  for (const auto &stroke : m_ink) {
+    if (stroke.slide != slide || stroke.points.size() < 2) continue;
+    QVariantList points;
+    for (const auto &point : stroke.points) points.append(QVariantMap{{"x", point.x()}, {"y", point.y()}});
+    strokes.append(QVariantMap{{"points", points}});
+  }
+  return strokes;
+}
+
+void Presenter::movePointer(qreal x, qreal y) {
+  m_pointer = QPointF(x, y);
+  m_pointerVisible = m_annotation != 0;
+  if (m_drawing) extendStroke(x, y);
+  emit pointerChanged();
+}
+
+void Presenter::hidePointer() {
+  if (!m_pointerVisible) return;
+  m_pointerVisible = false;
+  emit pointerChanged();
+}
+
+void Presenter::beginStroke(qreal x, qreal y) {
+  if (m_annotation != 3) return;
+  m_ink.append({m_backend->currentSlide(), {QPointF(x, y)}});
+  m_drawing = true;
+  emit annotationChanged();
+}
+
+void Presenter::extendStroke(qreal x, qreal y) {
+  if (!m_drawing || m_ink.isEmpty()) return;
+  auto &points = m_ink.last().points;
+  // Ignore the jitter of a slow hand; a stroke stays a handful of points.
+  if (!points.isEmpty() && (points.last() - QPointF(x, y)).manhattanLength() < 2) return;
+  if (points.size() > 4000) return;
+  points.append(QPointF(x, y));
+  emit annotationChanged();
+}
+
+void Presenter::endStroke() {
+  if (!m_drawing) return;
+  m_drawing = false;
+  if (!m_ink.isEmpty() && m_ink.last().points.size() < 2) m_ink.removeLast();
+  emit annotationChanged();
+}
+
+void Presenter::undoInk() {
+  const int slide = m_backend->currentSlide();
+  for (int i = m_ink.size() - 1; i >= 0; --i)
+    if (m_ink.at(i).slide == slide) {
+      m_ink.removeAt(i);
+      emit annotationChanged();
+      return;
+    }
+}
+
+void Presenter::clearInk() {
+  if (m_ink.isEmpty()) return;
+  m_ink.clear();
+  m_drawing = false;
+  emit annotationChanged();
+}
+
+bool Presenter::keepInkOnSlide() {
+  const int slide = m_backend->currentSlide();
+  QVector<QVector<QPointF>> strokes;
+  for (const auto &stroke : m_ink)
+    if (stroke.slide == slide && stroke.points.size() >= 2) strokes.append(stroke.points);
+  if (strokes.isEmpty()) return false;
+  bool kept = false;
+  for (const auto &points : strokes) {
+    QVariantList route;
+    for (const auto &point : points) route.append(QVariantMap{{"x", point.x()}, {"y", point.y()}});
+    if (m_backend->addPath(route, false, true)) kept = true;
+  }
+  if (!kept) return false;
+  for (int i = m_ink.size() - 1; i >= 0; --i)
+    if (m_ink.at(i).slide == slide) m_ink.removeAt(i);
+  m_status = tr("Drawing kept on the slide");
+  emit annotationChanged();
+  emit stateChanged();
+  return true;
+}
+
+// --- rehearsed timings -------------------------------------------------------
+void Presenter::recordSlideTime() {
+  if (!m_rehearsal || m_timedSlide < 0 || !m_slideClock.isValid()) return;
+  m_timings[m_timedSlide] += m_slideClock.elapsed() / 1000.0;
+  m_slideClock.restart();
+  emit timingsChanged();
+}
+
+QVariantList Presenter::timings() const {
+  QVariantList rows;
+  const auto &document = m_backend->document();
+  auto keys = m_timings.keys();
+  std::sort(keys.begin(), keys.end());
+  for (int index : keys) {
+    if (index < 0 || index >= document.slides.size()) continue;
+    rows.append(QVariantMap{{"index", index},
+                            {"seconds", m_timings.value(index)},
+                            {"current", Presentation::hold(document, index)},
+                            {"skipped", document.slides.at(index).skipped}});
+  }
+  return rows;
+}
+
+void Presenter::clearTimings() {
+  if (m_timings.isEmpty()) return;
+  m_timings.clear();
+  m_timedSlide = -1;
+  emit timingsChanged();
+}
+
+bool Presenter::applyTimings() {
+  QVariantList wanted;
+  for (const auto &row : timings()) {
+    const auto entry = row.toMap();
+    // Rehearsed time covers the builds as well; the hold is what is left.
+    const qreal builds = m_backend->document()
+                             .slides.at(entry["index"].toInt())
+                             .timeline.duration();
+    wanted.append(QVariantMap{{"index", entry["index"]},
+                              {"hold", qMax(qreal(0), entry["seconds"].toDouble() - builds)}});
+  }
+  if (wanted.isEmpty()) return false;
+  if (!m_backend->applyRehearsedTimings(wanted)) return false;
+  m_status = tr("Rehearsed timings applied");
+  emit stateChanged();
+  return true;
 }

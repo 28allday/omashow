@@ -231,6 +231,36 @@ int Backend::addBuildForSelection(int phase, int effect) {
     m_history.commit();touch();return first;
 }
 
+// Times measured while rehearsing, handed to the slides as their own hold.
+bool Backend::applyRehearsedTimings(const QVariantList &timings) {
+  if (timings.isEmpty()) return false;
+  QMap<int, qreal> holds;
+  for (const auto &row : timings) {
+    const auto entry = row.toMap();
+    bool ok = false;
+    const int index = entry.value("index").toInt(&ok);
+    const qreal hold = entry.value("hold").toDouble();
+    if (!ok || index < 0 || index >= m_document.slides.size() || !std::isfinite(hold) ||
+        hold < 0 || hold > 3600)
+      return false;
+    holds[index] = hold;
+  }
+  m_history.begin(m_document, tr("Use rehearsed timings"));
+  bool changed = false;
+  for (auto it = holds.cbegin(); it != holds.cend(); ++it)
+    if (m_document.slides.at(it.key()).advanceAfter != it.value()) {
+      m_document.slides[it.key()].advanceAfter = it.value();
+      changed = true;
+    }
+  if (!changed) {
+    m_history.abandon();
+    return true;
+  }
+  m_history.commit();
+  touch();
+  return true;
+}
+
 // --- transitions ------------------------------------------------------------
 QVariantMap Backend::slideTransition() const {
   const bool has = m_currentSlide >= 0 && m_currentSlide < m_document.slides.size();

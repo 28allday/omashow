@@ -254,6 +254,13 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     QJsonArray sections;
     for (const auto &section : document.sections) sections.append(QJsonObject{{"id",section.id},{"name",section.name}});
     manifest["sections"] = sections;
+    QJsonArray shows;
+    for (const auto &show : document.shows) {
+        QJsonArray slides;
+        for (const auto &id : show.slideIds) slides.append(id);
+        shows.append(QJsonObject{{"id",show.id},{"name",show.name},{"slides",slides}});
+    }
+    manifest["shows"] = shows;
 
     QJsonObject theme, colors, fonts;
     theme["name"] = document.theme.name;
@@ -437,6 +444,9 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
         }
         sectionIds.insert(section.id); document.sections.append(section);
     }
+    if (manifest.contains("shows") && !manifest.value("shows").isArray()) {
+        result.error = QStringLiteral("The deck's custom shows are damaged."); return result;
+    }
     const QJsonArray order = manifest.value(QStringLiteral("slides")).toArray();
     for (const QJsonValue &value : order) {
         const QString id = value.toString();
@@ -476,6 +486,29 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
     if (document.slides.isEmpty()) {
         result.error = QStringLiteral("The deck has no slides.");
         return result;
+    }
+
+    QSet<QString> showIds;
+    for (const auto &value : manifest.value("shows").toArray()) {
+        const auto json = value.toObject();
+        CustomShow show{json.value("id").toString(), json.value("name").toString(), {}};
+        if (show.id.isEmpty() || showIds.contains(show.id) || show.name.trimmed().isEmpty() ||
+            show.name.size() > 120 || !json.value("slides").isArray()) {
+            result.error = QStringLiteral("A custom show is damaged."); return result;
+        }
+        showIds.insert(show.id);
+        for (const auto &slide : json.value("slides").toArray()) {
+            const auto id = slide.toString();
+            bool exists = false;
+            for (const auto &known : document.slides) if (known.id == id) exists = true;
+            if (!exists || show.slideIds.contains(id)) {
+                result.error = QStringLiteral("A custom show names a slide twice, or one that "
+                                              "is not in the deck.");
+                return result;
+            }
+            show.slideIds.append(id);
+        }
+        document.shows.append(show);
     }
 
     // Review notes travel with the deck. One that points at a slide or object

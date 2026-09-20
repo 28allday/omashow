@@ -49,6 +49,10 @@ QPointF SlideView::toDocument(qreal x, qreal y) const {
     return QPointF((x - m_origin.x()) / m_scale, (y - m_origin.y()) / m_scale);
 }
 
+QPointF SlideView::fromDocument(qreal x, qreal y) const {
+    return QPointF(x * m_scale + m_origin.x(), y * m_scale + m_origin.y());
+}
+
 void SlideView::setTime(qreal time) {
     if (qFuzzyCompare(m_time, time))
         return;

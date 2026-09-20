@@ -337,9 +337,92 @@ Rectangle {
                                        onClicked: presenter.frozen = checked
                                        ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Hold the audience view while you move on  F") }
                         }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.s2
+                            ToolTile { objectName: "annotatePointer"; icon.name: "mouse-pointer-2"; text: qsTr("Pointer")
+                                       checkable: true; checked: presenter.annotation === 1; enabled: presenter.running
+                                       onClicked: presenter.annotation = checked ? 1 : 0
+                                       ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("A dot the audience can follow  P") }
+                            ToolTile { objectName: "annotateSpotlight"; icon.name: "scan-search"; text: qsTr("Spotlight")
+                                       checkable: true; checked: presenter.annotation === 2; enabled: presenter.running
+                                       onClicked: presenter.annotation = checked ? 2 : 0
+                                       ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Dim everything but where you point  S") }
+                            ToolTile { objectName: "annotateInk"; icon.name: "pencil-line"; text: qsTr("Draw")
+                                       checkable: true; checked: presenter.annotation === 3; enabled: presenter.running
+                                       onClicked: presenter.annotation = checked ? 3 : 0
+                                       ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Draw over the slide  D") }
+                        }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: presenter.ink.length > 0
+                            spacing: Theme.s2
+                            Button { objectName: "inkUndo"; Layout.fillWidth: true; text: qsTr("Undo the last line"); onClicked: presenter.undoInk() }
+                            Button { objectName: "inkClear"; Layout.fillWidth: true; text: qsTr("Clear"); onClicked: presenter.clearInk() }
+                            Button { objectName: "inkKeep"; Layout.fillWidth: true; text: qsTr("Keep on the slide"); onClicked: presenter.keepInkOnSlide() }
+                        }
+                        Label {
+                            Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                            visible: presenter.annotation !== 0
+                            text: qsTr("Drawing stays with the show unless you keep it, and never changes the deck by itself.")
+                        }
+                        FieldRow {
+                            label: qsTr("Showing")
+                            ComboBox {
+                                objectName: "customShowChoice"
+                                Layout.fillWidth: true
+                                enabled: !presenter.running
+                                textRole: "name"
+                                valueRole: "id"
+                                model: [{ id: "", name: qsTr("The whole deck"), count: backend.slideCount }]
+                                       .concat(backend.customShows)
+                                currentIndex: Math.max(0, model.findIndex(show => show.id === backend.activeShow))
+                                onActivated: backend.activeShow = currentValue
+                            }
+                            Button { objectName: "manageShows"; text: qsTr("Shows…"); enabled: !presenter.running
+                                     onClicked: showsDialog.open() }
+                        }
+                        Label {
+                            Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                            visible: backend.activeShow.length > 0
+                            text: qsTr("Presenting, previewing and exporting follow this show until you pick the whole deck again.")
+                        }
                         FieldRow {
                             label: qsTr("Target")
                             NumField { Layout.fillWidth: true; suffix: qsTr(" min"); value: presenter.targetMinutes; onCommitted: v => presenter.targetMinutes = v }
+                        }
+                        // What the rehearsal measured, and what to do with it.
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            visible: presenter.timings.length > 0
+                            spacing: Theme.s1
+                            SectionLabel { text: qsTr("REHEARSED") }
+                            Repeater {
+                                model: presenter.timings
+                                Label {
+                                    required property var modelData
+                                    required property int index
+                                    objectName: "timing" + index
+                                    Layout.fillWidth: true
+                                    color: Theme.textSecondary
+                                    font.pixelSize: Theme.fsLabel
+                                    text: qsTr("Slide %1 · %2 s · now %3 s")
+                                          .arg(modelData.index + 1)
+                                          .arg(modelData.seconds.toFixed(1))
+                                          .arg(modelData.current.toFixed(1))
+                                }
+                            }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                Button { objectName: "applyTimings"; Layout.fillWidth: true; text: qsTr("Use these timings")
+                                         onClicked: presenter.applyTimings() }
+                                Button { objectName: "discardTimings"; Layout.fillWidth: true; text: qsTr("Discard")
+                                         onClicked: presenter.clearTimings() }
+                            }
+                            Label {
+                                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                                text: qsTr("Using them makes each slide move on by itself after the time it took, in one undo step.")
+                            }
                         }
                     }
                 }
@@ -366,6 +449,123 @@ Rectangle {
                 Rectangle { implicitWidth: Theme.hairline; implicitHeight: Theme.s4; color: Theme.border }
                 Icon { name: "monitor"; size: Theme.szIcon - 2; color: Theme.textMuted }
                 Label { text: qsTr("Audience: %1").arg(presenter.displays[presenter.audienceIndex]?.label ?? qsTr("none")); color: Theme.textSecondary; font.pixelSize: Theme.fsLabel }
+            }
+        }
+    }
+
+    // Named orders of the slides that already exist, never copies of them.
+    Dialog {
+        id: showsDialog
+        objectName: "customShowsDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - Theme.s5 * 2, 720)
+        height: Math.min(parent.height - Theme.s5 * 2, 620)
+        modal: true
+        title: qsTr("Custom shows")
+        standardButtons: Dialog.Close
+        property string chosen: backend.customShows.length > 0 ? backend.customShows[0].id : ""
+        readonly property var show: backend.customShows.find(row => row.id === showsDialog.chosen) ?? ({})
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.s3
+            RowLayout {
+                Layout.fillWidth: true
+                ComboBox {
+                    objectName: "showChooser"
+                    Layout.fillWidth: true
+                    textRole: "name"
+                    valueRole: "id"
+                    model: backend.customShows
+                    currentIndex: Math.max(0, backend.customShows.findIndex(row => row.id === showsDialog.chosen))
+                    onActivated: showsDialog.chosen = currentValue
+                }
+                TextField {
+                    id: showName
+                    objectName: "newShowName"
+                    Layout.preferredWidth: 200
+                    placeholderText: qsTr("Name a new show")
+                }
+                Button {
+                    objectName: "addShow"
+                    text: qsTr("Add")
+                    enabled: showName.text.trim().length > 0
+                    onClicked: {
+                        const id = backend.addCustomShow(showName.text)
+                        if (id.length > 0) { showsDialog.chosen = id; showName.clear() }
+                    }
+                }
+            }
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                text: qsTr("A new show starts from the slides selected in the navigator, or the whole deck. The slides stay where they are: a show is only an order.")
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                visible: !!showsDialog.show.id
+                TextField {
+                    objectName: "showRename"
+                    Layout.fillWidth: true
+                    text: showsDialog.show.name ?? ""
+                    onEditingFinished: backend.renameCustomShow(showsDialog.chosen, text)
+                }
+                Button { objectName: "presentShow"; text: qsTr("Use this show")
+                         onClicked: backend.activeShow = showsDialog.chosen }
+                Button { objectName: "removeShow"; text: qsTr("Remove")
+                         onClicked: { backend.removeCustomShow(showsDialog.chosen)
+                                      showsDialog.chosen = backend.customShows.length > 0 ? backend.customShows[0].id : "" } }
+            }
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: availableWidth
+                clip: true
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 2
+                    Repeater {
+                        model: showsDialog.show.slides ?? []
+                        RowLayout {
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            Label {
+                                objectName: "showSlide" + index
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                text: qsTr("%1. Slide %2 — %3").arg(index + 1).arg(modelData.index + 1)
+                                      .arg(backend.navigator[modelData.index]?.title ?? "")
+                            }
+                            Button { flat: true; objectName: "showSlideUp" + index; icon.name: "arrow-up"
+                                     display: AbstractButton.IconOnly; text: qsTr("Earlier")
+                                     onClicked: backend.moveCustomShowSlide(showsDialog.chosen, index, index - 1) }
+                            Button { flat: true; objectName: "showSlideDown" + index; icon.name: "arrow-down"
+                                     display: AbstractButton.IconOnly; text: qsTr("Later")
+                                     onClicked: backend.moveCustomShowSlide(showsDialog.chosen, index, index + 1) }
+                            Button {
+                                flat: true; objectName: "showSlideRemove" + index; icon.name: "x"
+                                display: AbstractButton.IconOnly; text: qsTr("Take out")
+                                onClicked: {
+                                    const kept = (showsDialog.show.slides ?? []).map(row => row.id)
+                                    kept.splice(index, 1)
+                                    backend.setCustomShowSlides(showsDialog.chosen, kept)
+                                }
+                            }
+                        }
+                    }
+                    Button {
+                        objectName: "addSelectedToShow"
+                        Layout.fillWidth: true
+                        visible: !!showsDialog.show.id
+                        enabled: backend.selectedSlides.length > 0
+                        text: qsTr("Add the selected slides")
+                        onClicked: {
+                            const kept = (showsDialog.show.slides ?? []).map(row => row.id)
+                            for (const id of backend.selectedSlides) if (kept.indexOf(id) < 0) kept.push(id)
+                            backend.setCustomShowSlides(showsDialog.chosen, kept)
+                        }
+                    }
+                }
             }
         }
     }

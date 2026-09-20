@@ -39,7 +39,8 @@ namespace Bundle {
 // Format 15 adds move/scale/spin/emphasis builds and text reveals.
 // Format 16 adds builds that travel along another object's outline.
 // Format 17 adds character formatting over stretches of a text box.
-constexpr int kFormatVersion = 17;
+// Format 18 adds named custom shows: an order of slides, never copies of them.
+constexpr int kFormatVersion = 18;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

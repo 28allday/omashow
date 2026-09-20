@@ -146,6 +146,18 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   per slide, and statistics count slides, words, pictures, film, typefaces and
   how long the deck runs. The findings and open comments export as a plain-text
   review.
+- **Drawing over the show:** a pointer the audience can follow, a spotlight that
+  dims everything else, or freehand ink — with undo, clear, and an explicit
+  "keep on the slide" that turns the drawing into an ordinary editable path.
+  Nothing drawn changes the deck unless you keep it, and ending the show forgets
+  it.
+- **Rehearsing:** rehearse in a window and each slide is timed. The times are
+  listed against what the slides do now, and can be applied in one undo step so
+  each slide moves on by itself after the time it took — or discarded.
+- **Custom shows:** named orders of the slides you already have. Choose one and
+  presenting, previewing and exporting all follow it; choose the whole deck
+  again and everything goes back. A show is an order, never a copy, and deleting
+  a slide simply takes it out of the show.
 - **Present:** separate audience and presenter windows, current/next previews,
   speaker notes, slide navigator, click-group navigation, elapsed/countdown,
   black/white and freeze. Named display routing, swapping and windowed rehearsal.

@@ -164,6 +164,18 @@ bool Review::prune(Document &d) {
                 slide.readingOrder.removeAt(i);
                 changed = true;
             }
+    // A custom show is a list of slides; a deleted slide simply leaves it.
+    for (auto &show : d.shows)
+        for (int i = show.slideIds.size() - 1; i >= 0; --i)
+            if (!slideById(d, show.slideIds.at(i))) {
+                show.slideIds.removeAt(i);
+                changed = true;
+            }
+    for (int i = d.activeShow.size() - 1; i >= 0; --i)
+        if (!slideById(d, d.activeShow.at(i))) {
+            d.activeShow.removeAt(i);
+            changed = true;
+        }
     return changed;
 }
 

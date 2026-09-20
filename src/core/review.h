@@ -21,9 +21,10 @@ bool setText(Document &document, const QString &id, const QString &text);
 bool setResolved(Document &document, const QString &id, bool resolved);
 // Removing a comment removes its replies; removing a reply removes only it.
 bool remove(Document &document, const QString &id);
-// Drops comments whose slide or object has gone, and reading-order entries for
-// objects that are no longer there. Called after every edit, so the document in
-// hand always describes itself truthfully.
+// Drops references to things that are no longer there: comments on a slide or
+// object that has gone, reading-order entries for missing objects, and custom
+// shows naming slides that were deleted. Called after every edit, so the
+// document in hand always describes itself truthfully.
 bool prune(Document &document);
 QString validate(const Document &document);
 
