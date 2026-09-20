@@ -99,7 +99,9 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   no slide uses, empty sections and originals kept from optimising a picture or
   film, with what each would give back. Removing the ones you pick is one undo
   step and never changes what a slide looks like.
-- **Animate:** Fade and Rise builds in/out, individual or selected objects
+- **Animate:** builds in and out — fade, rise, move from an offset, scale, spin,
+  an emphasis that swells and settles in place, and text that arrives a
+  paragraph, a word or a character at a time. Individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
 - **Transitions:** cut, fade, push (in any of four directions) or morph, chosen

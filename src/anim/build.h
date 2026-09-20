@@ -17,6 +17,11 @@ enum class Effect {
     Fade,   // opacity 0 -> 1
     Media = 3, // source playback on the same deterministic timeline
     Rise = 2,   // opacity 0 -> 1 while translating up into place
+    Move = 4,   // travels in from, or out to, an offset
+    Scale = 5,  // grows or shrinks into place
+    Spin = 6,   // turns into place
+    Pulse = 7,  // emphasis: swells and settles again, in place
+    Reveal = 8, // text arriving by paragraph, word or character
 };
 
 enum class BuildPhase { In, Out };
@@ -33,7 +38,21 @@ struct BuildStep {
     BuildTrigger trigger = BuildTrigger::Absolute;
     qreal delay = 0.0;
 
+    // What the effect needs beyond its timing: how far a Move travels, what a
+    // Scale starts at, how far a Spin turns, how much a Pulse swells, and what
+    // a Reveal counts as one step.
+    qreal amountX = 0, amountY = 0;
+    qreal amount = 0;
+    int unit = 0;   // Reveal: 0 paragraphs, 1 words, 2 characters
+
     qreal end() const { return start + duration; }
+
+    // Whether the object is not there yet before this build runs. Media plays
+    // in place, and an emphasis acts on something already on the slide.
+    bool startsHidden() const {
+        return phase == BuildPhase::In && effect != Effect::None &&
+               effect != Effect::Media && effect != Effect::Pulse;
+    }
 
     // 0 before the build, 1 after it, eased in between.
     qreal progressAt(qreal t) const;

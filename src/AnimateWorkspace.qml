@@ -328,7 +328,47 @@ RowLayout {
                     FieldRow {
                         label: qsTr("Effect")
                         visible: root.build.effect!==3
-                        ComboBox { Layout.fillWidth: true; model: [qsTr("Fade"),qsTr("Rise")]; currentIndex: Math.max(0,(root.build.effect ?? 1)-1); onActivated: root.update("effect",currentIndex+1) }
+                        // Media keeps index 3 to itself, so the list skips it.
+                        ComboBox {
+                            objectName: "buildEffect"
+                            Layout.fillWidth: true
+                            property var effects: [1,2,4,5,6,7,8]
+                            model: [qsTr("Fade"),qsTr("Rise"),qsTr("Move"),qsTr("Scale"),qsTr("Spin"),qsTr("Emphasis"),qsTr("Reveal text")]
+                            currentIndex: Math.max(0,effects.indexOf(root.build.effect ?? 1))
+                            onActivated: root.update("effect",effects[currentIndex])
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                        visible: root.build.effect===8 && !root.build.text
+                        text: qsTr("Reveal only has an effect on text. This object will simply appear.")
+                    }
+                    FieldRow {
+                        label: qsTr("Travels")
+                        visible: root.build.effect===4
+                        NumField { objectName: "buildMoveX"; Layout.fillWidth: true; step: 10; suffix: " x"
+                                   value: root.build.amountX ?? 0; onCommitted: v => root.update("amountX",v) }
+                        NumField { objectName: "buildMoveY"; Layout.fillWidth: true; step: 10; suffix: " y"
+                                   value: root.build.amountY ?? 0; onCommitted: v => root.update("amountY",v) }
+                    }
+                    FieldRow {
+                        label: root.build.effect===5 ? qsTr("Starts at") : root.build.effect===6 ? qsTr("Turns") : qsTr("Swells by")
+                        visible: root.build.effect===5 || root.build.effect===6 || root.build.effect===7
+                        NumField {
+                            objectName: "buildAmount"
+                            Layout.fillWidth: true
+                            step: root.build.effect===6 ? 15 : .05
+                            suffix: root.build.effect===6 ? "°" : "×"
+                            value: root.build.amount || (root.build.effect===5 ? .5 : root.build.effect===6 ? 180 : .15)
+                            onCommitted: v => root.update("amount",v)
+                        }
+                    }
+                    FieldRow {
+                        label: qsTr("One step is")
+                        visible: root.build.effect===8
+                        ComboBox { objectName: "buildUnit"; Layout.fillWidth: true
+                                   model: [qsTr("A paragraph"),qsTr("A word"),qsTr("A character")]
+                                   currentIndex: root.build.unit ?? 0; onActivated: root.update("unit",currentIndex) }
                     }
                     FieldRow {
                         label: qsTr("Order")

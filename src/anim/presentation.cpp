@@ -182,8 +182,7 @@ QVector<SceneObject> Presentation::stateAt(const Document &document, qreal t,
     for (const SceneObject &object : to.objects) {
       bool buildsIn = false;
       for (const auto *step : to.timeline.stepsFor(object.id))
-        if (step->phase == BuildPhase::In && step->effect != Effect::None && step->effect != Effect::Media)
-          buildsIn = true;
+        if (step->startsHidden()) buildsIn = true;
       if (!buildsIn)
         arrivingTo.objects.append(object);
     }

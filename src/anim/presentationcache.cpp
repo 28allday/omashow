@@ -75,8 +75,7 @@ QVector<SceneObject> PresentationCache::statesAt(qreal time) const {
         for (const auto &object : incoming.objects) {
             bool buildsIn = false;
             for (const auto *step : incoming.timeline.stepsFor(object.id))
-                if (step->phase == BuildPhase::In && step->effect != Effect::None && step->effect != Effect::Media)
-                    buildsIn = true;
+                if (step->startsHidden()) buildsIn = true;
             if (!buildsIn) m_arriving.objects.append(object);
         }
         m_kind = Presentation::transitionKind(m_document, m_to);

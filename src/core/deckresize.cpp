@@ -12,15 +12,10 @@ bool DeckResize::apply(Document &document, const QSizeF &size,
     const QPointF offset((size.width() - document.size.width() * scale) / 2,
                          (size.height() - document.size.height() * scale) / 2);
     const auto transform = [&](SceneObject &o) {
-      o.rect = QRectF(o.rect.topLeft() * scale + offset, o.rect.size() * scale);
-      Table::scale(o.table,scale);
-      o.fontSize *= scale;
-      o.letterSpacing *= scale;
-      o.paragraphSpacing *= scale;
-      o.textIndent *= scale;
-      o.cornerRadius *= scale;
-      o.connectorStart=o.connectorStart*scale+offset; o.connectorEnd=o.connectorEnd*scale+offset;
-      o.strokeWidth *= scale; o.shadowX *= scale; o.shadowY *= scale;
+      scaleObject(o, scale);
+      o.rect.translate(offset);
+      o.connectorStart += offset;
+      o.connectorEnd += offset;
     };
     for (auto &master : document.masters)
       for (auto &o : master.objects)
@@ -34,4 +29,19 @@ bool DeckResize::apply(Document &document, const QSizeF &size,
   }
   document.size = size;
   return true;
+}
+
+void DeckResize::scaleObject(SceneObject &o, qreal scale, const QPointF &origin) {
+  o.rect = QRectF(origin + (o.rect.topLeft() - origin) * scale, o.rect.size() * scale);
+  Table::scale(o.table, scale);
+  o.fontSize *= scale;
+  o.letterSpacing *= scale;
+  o.paragraphSpacing *= scale;
+  o.textIndent *= scale;
+  o.cornerRadius *= scale;
+  o.connectorStart = origin + (o.connectorStart - origin) * scale;
+  o.connectorEnd = origin + (o.connectorEnd - origin) * scale;
+  o.strokeWidth *= scale;
+  o.shadowX *= scale;
+  o.shadowY *= scale;
 }

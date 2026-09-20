@@ -60,6 +60,11 @@ QString effectToString(Effect effect) {
     case Effect::Media: return QStringLiteral("media");
     case Effect::Fade: return QStringLiteral("fade");
     case Effect::Rise: return QStringLiteral("rise");
+    case Effect::Move: return QStringLiteral("move");
+    case Effect::Scale: return QStringLiteral("scale");
+    case Effect::Spin: return QStringLiteral("spin");
+    case Effect::Pulse: return QStringLiteral("pulse");
+    case Effect::Reveal: return QStringLiteral("reveal");
     case Effect::None: break;
     }
     return QStringLiteral("none");
@@ -69,6 +74,11 @@ Effect effectFromString(const QString &value) {
     if (value == QLatin1String("media")) return Effect::Media;
     if (value == QLatin1String("fade")) return Effect::Fade;
     if (value == QLatin1String("rise")) return Effect::Rise;
+    if (value == QLatin1String("move")) return Effect::Move;
+    if (value == QLatin1String("scale")) return Effect::Scale;
+    if (value == QLatin1String("spin")) return Effect::Spin;
+    if (value == QLatin1String("pulse")) return Effect::Pulse;
+    if (value == QLatin1String("reveal")) return Effect::Reveal;
     return Effect::None;
 }
 
@@ -82,6 +92,10 @@ QJsonObject stepToJson(const BuildStep &step) {
     json["delay"] = step.delay;
     json[QStringLiteral("duration")] = step.duration;
     json[QStringLiteral("easing")] = int(step.easing);
+    json["amountX"] = step.amountX;
+    json["amountY"] = step.amountY;
+    json["amount"] = step.amount;
+    json["unit"] = step.unit;
     return json;
 }
 
@@ -96,6 +110,10 @@ BuildStep stepFromJson(const QJsonObject &json) {
     step.duration = json.value(QStringLiteral("duration")).toDouble(0.6);
     step.easing = QEasingCurve::Type(json.value(QStringLiteral("easing"))
                                          .toInt(int(QEasingCurve::OutCubic)));
+    step.amountX = json.value("amountX").toDouble();
+    step.amountY = json.value("amountY").toDouble();
+    step.amount = json.value("amount").toDouble();
+    step.unit = qBound(0, json.value("unit").toInt(), 2);
     return step;
 }
 
@@ -182,8 +200,19 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
         slide.objects.append(objectFromJson(value.toObject()));
 
     const QJsonArray builds = json.value(QStringLiteral("builds")).toArray();
-    for (const QJsonValue &value : builds)
-        slide.timeline.steps.append(stepFromJson(value.toObject()));
+    for (const QJsonValue &value : builds) {
+        const auto object = value.toObject();
+        for (const auto &key : {"amountX", "amountY", "amount", "unit"})
+            if (object.contains(key) && !object.value(key).isDouble()) { if (ok) *ok = false; return slide; }
+        const auto step = stepFromJson(object);
+        if (!std::isfinite(step.amountX) || !std::isfinite(step.amountY) ||
+            !std::isfinite(step.amount) || std::abs(step.amountX) > 100000 ||
+            std::abs(step.amountY) > 100000 || std::abs(step.amount) > 100000) {
+            if (ok) *ok = false;
+            return slide;
+        }
+        slide.timeline.steps.append(step);
+    }
 
     if (ok) *ok = true;
     return slide;

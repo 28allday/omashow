@@ -36,7 +36,8 @@ namespace Bundle {
 // Format 12 adds master number/date/footer fields and per-slide artwork/field visibility.
 // Format 13 adds review comments, alternative text, reading order and dismissed findings.
 // Format 14 adds per-slide transitions, directions, durations and automatic advance.
-constexpr int kFormatVersion = 14;
+// Format 15 adds move/scale/spin/emphasis builds and text reveals.
+constexpr int kFormatVersion = 15;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

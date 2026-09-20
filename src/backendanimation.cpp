@@ -26,7 +26,12 @@ QVariantList Backend::builds() const {
                             {"absoluteStart", timeline.steps.at(i).start},
                             {"duration", step.duration},
                             {"delay", step.delay},
-                            {"easing", int(step.easing)}});
+                            {"easing", int(step.easing)},
+                            {"amountX", step.amountX},
+                            {"amountY", step.amountY},
+                            {"amount", step.amount},
+                            {"unit", step.unit},
+                            {"text", o && o->type == ObjectType::Text}});
   }
   return list;
 }
@@ -92,7 +97,7 @@ void Backend::previewBuild(int index) {
 int Backend::addBuild(const QString &targetId, int phase, int effect) {
   if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size() ||
       !m_document.slides.at(m_currentSlide).find(targetId) || phase < 0 ||
-      phase > 1 || effect < 1 || effect > 2)
+      phase > 1 || effect < 1 || effect == int(Effect::Media) || effect > int(Effect::Reveal))
     return -1;
   m_history.begin(m_document, tr("Add build"));
   auto &timeline = m_document.slides[m_currentSlide].timeline;
@@ -147,8 +152,17 @@ void Backend::setBuildProperty(int index, const QString &key,
     changed.trigger = BuildTrigger(value.toInt());
   else if (key == "phase" && number >= 0 && number <= 1)
     changed.phase = BuildPhase(value.toInt());
-  else if (key == "effect" && number >= 1 && number <= 2)
+  else if (key == "effect" && number >= 1 && number <= int(Effect::Reveal) &&
+           number != int(Effect::Media))
     changed.effect = Effect(value.toInt());
+  else if (key == "amountX" && std::abs(number) <= 100000)
+    changed.amountX = number;
+  else if (key == "amountY" && std::abs(number) <= 100000)
+    changed.amountY = number;
+  else if (key == "amount" && std::abs(number) <= 100000)
+    changed.amount = number;
+  else if (key == "unit" && number >= 0 && number <= 2)
+    changed.unit = value.toInt();
   else if (key == "easing" && (number == QEasingCurve::Linear ||
                                number == QEasingCurve::OutCubic ||
                                number == QEasingCurve::InOutCubic))
