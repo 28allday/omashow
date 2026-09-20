@@ -3,7 +3,9 @@
 #include "anim/presentation.h"
 #include "anim/presentationcache.h"
 #include "core/design.h"
+#include "io/packagedeck.h"
 #include "io/pdf.h"
+#include "io/printing.h"
 #include "render/scenerenderer.h"
 
 #include <QElapsedTimer>
@@ -43,14 +45,15 @@ QString numbered(const QString &path, int n, int of, const QString &suffix) {
 
 QVariantMap Exports::Request::toMap() const {
     return {{"kind", kind}, {"path", path}, {"includeSkipped", includeSkipped},
-            {"stages", stages}, {"from", from}, {"to", to}, {"format", format},
+            {"stages", stages}, {"layout", layout}, {"perPage", perPage},
+            {"from", from}, {"to", to}, {"format", format},
             {"width", width}, {"transparent", transparent}, {"fps", fps},
-            {"quality", quality}};
+            {"quality", quality}, {"printer", printer}, {"copies", copies}};
 }
 
 Exports::Request Exports::Request::fromMap(const QVariantMap &map) {
     Request request;
-    request.kind = qBound(int(Pdf), map.value("kind", Pdf).toInt(), int(Video));
+    request.kind = qBound(int(Pdf), map.value("kind", Pdf).toInt(), int(Print));
     request.path = map.value("path").toString();
     request.includeSkipped = map.value("includeSkipped").toBool();
     request.stages = map.value("stages").toBool();
@@ -61,10 +64,19 @@ Exports::Request Exports::Request::fromMap(const QVariantMap &map) {
     request.transparent = map.value("transparent").toBool();
     request.fps = qBound(1, map.value("fps", 30).toInt(), 120);
     request.quality = qBound(0, map.value("quality").toInt(), 1);
+    request.layout = qBound(0, map.value("layout").toInt(), 3);
+    request.perPage = qBound(1, map.value("perPage", 2).toInt(), 9);
+    request.printer = map.value("printer").toString();
+    request.copies = qBound(1, map.value("copies", 1).toInt(), 99);
     return request;
 }
 
 QString Exports::Request::describe() const {
+    const QStringList pages{QStringLiteral("a page a slide"),
+                            QStringLiteral("slides with their notes"),
+                            QStringLiteral("an outline"),
+                            QStringLiteral("%1 slides a sheet")};
+    const QString shape = layout == 3 ? pages.at(3).arg(perPage) : pages.at(qBound(0, layout, 2));
     switch (kind) {
     case Images:
         return QStringLiteral("%1 pictures, %2 wide%3")
@@ -73,10 +85,17 @@ QString Exports::Request::describe() const {
     case Video:
         return QStringLiteral("H.264 film, %1 wide at %2 frames a second")
             .arg(width).arg(fps);
+    case Package:
+        return QStringLiteral("The deck with copies of everything it links to");
+    case Print:
+        return QStringLiteral("Printed on %1 · %2%3")
+            .arg(printer.isEmpty() ? QStringLiteral("the default printer") : printer, shape)
+            .arg(copies > 1 ? QStringLiteral(" · %1 copies").arg(copies) : QString());
     default: break;
     }
-    return stages ? QStringLiteral("PDF, a page for every build stage")
-                  : QStringLiteral("PDF, a page a slide");
+    return stages && layout == 0
+               ? QStringLiteral("PDF, a page for every build stage")
+               : QStringLiteral("PDF, ") + shape;
 }
 
 QString Exports::Request::suggestedName(const QString &deckName) const {
@@ -85,6 +104,7 @@ QString Exports::Request::suggestedName(const QString &deckName) const {
     switch (kind) {
     case Images: return base + (format == 0 ? ".png" : ".jpg");
     case Video: return base + ".mp4";
+    case Package: return base + "-package.zip";
     default: break;
     }
     return base + ".pdf";
@@ -96,7 +116,8 @@ bool Exports::encoderAvailable() {
 
 Exports::Outcome Exports::run(const Document &document, const Request &request,
                               const std::shared_ptr<Workers::Job> &job,
-                              const std::function<void(int)> &progress) {
+                              const std::function<void(int)> &progress,
+                              const QHash<QString, QString> &approved) {
     Outcome outcome;
     const auto report = [&progress](int percent) { if (progress) progress(percent); };
     const auto fail = [&outcome](const QString &message) {
@@ -104,23 +125,54 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
         return outcome;
     };
     const auto canceled = [&job] { return job && job->canceled; };
-    if (request.path.isEmpty()) return fail(QStringLiteral("Choose where to write it."));
+    if (request.path.isEmpty() && request.kind != Print)
+        return fail(QStringLiteral("Choose where to write it."));
     const auto indices = slidesIn(document, request);
     if (indices.isEmpty())
         return fail(QStringLiteral("That range has no slides to export."));
 
-    if (request.kind == Pdf) {
+    if (request.kind == Package) {
+        report(5);
+        const auto packaged = Package::write(document, request.path, approved, job);
+        if (!packaged.ok) return fail(packaged.error);
+        outcome.files.append(request.path);
+        outcome.log = packaged.lines;
+        report(100);
+        outcome.ok = true;
+        return outcome;
+    }
+
+    if (request.kind == Pdf || request.kind == Print) {
         Pdf::Options options;
         options.from = indices.first();
         options.to = indices.last();
         options.pagePerBuildStage = request.stages;
         options.includeSkipped = request.includeSkipped;
+        options.layout = request.layout;
+        options.perPage = request.perPage;
         QString error;
         report(5);
+        if (request.kind == Print) {
+            if (!Printing::print(document, request.printer.isEmpty()
+                                               ? Printing::defaultPrinter() : request.printer,
+                                 request.copies, options, &error, job))
+                return fail(error.isEmpty() ? QStringLiteral("Printing failed.") : error);
+            outcome.log.append(QStringLiteral("%1 pages sent to %2")
+                                   .arg(Pdf::pageCount(document, options))
+                                   .arg(request.printer.isEmpty()
+                                            ? Printing::defaultPrinter() : request.printer));
+            report(100);
+            outcome.ok = true;
+            return outcome;
+        }
         if (!Pdf::write(document, request.path, options, &error, job))
             return fail(error.isEmpty() ? QStringLiteral("The PDF could not be written.") : error);
         outcome.files.append(request.path);
-        outcome.log.append(QStringLiteral("%1 slides").arg(indices.size()));
+        outcome.log.append(QStringLiteral("%1 slides, %2 pages")
+                               .arg(indices.size())
+                               .arg(Pdf::pageCount(document, options) > 0
+                                        ? QString::number(Pdf::pageCount(document, options))
+                                        : QStringLiteral("as many as the outline needs")));
         report(100);
         outcome.ok = true;
         return outcome;

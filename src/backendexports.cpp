@@ -1,6 +1,7 @@
 #include "backend.h"
 #include "filepicker.h"
 #include "io/exports.h"
+#include "io/printing.h"
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QtConcurrent>
@@ -14,7 +15,10 @@ QVariantList Backend::exportQueue() const {
     row["progress"] = entry.percent ? entry.percent->load() : entry.progress;
     row["message"] = entry.message;
     row["log"] = entry.log;
-    row["name"] = QFileInfo(entry.request.path).fileName();
+    row["name"] = entry.request.kind == Exports::Print
+                      ? (entry.request.printer.isEmpty() ? tr("Printer")
+                                                         : entry.request.printer)
+                      : QFileInfo(entry.request.path).fileName();
     row["folder"] = QFileInfo(entry.request.path).absolutePath();
     row["detail"] = entry.request.describe();
     row["running"] = entry.state == QLatin1String("running");
@@ -28,15 +32,46 @@ QVariantList Backend::exportQueue() const {
 
 bool Backend::encoderAvailable() const { return Exports::encoderAvailable(); }
 
+// Asking CUPS what printers exist can take many seconds, so the answer is
+// fetched once on a worker and the interface fills in when it arrives.
+QVariantList Backend::printers() const { return m_printers; }
+bool Backend::printersKnown() const { return m_printersKnown; }
+
+void Backend::refreshPrinters() {
+  if (m_printersRunning) return;
+  m_printersRunning = true;
+  struct Found { QVariantList printers; QString byDefault; };
+  auto *watcher = new QFutureWatcher<Found>(this);
+  connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher] {
+    const auto found = watcher->result();
+    watcher->deleteLater();
+    m_printersRunning = false;
+    m_printersKnown = true;
+    m_printers = found.printers;
+    m_defaultPrinter = found.byDefault;
+    emit printersChanged();
+  });
+  watcher->setFuture(QtConcurrent::run(Workers::io(), [] {
+    return Found{Printing::printers(), Printing::defaultPrinter()};
+  }));
+}
+
 void Backend::exportDialog(const QVariantMap &options) {
+  // Printing has no file to name; it goes straight into the queue.
+  if (Exports::Request::fromMap(options).kind == Exports::Print) {
+    queueExport(options);
+    return;
+  }
   m_pendingExport = options;
   m_pending = Pending::ExportFile;
   const auto request = Exports::Request::fromMap(options);
-  const QString filter = request.kind == Exports::Video ? tr("MP4 film")
+  const QString filter = request.kind == Exports::Video   ? tr("MP4 film")
+                         : request.kind == Exports::Package ? tr("Deck packages")
                          : request.kind == Exports::Images
                              ? (request.format == 0 ? tr("PNG pictures") : tr("JPEG pictures"))
                              : tr("PDF documents");
-  const QString pattern = request.kind == Exports::Video ? QStringLiteral("*.mp4")
+  const QString pattern = request.kind == Exports::Video   ? QStringLiteral("*.mp4")
+                          : request.kind == Exports::Package ? QStringLiteral("*.zip")
                           : request.kind == Exports::Images
                               ? (request.format == 0 ? QStringLiteral("*.png")
                                                      : QStringLiteral("*.jpg"))
@@ -46,7 +81,14 @@ void Backend::exportDialog(const QVariantMap &options) {
 
 int Backend::queueExport(const QVariantMap &options) {
   auto request = Exports::Request::fromMap(options);
-  if (request.path.isEmpty() || m_document.slides.isEmpty()) return -1;
+  if (m_document.slides.isEmpty()) return -1;
+  if (request.path.isEmpty() && request.kind != Exports::Print) return -1;
+  if (request.kind == Exports::Print && m_printersKnown && m_defaultPrinter.isEmpty() &&
+      request.printer.isEmpty()) {
+    setStatus(tr("No printer is set up on this computer."));
+    emit failed(status());
+    return -1;
+  }
   if (request.kind == Exports::Video && !Exports::encoderAvailable()) {
     setStatus(tr("FFmpeg is not installed, so film cannot be encoded here."));
     emit failed(status());
@@ -92,6 +134,7 @@ void Backend::startNextExport() {
   const auto document = entry.document;
   const auto job = entry.job;
   const auto percent = entry.percent;
+  const auto approved = m_mediaPermissions;
   if (!m_exportTicker.isActive()) m_exportTicker.start(200);
   emit exportQueueChanged();
   auto *watcher = new QFutureWatcher<Exports::Outcome>(this);
@@ -121,9 +164,9 @@ void Backend::startNextExport() {
     emit exportQueueChanged();
     startNextExport();
   });
-  watcher->setFuture(QtConcurrent::run(Workers::io(), [document, request, job, percent] {
+  watcher->setFuture(QtConcurrent::run(Workers::io(), [document, request, job, percent, approved] {
     return Exports::run(document, request, job,
-                        [percent](int value) { percent->store(value); });
+                        [percent](int value) { percent->store(value); }, approved);
   }));
 }
 

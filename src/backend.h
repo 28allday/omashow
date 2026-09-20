@@ -105,6 +105,8 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantMap slideTransition READ slideTransition NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList exportQueue READ exportQueue NOTIFY exportQueueChanged)
     Q_PROPERTY(bool encoderAvailable READ encoderAvailable CONSTANT)
+    Q_PROPERTY(QVariantList printers READ printers NOTIFY printersChanged)
+    Q_PROPERTY(bool printersKnown READ printersKnown NOTIFY printersChanged)
     Q_PROPERTY(QString reviewAuthor READ reviewAuthor WRITE setReviewAuthor NOTIFY reviewAuthorChanged)
 
 public:
@@ -439,6 +441,9 @@ public:
     QVariantMap slideTransition() const;
     QVariantList exportQueue() const;
     bool encoderAvailable() const;
+    QVariantList printers() const;
+    bool printersKnown() const;
+    Q_INVOKABLE void refreshPrinters();
     Q_INVOKABLE void exportDialog(const QVariantMap &options);
     Q_INVOKABLE int queueExport(const QVariantMap &options);
     Q_INVOKABLE void cancelExport(int id);
@@ -454,6 +459,7 @@ signals:
     void findChanged();
     void reviewAuthorChanged();
     void exportQueueChanged();
+    void printersChanged();
     void operationChanged();
     void layoutPreviewChanged();
     void diagramPreviewChanged();
@@ -599,6 +605,9 @@ private:
     };
     QVector<ExportEntry> m_exports;
     QVariantMap m_pendingExport;
+    QVariantList m_printers;
+    QString m_defaultPrinter;
+    bool m_printersRunning = false, m_printersKnown = false;
     QTimer m_exportTicker;
     int m_exportSerial = 0;
     void startNextExport();

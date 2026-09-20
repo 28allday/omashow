@@ -144,18 +144,22 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Present:** separate audience and presenter windows, current/next previews,
   speaker notes, slide navigator, click-group navigation, elapsed/countdown,
   black/white and freeze. Named display routing, swapping and windowed rehearsal.
-- **Export:** PDF with real text and build-stage handouts; pictures as PNG or
+- **Export:** PDF with real text — the slides, slides with their notes, the deck
+  as an outline, or several slides a sheet — and build-stage handouts; pictures as PNG or
   JPEG at any width, with or without the slide background; and film as H.264,
   every build, transition and hold rendered frame by frame by the same
   evaluator that drives the show. Each export takes the deck as it stands,
   queues behind the last one, shows its progress and can be cancelled or tried
-  again. Sound is not in the film yet, and the export says so.
+  again. Sound is not in the film yet, and the export says so. The same pages
+  print on paper, and a deck can be packaged as a zip carrying copies of
+  everything it links to plus a manifest of what is inside, what was left out
+  and why — nothing on your computer is changed by packaging.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
   rendering from the command line.
 
-Template-pack installation, recording, printing, packaging a deck with its
-assets, interchange with other applications and other release features remain on
-the roadmap. Notes are plain
+Template-pack installation, recording, interchange with other applications and
+other release features remain on the roadmap. Exported PDFs carry real text but
+not clickable link annotations. Notes are plain
 text, and reading order is not yet carried into exported PDF. Text formatting applies to whole
 boxes; per-character styles and advanced typography remain planned.
 

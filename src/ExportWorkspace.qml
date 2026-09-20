@@ -9,6 +9,8 @@ Item {
     id: root
     objectName: "exportWorkspace"
     readonly property var queue: backend.exportQueue
+    // Finding printers can take seconds; ask once, when this page first opens.
+    Component.onCompleted: backend.refreshPrinters()
     readonly property int slides: backend.slideCount
 
     component Divider: Rectangle { Layout.fillWidth: true; implicitHeight: Theme.hairline; color: Theme.border }
@@ -73,7 +75,26 @@ Item {
                 CardHeader { title: qsTr("PDF document"); icon: "file-text"
                              detail: qsTr("Real text, not outlines — searchable and quotable.") }
                 Divider {}
-                CheckBox { id: stagePages; objectName: "pdfStages"; text: qsTr("A page per build stage (handout)") }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Pages"); color: Theme.textSecondary; Layout.preferredWidth: Theme.wFieldLabel }
+                    ComboBox {
+                        id: pdfLayout
+                        objectName: "pdfLayout"
+                        Layout.fillWidth: true
+                        model: [qsTr("The slides"), qsTr("Slides with their notes"),
+                                qsTr("An outline"), qsTr("Several slides a sheet")]
+                    }
+                    ComboBox {
+                        id: pdfPerPage
+                        objectName: "pdfPerPage"
+                        visible: pdfLayout.currentIndex === 3
+                        model: [2, 3, 4, 6, 9]
+                        currentIndex: 2
+                    }
+                }
+                CheckBox { id: stagePages; objectName: "pdfStages"; visible: pdfLayout.currentIndex === 0
+                           text: qsTr("A page per build stage (handout)") }
                 CheckBox { id: pdfSkipped; objectName: "pdfSkipped"; text: qsTr("Include skipped slides") }
                 RowLayout {
                     Layout.fillWidth: true
@@ -89,6 +110,8 @@ Item {
                         onClicked: {
                             const r = root.range(pdfAll.checked, pdfFrom.value, pdfTo.value)
                             backend.exportDialog({ kind: 0, stages: stagePages.checked,
+                                                   layout: pdfLayout.currentIndex,
+                                                   perPage: pdfPerPage.model[pdfPerPage.currentIndex],
                                                    includeSkipped: pdfSkipped.checked,
                                                    from: r.from, to: r.to })
                         }
@@ -178,6 +201,79 @@ Item {
                 Label {
                     Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
                     text: qsTr("Sound from film and audio on the slides is not included yet. The picture is frame-exact: the same evaluator draws it as drives the show.")
+                }
+            }
+
+            ExportCard {
+                CardHeader { title: qsTr("Print"); icon: "file-text"
+                             detail: !backend.printersKnown ? qsTr("Looking for printers…")
+                                     : backend.printers.length > 0
+                                     ? qsTr("The same pages as the PDF, on paper.")
+                                     : qsTr("No printer is set up on this computer.") }
+                Divider {}
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Printer"); color: Theme.textSecondary; Layout.preferredWidth: Theme.wFieldLabel }
+                    ComboBox {
+                        id: printer
+                        objectName: "printerChoice"
+                        Layout.fillWidth: true
+                        textRole: "name"
+                        valueRole: "name"
+                        model: backend.printers
+                        currentIndex: Math.max(0, backend.printers.findIndex(p => p.default))
+                    }
+                    Label { text: qsTr("Copies"); color: Theme.textSecondary }
+                    SpinBox { id: copies; objectName: "printCopies"; from: 1; to: 99; value: 1 }
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label { text: qsTr("Pages"); color: Theme.textSecondary; Layout.preferredWidth: Theme.wFieldLabel }
+                    ComboBox {
+                        id: printLayout
+                        objectName: "printLayout"
+                        Layout.fillWidth: true
+                        model: [qsTr("The slides"), qsTr("Slides with their notes"),
+                                qsTr("An outline"), qsTr("Several slides a sheet")]
+                        currentIndex: 3
+                    }
+                    ComboBox {
+                        id: printPerPage
+                        objectName: "printPerPage"
+                        visible: printLayout.currentIndex === 3
+                        model: [2, 3, 4, 6, 9]
+                        currentIndex: 2
+                    }
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        objectName: "printDeck"
+                        icon.name: "file-text"; text: qsTr("Print")
+                        enabled: backend.printers.length > 0
+                        onClicked: backend.exportDialog({ kind: 4, printer: printer.currentValue ?? "",
+                                                          copies: copies.value,
+                                                          layout: printLayout.currentIndex,
+                                                          perPage: printPerPage.model[printPerPage.currentIndex],
+                                                          includeSkipped: false })
+                    }
+                }
+            }
+
+            ExportCard {
+                CardHeader { title: qsTr("Package"); icon: "folder-open"
+                             detail: qsTr("The deck with copies of everything it links to, and a manifest.") }
+                Divider {}
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    text: qsTr("Film small enough to live inside the deck is brought in, so the package opens complete elsewhere. Linked files you have not approved for reading stay out and are named in the manifest. Nothing on this computer is changed.")
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        objectName: "exportPackage"
+                        icon.name: "save"; text: qsTr("Package deck…")
+                        onClicked: backend.exportDialog({ kind: 3 })
+                    }
                 }
             }
 
