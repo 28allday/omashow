@@ -3,6 +3,7 @@
         <file alias="StartCentre.qml">StartCentre.qml</file>
         <file alias="SlideSizeDialog.qml">SlideSizeDialog.qml</file>
         <file>LayoutApplyDialog.qml</file>
+        <file>ImportDesignDialog.qml</file>
         <file alias="Main.qml">Main.qml</file>
         <file alias="AudienceWindow.qml">AudienceWindow.qml</file>
         <file alias="PresenterConsole.qml">PresenterConsole.qml</file>

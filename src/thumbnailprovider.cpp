@@ -9,6 +9,7 @@
 #include "core/scene.h"
 #include "render/scenerenderer.h"
 #include <QMutexLocker>
+#include <QDeadlineTimer>
 
 SlideThumbnailProvider::SlideThumbnailProvider(Backend *backend)
     : QQuickImageProvider(QQuickImageProvider::Image, ForceAsynchronousImageLoading) {
@@ -19,6 +20,7 @@ SlideThumbnailProvider::SlideThumbnailProvider(Backend *backend)
     QObject::connect(backend, &Backend::selectionChanged, &m_observer, refresh);
     QObject::connect(backend, &Backend::currentSlideChanged, &m_observer, refresh);
     QObject::connect(backend, &Backend::layoutPreviewChanged, &m_observer, refresh);
+    QObject::connect(backend, &Backend::deckImportChanged, &m_observer, refresh);
     QObject::connect(backend, &Backend::diagramPreviewChanged, &m_observer, refresh);
     QObject::connect(backend, &Backend::mediaOptimisationChanged, &m_observer, refresh);
     capture(backend);
@@ -29,6 +31,11 @@ void SlideThumbnailProvider::capture(Backend *backend) {
     next.document = backend->document();
     next.layoutDocument = backend->layoutPreviewDocument();
     next.layoutOk = backend->layoutPreview().value("ok").toBool();
+    next.layoutRevision = backend->layoutPreview().value("revision").toInt();
+    next.importDocument = backend->importPreviewDocument();
+    next.importSource = backend->importSourceDocument();
+    next.importOk = backend->deckImport().value("ok").toBool();
+    next.importRevision = backend->deckImport().value("revision").toInt();
     next.diagram = backend->diagramObjects();
     next.current = backend->currentSlide();
     next.selected = backend->selectedIds();
@@ -36,6 +43,18 @@ void SlideThumbnailProvider::capture(Backend *backend) {
     next.after = backend->m_mediaPreview;
     QMutexLocker lock(&m_mutex);
     m_snapshot = std::move(next);
+    m_captured.wakeAll();
+}
+
+SlideThumbnailProvider::Snapshot SlideThumbnailProvider::snapshotFor(int layoutRevision,
+                                                                    int importRevision) {
+    QMutexLocker lock(&m_mutex);
+    QDeadlineTimer deadline(250);
+    while ((layoutRevision > 0 && m_snapshot.layoutRevision != layoutRevision) ||
+           (importRevision > 0 && m_snapshot.importRevision != importRevision)) {
+        if (!m_captured.wait(&m_mutex, deadline)) break;
+    }
+    return m_snapshot;
 }
 
 QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
@@ -47,8 +66,9 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         if (size) *size = image.size();
         return image;
     };
-    Snapshot snapshot;
-    { QMutexLocker lock(&m_mutex); snapshot = m_snapshot; }
+    const Snapshot snapshot = snapshotFor(
+        id.startsWith("layout-apply/") ? id.section('/', 2, 2).toInt() : 0,
+        id.startsWith("import/") || id.startsWith("import-source/") ? id.section('/', 2, 2).toInt() : 0);
     if(id.startsWith("media-comparison/")) {
         const auto &object = id.section('/',1,1)=="after" ? snapshot.after : snapshot.before;
         auto image = object.type == ObjectType::Media ? MediaAsset::frameAt(object, id.section('/',2,2).toDouble()) : object.image;
@@ -70,6 +90,19 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         const auto slide = Design::resolve(document, index);
         const int width = requestedSize.width() > 0 ? requestedSize.width() : 640;
         const QSize pixels(width, qRound(width * document.size.height() / document.size.width()));
+        if (size) *size = pixels;
+        return SceneRenderer::render(slide.objects, document.size, pixels, slide.background);
+    }
+    // "import/<index>" is the slide as it would arrive; "import-source/<index>"
+    // is the slide as it stands in the deck being imported from.
+    if (id.startsWith("import/") || id.startsWith("import-source/")) {
+        const bool arriving = id.startsWith("import/");
+        const auto &document = arriving ? snapshot.importDocument : snapshot.importSource;
+        const int index = id.section('/', 1, 1).toInt();
+        if ((arriving && !snapshot.importOk) || index < 0 || index >= document.slides.size()) return blank();
+        const auto slide = Design::resolve(document, index);
+        const int width = requestedSize.width() > 0 ? requestedSize.width() : 640;
+        const QSize pixels(width, qMax(1, qRound(width * document.size.height() / document.size.width())));
         if (size) *size = pixels;
         return SceneRenderer::render(slide.objects, document.size, pixels, slide.background);
     }

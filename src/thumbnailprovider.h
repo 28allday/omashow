@@ -7,6 +7,7 @@
 
 #include <QQuickImageProvider>
 #include <QMutex>
+#include <QWaitCondition>
 #include <QObject>
 #include "core/scene.h"
 
@@ -20,15 +21,22 @@ public:
 
 private:
     struct Snapshot {
-        Document document, layoutDocument;
+        Document document, layoutDocument, importDocument, importSource;
         QVector<SceneObject> diagram;
         SceneObject before, after;
         QStringList selected;
         int current = 0;
-        bool layoutOk = false;
+        bool layoutOk = false, importOk = false;
+        int layoutRevision = 0, importRevision = 0;
     };
     void capture(Backend *backend);
+    // QML property bindings are notified before ordinary connections, so a
+    // preview's first request can reach this thread before the snapshot it
+    // names does. Waiting for that revision beats painting a blank the view
+    // would then keep until the next change.
+    Snapshot snapshotFor(int layoutRevision, int importRevision);
     QObject m_observer;
     QMutex m_mutex;
+    QWaitCondition m_captured;
     Snapshot m_snapshot;
 };

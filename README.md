@@ -87,6 +87,18 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   muted colour in a footer strip that follows slide size. In Edit, deselect
   objects to toggle master artwork or fields for that slide, independently of
   its background colour. Fields stay as selectable text in PDF.
+- **Import from another deck:** File → Import from deck, or Design → Import from
+  deck, brings slides across with their masters, layouts, theme and content.
+  Choose the slides, then reuse matching masters and layouts, import copies of
+  them, or keep each slide's own appearance with no design at all. Missing
+  typefaces must be replaced or explicitly kept, and missing linked files left
+  out, before anything is inserted. A different slide size is scaled to this
+  deck, sections arrive by name, and the whole import is one undo step. The
+  preview on the right is the slide that will arrive.
+- **Unused design:** Design → Unused lists masters no layout points at, layouts
+  no slide uses, empty sections and originals kept from optimising a picture or
+  film, with what each would give back. Removing the ones you pick is one undo
+  step and never changes what a slide looks like.
 - **Animate:** Fade and Rise builds in/out, individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
@@ -112,8 +124,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Files:** atomic `.omashow` saves, autosave recovery, PDF export with real
   text, build-stage handouts and headless PNG frame rendering.
 
-Template-pack installation, recording, interchange imports and
-other release features remain on the roadmap. Text formatting applies to whole
+Template-pack installation, recording, interchange imports from other
+applications and other release features remain on the roadmap. Text formatting applies to whole
 boxes; per-character styles and advanced typography remain planned.
 
 ## Shared design and time

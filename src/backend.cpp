@@ -21,6 +21,9 @@
 Backend::Backend(QObject *parent)
     : QObject(parent), m_chooser(new PortalFileChooser(this)) {
   connect(this,&Backend::documentChanged,this,&Backend::slideSelectionChanged);
+  // A pending import is described against the document it would land in.
+  connect(this,&Backend::documentChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
+  connect(this,&Backend::currentSlideChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
   connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
@@ -57,6 +60,9 @@ Backend::Backend(QObject *parent)
               loadImageAsync(url,pending==Pending::ReplaceImage,index,m_imageTargetId);
               break;
             }
+            case Pending::ImportDeck:
+              importFromDeck(url);
+              break;
             case Pending::None:
               openAsync(url);
               break;

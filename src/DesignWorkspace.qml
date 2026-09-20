@@ -12,6 +12,13 @@ RowLayout {
     property string layoutId: ""
     property string roleId: ""
     property int previewTheme: -1
+    property var auditChosen: []
+    readonly property var audit: backend.designAudit
+    function chooseAudit(id, on) {
+        const next = auditChosen.filter(item => item !== id)
+        if (on) next.push(id)
+        auditChosen = next
+    }
     signal applyLayoutRequested(string layoutId)
     readonly property var master: info.masters.find(m => m.id === masterId) ?? info.masters[0] ?? ({})
     readonly property var layouts: info.layouts.filter(l => l.masterId === (master.id ?? ""))
@@ -130,6 +137,9 @@ RowLayout {
                          enabled: !!root.layout.id; onClicked: root.applyLayoutRequested(root.layout.id) }
                 Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel;
                         text: qsTr("Matching placeholders keep their content and local edits. Unmatched objects stay on the slide.") }
+                Divider {}
+                Button { objectName: "importDeckButton"; Layout.fillWidth: true; icon.name: "folder-open"
+                         text: qsTr("Import from deck…"); onClicked: backend.importDeckDialog() }
             }
         }
     }
@@ -213,6 +223,7 @@ RowLayout {
                 TabButton { text: qsTr("Placeholder") }
                 TabButton { text: qsTr("Theme") }
                 TabButton { text: qsTr("Fields") }
+                TabButton { objectName: "designUnusedTab"; text: qsTr("Unused") }
             }
             ScrollView {
                 Layout.fillWidth: true
@@ -326,6 +337,53 @@ RowLayout {
                                            onAccepted: backend.setThemeToken(modelData, editText, true) }
                             }
                         }
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: inspectorTabs.currentIndex === 3
+                        Heading { text: qsTr("NOTHING USES THESE") }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                                text: (root.audit.rows ?? []).length === 0
+                                      ? qsTr("Every master, layout and section is in use, and no originals are being kept.")
+                                      : qsTr("%1 items").arg(root.audit.rows.length)
+                                        + ((root.audit.bytes ?? 0) > 0
+                                           ? " · " + qsTr("%1 to reclaim of %2 in pictures, film and posters")
+                                             .arg(root.audit.summary ?? "").arg(Math.round((root.audit.assetBytes ?? 0) / 1024) + " kB")
+                                           : "") }
+                        Repeater {
+                            model: root.audit.rows ?? []
+                            ColumnLayout {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                spacing: 0
+                                CheckBox {
+                                    objectName: "auditRow" + index
+                                    Layout.fillWidth: true
+                                    text: modelData.name
+                                    checked: root.auditChosen.indexOf(modelData.id) >= 0
+                                    onToggled: root.chooseAudit(modelData.id, checked)
+                                }
+                                Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                                        font.pixelSize: Theme.fsLabel; leftPadding: Theme.s5
+                                        text: modelData.detail + (modelData.bytes > 0 ? " · " + Math.round(modelData.bytes / 1024) + " kB" : "") }
+                            }
+                        }
+                        RowLayout {
+                            visible: (root.audit.rows ?? []).length > 0
+                            Action { objectName: "auditSelectAll"; text: qsTr("Select all")
+                                     onClicked: root.auditChosen = (root.audit.rows ?? []).map(row => row.id) }
+                            Action { objectName: "auditSelectNone"; text: qsTr("Select none"); onClicked: root.auditChosen = [] }
+                        }
+                        Button {
+                            objectName: "removeUnusedDesign"
+                            Layout.fillWidth: true
+                            text: root.auditChosen.length === 1 ? qsTr("Remove 1 item") : qsTr("Remove %1 items").arg(root.auditChosen.length)
+                            enabled: root.auditChosen.length > 0
+                            onClicked: { backend.removeUnusedDesign(root.auditChosen); root.auditChosen = [] }
+                        }
+                        Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                                text: qsTr("Removing is one undo step and never changes a slide: only masters no layout points at, layouts no slide uses, empty sections and originals kept before optimising are offered.") }
                     }
                     ColumnLayout {
                         Layout.fillWidth: true

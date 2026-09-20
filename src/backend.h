@@ -92,6 +92,8 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantMap design READ design NOTIFY documentChanged)
     Q_PROPERTY(QVariantMap layoutPreview READ layoutPreview NOTIFY layoutPreviewChanged)
     Q_PROPERTY(QVariantMap slideDesign READ slideDesign NOTIFY selectionChanged)
+    Q_PROPERTY(QVariantMap deckImport READ deckImport NOTIFY deckImportChanged)
+    Q_PROPERTY(QVariantMap designAudit READ designAudit NOTIFY documentChanged)
 
 public:
     explicit Backend(QObject *parent = nullptr);
@@ -380,8 +382,24 @@ public:
     Q_INVOKABLE void movePlaceholder(const QString &id, const QString &role, int delta);
     Q_INVOKABLE void deletePlaceholder(const QString &id, const QString &role);
 
+    // --- design and slides from another deck, and what this one no longer uses
+    Q_INVOKABLE void importDeckDialog();
+    Q_INVOKABLE void importFromDeck(const QUrl &url);
+    QVariantMap deckImport() const;
+    const Document &importPreviewDocument() const { return m_importDocument; }
+    const Document &importSourceDocument() const { return m_importSource; }
+    Q_INVOKABLE void setImportOption(const QString &key, const QVariant &value);
+    Q_INVOKABLE void setImportSlideSelected(int index, bool selected);
+    Q_INVOKABLE void setImportSlidesSelected(bool selected);
+    Q_INVOKABLE bool applyImport();
+    Q_INVOKABLE void clearImport();
+    QVariantMap designAudit() const;
+    Q_INVOKABLE bool removeUnusedDesign(const QStringList &ids);
+
 signals:
     void opened();
+    void importReady();
+    void deckImportChanged();
     void operationChanged();
     void layoutPreviewChanged();
     void diagramPreviewChanged();
@@ -479,7 +497,7 @@ private:
     // The portal answers `selected` for every dialog, so the intent behind the
     // one in flight has to be remembered — otherwise a save would open the file
     // it was about to write, or a PDF export would overwrite the deck.
-    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia };
+    enum class Pending { None, SaveDeck, ExportPdf, InsertImage, ReplaceImage, InsertMedia, ReplaceMedia, ImportDeck };
     QString m_imageTargetId, m_imageSlideId;
     bool loadImage(const QUrl &url, bool replace, int index, const QString &target);
     Pending m_pending = Pending::None;
@@ -508,6 +526,13 @@ private:
     QStringList m_selectedIds;
     QStringList m_groupScope;
     QVariantMap m_diagramPreview;
+    void refreshImport();
+    Document m_importSource, m_importDocument;
+    QVariantMap m_importPlan, m_importOptions;
+    QList<int> m_importSlides;
+    QStringList m_importSlideIds;
+    QString m_importName;
+    int m_importBaseRevision = -1, m_importRevision = 0, m_importPreviewSerial = 0;
     QVariantMap m_layoutPreview;
     Document m_layoutPreviewDocument;
     int m_layoutPreviewRevision = 0, m_layoutBaseRevision = -1, m_layoutScope = 0;
