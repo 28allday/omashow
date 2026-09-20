@@ -109,7 +109,7 @@ void Backend::saveAsync(const QString &path) {
     });
     watcher->setFuture(QtConcurrent::run(Workers::io(), [document, path, job] {
         QString error;
-        if (!job->canceled) Workers::write(path, Bundle::toBytes(document), &error, job);
+        if (!job->canceled) Workers::write(path, Bundle::toBytes(document), &error, job, true);
         return error;
     }));
 }

@@ -265,6 +265,8 @@ ApplicationWindow {
             { group: qsTr("View"), name: win.inspectorCollapsed ? qsTr("Show the inspector") : qsTr("Hide the inspector"), also: "panel properties sidebar", run: () => win.inspectorCollapsed = !win.inspectorCollapsed },
             { group: qsTr("View"), name: qsTr("Put the panels back"), also: "reset widths restore layout", run: () => { win.navigatorCollapsed = false; win.inspectorCollapsed = false; win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } },
             { group: qsTr("View"), name: qsTr("Snap to guides"), also: "align magnet", run: () => backend.snapEnabled = !backend.snapEnabled },
+            { group: qsTr("View"), name: backend.reducedMotion ? qsTr("Allow movement again") : qsTr("Less movement"), also: "reduced motion animation accessibility vestibular", run: () => backend.reducedMotion = !backend.reducedMotion },
+            { group: qsTr("View"), name: backend.highContrast ? qsTr("Ordinary contrast") : qsTr("Stronger contrast"), also: "high contrast accessibility legible", run: () => backend.highContrast = !backend.highContrast },
             { group: qsTr("Help"), name: qsTr("Keyboard shortcuts"), also: "keys help", shortcut: "?", run: () => helpSheet.open() }
         ]
     }
@@ -462,6 +464,11 @@ ApplicationWindow {
                                                   win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } }
                         MenuItem { objectName: "commandSearchMenuItem"; text: qsTr("Find a command…"); onTriggered: commandPalette.show() }
                         MenuSeparator {}
+                        MenuItem { objectName: "reducedMotionItem"; checkable: true; checked: backend.reducedMotion
+                                   text: qsTr("Less movement"); onTriggered: backend.reducedMotion = checked }
+                        MenuItem { objectName: "highContrastItem"; checkable: true; checked: backend.highContrast
+                                   text: qsTr("Stronger contrast"); onTriggered: backend.highContrast = checked }
+                        MenuSeparator {}
                         MenuItem { text: qsTr("Zoom in"); icon.name: "zoom-in"; enabled: win.editing; onTriggered: editCanvas.zoomBy(1.25) }
                         MenuItem { text: qsTr("Zoom out"); icon.name: "zoom-out"; enabled: win.editing; onTriggered: editCanvas.zoomBy(1 / 1.25) }
                         MenuItem { text: qsTr("Fit slide"); icon.name: "maximize"; enabled: win.editing; onTriggered: editCanvas.fit() }
@@ -535,6 +542,12 @@ ApplicationWindow {
                         required property var modelData
                         required property int index
                         readonly property bool current: win.workspace === index
+                        Accessible.role: Accessible.PageTab
+                        Accessible.name: modelData.name
+                        Accessible.description: modelData.on ? qsTr("Workspace") : qsTr("Not built yet")
+                        Accessible.checkable: true
+                        Accessible.checked: current
+                        Accessible.onPressAction: if (modelData.on) win.workspace = index
                         readonly property color ink: !modelData.on ? Theme.borderStrong
                                                      : current ? Theme.accent
                                                      : hover.hovered ? Theme.textPrimary : Theme.textSecondary
@@ -842,7 +855,7 @@ ApplicationWindow {
             objectName: "fileStateBar"
             Layout.fillWidth: true
             visible: (backend.fileState.changedOnDisk ?? false) || (backend.fileState.readOnly ?? false)
-                     || (backend.fileState.missing ?? false)
+                     || (backend.fileState.missing ?? false) || (backend.fileState.openedElsewhere ?? false)
             implicitHeight: Theme.hRow + Theme.s2
             color: Theme.withAlpha(Theme.accent, 0.12)
             Hairline { anchors.bottom: parent.bottom; width: parent.width }
@@ -856,7 +869,9 @@ ApplicationWindow {
                     objectName: "fileStateMessage"
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
-                    text: backend.fileState.missing
+                    text: backend.fileState.openedElsewhere
+                          ? qsTr("%1 is open in another copy of OmaShow. The last one to save wins; the version it replaces is kept beside it as .bak.").arg(backend.fileName)
+                          : backend.fileState.missing
                           ? qsTr("%1 is no longer on disk. Saving will write it again.").arg(backend.fileName)
                           : backend.fileState.changedOnDisk
                           ? qsTr("%1 has changed on disk since you opened it.").arg(backend.fileName)
@@ -902,7 +917,13 @@ ApplicationWindow {
                 StatusRule { visible: backend.hasSelection }
                 StatusText { visible: backend.hasSelection; text: qsTr("%1 selected").arg(backend.selection.type) }
                 Item { Layout.fillWidth: true }
-                StatusText { text: backend.status; visible: text !== "" && text !== backend.fileName }
+                StatusText {
+                    objectName: "statusMessage"
+                    text: backend.status; visible: text !== "" && text !== backend.fileName
+                    // What just happened, for anything reading the window aloud.
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: text
+                }
                 StatusText { visible: showGuard.engaged; text: showGuard.state; color: Theme.success }
 
                 // Zoom lives here, as in the concept, so the canvas stays clear.

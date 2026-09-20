@@ -188,6 +188,17 @@ FocusScope {
             readonly property bool current: !modelData.collapsed && slide === backend.currentSlide
             readonly property real headerHeight: modelData.sectionStart || root.sorter ? Theme.hRow : 0
             objectName: (root.sorter ? "sorterRow" : "slideRow") + slide
+            // A slide in a list, said the way the list says it.
+            Accessible.role: Accessible.ListItem
+            Accessible.name: qsTr("Slide %1 — %2").arg(slide + 1).arg(modelData.title ?? "")
+            Accessible.description: [modelData.skipped ? qsTr("skipped") : "",
+                                     modelData.notes ? qsTr("has notes") : "",
+                                     modelData.commentCount ? qsTr("has comments") : "",
+                                     modelData.buildCount ? qsTr("has builds") : ""]
+                                    .filter(part => part.length > 0).join(", ")
+            Accessible.selectable: true
+            Accessible.selected: selected
+            Accessible.onPressAction: backend.currentSlide = slide
             width: root.cardWidth
             height: root.sorter ? root.cardHeight : headerHeight + root.bodyHeight(modelData) + Theme.s2
 

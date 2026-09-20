@@ -110,6 +110,8 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList outline READ outline NOTIFY documentChanged)
     Q_PROPERTY(QVariantMap findState READ findState NOTIFY findChanged)
     Q_PROPERTY(QVariantMap panelState READ panelState CONSTANT)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY viewPreferencesChanged)
+    Q_PROPERTY(bool highContrast READ highContrast WRITE setHighContrast NOTIFY viewPreferencesChanged)
     Q_PROPERTY(QVariantMap slideTransition READ slideTransition NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList exportQueue READ exportQueue NOTIFY exportQueueChanged)
     Q_PROPERTY(bool encoderAvailable READ encoderAvailable CONSTANT)
@@ -446,6 +448,10 @@ public:
     QVariantMap findState() const;
     QVariantMap panelState() const;
     Q_INVOKABLE void setPanelState(const QString &key, const QVariant &value);
+    bool reducedMotion() const;
+    void setReducedMotion(bool reduced);
+    bool highContrast() const;
+    void setHighContrast(bool high);
     Q_INVOKABLE bool setOutlineText(const QString &slideId, const QString &objectId, const QString &text);
     Q_INVOKABLE QString addComment(const QString &text, bool onSelection = true);
     Q_INVOKABLE QString replyToComment(const QString &parentId, const QString &text);
@@ -488,6 +494,7 @@ signals:
     void reviewAuthorChanged();
     void exportQueueChanged();
     void printersChanged();
+    void viewPreferencesChanged();
     void operationChanged();
     void layoutPreviewChanged();
     void diagramPreviewChanged();
@@ -597,7 +604,7 @@ private:
     QFileSystemWatcher m_watcher;
     QDateTime m_fileStamp;
     qint64 m_fileBytes = -1;
-    bool m_fileChangedOnDisk = false;
+    bool m_fileChangedOnDisk = false, m_openedElsewhere = false;
     void watchFile();
     QString m_status;
     bool m_busy = false;
@@ -647,6 +654,7 @@ private:
     QVariantList m_printers;
     QString m_defaultPrinter;
     bool m_printersRunning = false, m_printersKnown = false;
+    int m_reducedMotion = -1, m_highContrast = -1;
     QTimer m_exportTicker;
     int m_exportSerial = 0;
     void startNextExport();

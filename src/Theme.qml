@@ -26,12 +26,14 @@ QtObject {
     readonly property color panelRaised: "#171E2A"
     readonly property color controlBg: "#1B2431"
     readonly property color controlHover: "#222D3D"
-    readonly property color border: "#293241"
-    readonly property color borderStrong: "#3A4658"
+    // High contrast strengthens the edges and the quiet text. It is interface
+    // only: slide content and exported pixels never take an interface colour.
+    readonly property color border: highContrast ? "#6E7C92" : "#293241"
+    readonly property color borderStrong: highContrast ? "#9AA8BD" : "#3A4658"
 
     readonly property color textPrimary: "#E7EDF7"
-    readonly property color textSecondary: "#A7B1C1"
-    readonly property color textMuted: "#727E90"
+    readonly property color textSecondary: highContrast ? "#D2DAE6" : "#A7B1C1"
+    readonly property color textMuted: highContrast ? "#AFB9C8" : "#727E90"
 
     // The desktop's accent when Omarchy is there, the Oma accent when it is not
     // (plain Arch, a container, CI) — and the app has to look finished either
@@ -173,8 +175,12 @@ QtObject {
     readonly property int wTrackLabel: 180
 
     // ── Motion ──────────────────────────────────────────────────────────────
-    readonly property int dFast: 100
-    readonly property int dNormal: 130
+    // Someone who has asked for less movement gets none: the interface still
+    // changes, it just stops sliding and fading on the way.
+    readonly property bool reducedMotion: backend.reducedMotion
+    readonly property bool highContrast: backend.highContrast
+    readonly property int dFast: reducedMotion ? 0 : 100
+    readonly property int dNormal: reducedMotion ? 0 : 130
     readonly property int dSlow: 160
     readonly property int easing: Easing.OutCubic
     readonly property int tooltipDelay: 450

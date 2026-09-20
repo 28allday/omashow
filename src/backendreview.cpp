@@ -11,10 +11,49 @@ namespace {
 QString authorSettingsPath() {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/review.ini";
 }
+QString viewSettingsPath() {
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/view.ini";
+}
 QString panelSettingsPath() {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/panels.ini";
 }
 } // namespace
+
+// How the person wants the interface to behave. Neither touches the deck: a
+// file saved with reduced motion on is the same file.
+bool Backend::reducedMotion() const {
+    if (m_reducedMotion >= 0) return m_reducedMotion == 1;
+    if (qEnvironmentVariableIsSet("OMASHOW_REDUCED_MOTION"))
+        return qEnvironmentVariableIntValue("OMASHOW_REDUCED_MOTION") != 0;
+    QSettings settings(viewSettingsPath(), QSettings::IniFormat);
+    return settings.value("reducedMotion", false).toBool();
+}
+
+void Backend::setReducedMotion(bool reduced) {
+    if (reduced == reducedMotion()) return;
+    m_reducedMotion = reduced ? 1 : 0;
+    QSettings settings(viewSettingsPath(), QSettings::IniFormat);
+    settings.setValue("reducedMotion", reduced);
+    settings.sync();
+    emit viewPreferencesChanged();
+}
+
+bool Backend::highContrast() const {
+    if (m_highContrast >= 0) return m_highContrast == 1;
+    if (qEnvironmentVariableIsSet("OMASHOW_HIGH_CONTRAST"))
+        return qEnvironmentVariableIntValue("OMASHOW_HIGH_CONTRAST") != 0;
+    QSettings settings(viewSettingsPath(), QSettings::IniFormat);
+    return settings.value("highContrast", false).toBool();
+}
+
+void Backend::setHighContrast(bool high) {
+    if (high == highContrast()) return;
+    m_highContrast = high ? 1 : 0;
+    QSettings settings(viewSettingsPath(), QSettings::IniFormat);
+    settings.setValue("highContrast", high);
+    settings.sync();
+    emit viewPreferencesChanged();
+}
 
 // Where the panels were left: their widths, and whether they were put away.
 QVariantMap Backend::panelState() const {

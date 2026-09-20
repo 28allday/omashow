@@ -245,6 +245,19 @@ void Presenter::runToBoundary() {
                              : slide.timeline.duration();
   m_boundary = m_backend->slideStart() + localEnd;
   m_userPaused = false;
+  // Reduced motion: arrive at the moment rather than travelling to it.
+  if (m_backend->reducedMotion()) {
+    m_backend->pause();
+    m_backend->setTime(m_boundary);
+    m_advance.stop();
+    const auto &reduced = m_backend->document().slides.at(m_backend->currentSlide());
+    if (m_consumedClicks >= clicks.size() && reduced.advanceAfter >= 0 &&
+        nextSlideIndex() >= 0 && !m_frozen && m_blank == 0)
+      m_advance.start(int(reduced.advanceAfter * 1000));
+    m_status = tr("Ready · Next to continue");
+    emit stateChanged();
+    return;
+  }
   // A slide that moves on by itself waits out its hold after the last build.
   m_advance.stop();
   if (m_consumedClicks >= clicks.size() && slide.advanceAfter >= 0 &&
@@ -297,8 +310,10 @@ void Presenter::next() {
     emit stateChanged();
     return;
   }
-  const qreal transitionStart =
-      m_backend->slideStart() + m_backend->slideDuration();
+  const qreal transitionStart = m_backend->reducedMotion()
+                                    ? m_backend->slideStart() + m_backend->slideDuration() +
+                                          Presentation::transitionSeconds(m_backend->document(), next)
+                                    : m_backend->slideStart() + m_backend->slideDuration();
   recordSlideTime();
   m_timedSlide = next;
   m_slideClock.start();

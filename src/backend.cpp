@@ -2,6 +2,7 @@
 #include "mediaplayback.h"
 #include "core/design.h"
 #include "core/review.h"
+#include "io/decklock.h"
 #include "io/exports.h"
 #include <QDateTime>
 #include <QProcess>
@@ -366,6 +367,8 @@ bool Backend::saveTo(const QString &path) {
   // The deck on disk is now the truth; the journal has nothing left to add.
   Recovery::discard();
   setFileUrl(QUrl::fromLocalFile(path));
+  watchFile();
+  emit fileStateChanged();
   emit documentChanged();
   rememberRecent(path);
   setStatus(tr("Saved %1").arg(fileName()));
@@ -402,7 +405,17 @@ void Backend::watchFile() {
   if (!m_watcher.files().isEmpty()) m_watcher.removePaths(m_watcher.files());
   m_fileChangedOnDisk = false;
   const auto path = m_fileUrl.toLocalFile();
-  if (path.isEmpty()) { m_fileStamp = QDateTime(); m_fileBytes = -1; return; }
+  if (path.isEmpty()) {
+    m_fileStamp = QDateTime();
+    m_fileBytes = -1;
+    m_openedElsewhere = false;
+    DeckLock::release();
+    return;
+  }
+  // Advisory only: it says who else has this open, and prevents nothing.
+  const auto holder = DeckLock::check(path);
+  m_openedElsewhere = holder.held && !holder.mine;
+  if (!m_openedElsewhere) DeckLock::take(path);
   const QFileInfo info(path);
   m_fileStamp = info.lastModified();
   m_fileBytes = info.exists() ? info.size() : -1;
@@ -415,6 +428,7 @@ QVariantMap Backend::fileState() const {
   const bool saved = !path.isEmpty();
   return {{"path", path},
           {"saved", saved},
+          {"openedElsewhere", m_openedElsewhere},
           {"missing", saved && !info.exists()},
           {"readOnly", saved && info.exists() && !info.isWritable()},
           {"changedOnDisk", m_fileChangedOnDisk},

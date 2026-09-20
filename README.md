@@ -178,10 +178,19 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   undo, playback and export queue.
 - **Paste special:** keep what was copied, match this deck's text style, take
   the words only, or flatten it into a picture.
+- **Accessibility:** the interface names itself to assistive technology — the
+  canvas says which slide it is showing and what is selected, slide rows say
+  what is special about them, workspaces are tabs and the status line is
+  readable text. "Less movement" takes the animation out of the interface and
+  makes a show arrive at each moment instead of travelling to it; "Stronger
+  contrast" firms up edges and quiet text. Both are yours, not the deck's: a
+  file saved with them on is the same file.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
   rendering from the command line. A deck whose file is read-only, missing or
   changed by something else says so in a bar across the top, with the way out of
-  it: reload, keep yours, or save somewhere else.
+  it: reload, keep yours, or save somewhere else. Every save keeps the version
+  it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
+  says so — advice, not a lock.
 
 Template-pack installation, recording, interchange with other applications and
 other release features remain on the roadmap. Tab stops, columns, text

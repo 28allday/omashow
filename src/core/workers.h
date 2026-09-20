@@ -20,6 +20,8 @@ struct Job {
     QMutex commitMutex;
     void cancel();
 };
+// Writes atomically. `keepPrevious` copies whatever is already there to
+// "<name>.bak" first, so one mistake is always recoverable by hand.
 bool write(const QString &path, const QByteArray &bytes, QString *error,
-           const std::shared_ptr<Job> &job = {});
+           const std::shared_ptr<Job> &job = {}, bool keepPrevious = false);
 }

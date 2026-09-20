@@ -70,6 +70,11 @@ Item {
     }
 
     SlideView {
+        Accessible.role: Accessible.Canvas
+        Accessible.name: qsTr("Slide %1 of %2").arg(backend.currentSlide + 1).arg(backend.slideCount)
+        Accessible.description: backend.hasSelection
+                                ? qsTr("%1 objects selected").arg(backend.selectionCount)
+                                : qsTr("Nothing selected")
         id: view
         objectName: "editSlideView"
         anchors.fill: parent

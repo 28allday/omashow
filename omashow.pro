@@ -149,8 +149,8 @@ HEADERS += src/core/review.h src/core/findreplace.h
 SOURCES += src/core/review.cpp src/core/findreplace.cpp src/backendreview.cpp
 HEADERS += src/core/textruns.h
 SOURCES += src/core/textruns.cpp
-HEADERS += src/io/exports.h src/io/printing.h src/io/packagedeck.h
-SOURCES += src/io/exports.cpp src/io/printing.cpp src/io/packagedeck.cpp src/backendexports.cpp
+HEADERS += src/io/exports.h src/io/printing.h src/io/packagedeck.h src/io/decklock.h
+SOURCES += src/io/exports.cpp src/io/printing.cpp src/io/packagedeck.cpp src/io/decklock.cpp src/backendexports.cpp
 SOURCES += src/core/designfields.cpp
 
 HEADERS += src/anim/presentationcache.h src/render/liveframes.h

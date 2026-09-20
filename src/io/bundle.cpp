@@ -627,6 +627,13 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
 }
 
 bool Bundle::save(const Document &document, const QString &path, QString *error) {
+    // The version being replaced is kept beside it as "<name>.bak", so one
+    // mistaken save is always recoverable by hand.
+    if (QFileInfo::exists(path)) {
+        const QString backup = path + QStringLiteral(".bak");
+        QFile::remove(backup);
+        QFile::copy(path, backup);
+    }
     // QSaveFile is the atomic write: a temporary beside the target, then a
     // rename on commit. An interrupted save leaves the old deck untouched.
     QSaveFile file(path);
