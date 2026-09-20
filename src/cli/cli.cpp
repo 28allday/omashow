@@ -211,41 +211,92 @@ same ones the interface calls, so anything the app can do is in that list.
 )") << Qt::flush;
 }
 
-// The skill is a file in the app; putting it where Claude Code looks is a link
-// the person asks for, never something an install does to their home directory.
+// Where the agents on this computer keep their skills. Omarchy's own skills are
+// one directory under /usr/share linked into each of these, so OmaShow's is put
+// there the same way rather than inventing a second arrangement.
+QVector<QPair<QString, bool>> skillPlaces() {
+    const auto home = QDir::homePath();
+    QVector<QPair<QString, bool>> places{
+        {home + QStringLiteral("/.agents/skills"), true},   // whichever agent reads it
+        {home + QStringLiteral("/.claude/skills"), true}};
+    const QVector<QPair<QString, QString>> others{
+        {home + QStringLiteral("/.codex"), home + QStringLiteral("/.codex/skills")},
+        {home + QStringLiteral("/.pi"), home + QStringLiteral("/.pi/agent/skills")},
+        {home + QStringLiteral("/.hermes"), home + QStringLiteral("/.hermes/skills")}};
+    // Only for the agents that are actually here: a directory for a tool
+    // somebody does not use is litter.
+    for (const auto &other : others)
+        if (QFileInfo::exists(other.first)) places.append({other.second, false});
+    const auto profiles = home + QStringLiteral("/.hermes/profiles");
+    if (QFileInfo::exists(profiles))
+        for (const auto &profile :
+             QDir(profiles).entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+            places.append({profiles + '/' + profile + QStringLiteral("/skills"), false});
+    return places;
+}
+
+// The skill is a file in the app; putting it where the agents look is a link the
+// person asks for, never something an install does to their home directory.
 int offerSkill(const Flags &flags) {
     const auto folder = skillFolder();
     if (folder.isEmpty())
         return refuse(QStringLiteral("the skill is not beside this copy of OmaShow; it lives in "
                                      "skills/omashow in the source."));
-    const auto home = QDir::homePath() + QStringLiteral("/.claude/skills");
-    const auto target = home + QStringLiteral("/omashow");
+    const auto canonical = QFileInfo(folder).canonicalFilePath();
+    const bool link = flags.has(QStringLiteral("link"));
+    QVariantList rows;
+    QStringList trouble;
+    int linkedNow = 0, alreadyThere = 0;
+    for (const auto &place : skillPlaces()) {
+        const auto target = place.first + QStringLiteral("/omashow");
+        const QFileInfo already(target);
+        const bool matches =
+            already.exists() && already.canonicalFilePath() == canonical;
+        QVariantMap row{{QStringLiteral("place"), target}, {QStringLiteral("linked"), matches}};
+        if (matches) ++alreadyThere;
+        if (!link || matches) {
+            rows.append(row);
+            continue;
+        }
+        if (already.exists() || already.isSymLink()) {
+            if (!flags.has(QStringLiteral("force"))) {
+                row[QStringLiteral("note")] =
+                    QStringLiteral("something else is there; --force replaces it");
+                trouble.append(QStringLiteral("%1 is already something else").arg(target));
+                rows.append(row);
+                continue;
+            }
+            const bool cleared = already.isSymLink() ? QFile::remove(target)
+                                                     : QDir(target).removeRecursively();
+            if (!cleared) {
+                trouble.append(QStringLiteral("%1 could not be replaced").arg(target));
+                rows.append(row);
+                continue;
+            }
+        }
+        if (!QDir().mkpath(place.first) || !QFile::link(folder, target)) {
+            trouble.append(QStringLiteral("%1 could not be linked").arg(target));
+            rows.append(row);
+            continue;
+        }
+        row[QStringLiteral("linked")] = true;
+        ++linkedNow;
+        rows.append(row);
+    }
     QVariantMap payload{{QStringLiteral("skill"), folder + QStringLiteral("/SKILL.md")},
-                        {QStringLiteral("linksTo"), target}};
-    const QFileInfo already(target);
-    const bool linked = already.exists() &&
-                        already.canonicalFilePath() == QFileInfo(folder).canonicalFilePath();
-    payload[QStringLiteral("linked")] = linked;
-    if (!flags.has(QStringLiteral("link"))) {
-        payload[QStringLiteral("advice")] =
-            linked ? QStringLiteral("Claude already has it.")
-                   : QStringLiteral("Run `omashow skill --link` to put it where Claude looks.");
-        return say(payload);
+                        {QStringLiteral("places"), rows},
+                        {QStringLiteral("linked"), linkedNow + alreadyThere}};
+    if (!trouble.isEmpty()) {
+        auto said = trouble.join(QStringLiteral("; ")) + '.';
+        if (said.contains(QStringLiteral("already something else")))
+            said += QStringLiteral(" Use --force to replace what is there.");
+        return refuse(said, payload);
     }
-    if (linked) return say(payload);
-    if (already.exists() || already.isSymLink()) {
-        if (!flags.has(QStringLiteral("force")))
-            return refuse(QStringLiteral("%1 is already something else; --force replaces it.")
-                              .arg(target),
-                          payload);
-        if (already.isSymLink() ? !QFile::remove(target) : !QDir(target).removeRecursively())
-            return refuse(QStringLiteral("%1 could not be replaced.").arg(target), payload);
-    }
-    if (!QDir().mkpath(home)) return refuse(QStringLiteral("%1 could not be made.").arg(home));
-    if (!QFile::link(folder, target))
-        return refuse(QStringLiteral("%1 could not be linked to %2.").arg(target, folder), payload);
-    payload[QStringLiteral("linked")] = true;
-    payload[QStringLiteral("advice")] = QStringLiteral("Claude will find it in a new session.");
+    payload[QStringLiteral("advice")] =
+        link ? QStringLiteral("The agents on this computer will find it in a new session.")
+             : (alreadyThere > 0 && linkedNow == 0 && alreadyThere == rows.size()
+                    ? QStringLiteral("Every agent here already has it.")
+                    : QStringLiteral("Run `omashow skill --link` to put it where the agents look."));
     return say(payload);
 }
 

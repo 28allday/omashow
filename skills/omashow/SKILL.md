@@ -98,6 +98,12 @@ notes. `review` gives findings (missing descriptions, contrast, type too small,
 text that does not fit, slides with no title, unknown words) and statistics.
 Both are how to check your own work before handing it over.
 
+## If this skill is only on one machine
+
+`omashow skill --link` puts it where every agent on the computer looks — the
+same arrangement Omarchy uses for its own skills. The copy it links to is the
+one that came with the app, so updating OmaShow updates this.
+
 ## If `omashow` is not on the path
 
 Build it from a clone with `./bin/build` and call `./build/omashow`, or install

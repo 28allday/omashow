@@ -132,22 +132,31 @@ installed; `dictionaries` says which ones this computer has.
 
 ## Driving it from an agent
 
-`skills/omashow/SKILL.md` is a Claude skill for this command line — the working
+`skills/omashow/SKILL.md` is an agent skill for this command line — the working
 loop, the operations worth knowing and the things that bite. It ships with the
 app, packaged to `/usr/share/omashow/skills/`, but installing OmaShow does not
 put anything in your home directory. Ask for it:
 
 ```sh
-$ omashow skill
-{ "ok": true, "skill": "/usr/share/omashow/skills/omashow/SKILL.md",
-  "linksTo": "/home/you/.claude/skills/omashow", "linked": false,
-  "advice": "Run `omashow skill --link` to put it where Claude looks." }
-
-$ omashow skill --link
-{ "ok": true, …, "linked": true, "advice": "Claude will find it in a new session." }
+$ omashow skill          # where it is, and which agents have it
+$ omashow skill --link   # put it where they look
 ```
 
-Something already at that name is not replaced unless you say `--force`.
+Omarchy keeps one skill directory per agent and links its own skills into each,
+so `--link` does the same: `~/.agents/skills`, `~/.claude/skills`, and
+`~/.codex/skills`, `~/.pi/agent/skills`, `~/.hermes/skills` and each Hermes
+profile for whichever of those agents are installed. No directory is made for an
+agent that is not there.
+
+```sh
+$ omashow skill --link
+{ "ok": true, "skill": "/usr/share/omashow/skills/omashow/SKILL.md", "linked": 5,
+  "places": [ { "place": "/home/you/.agents/skills/omashow", "linked": true }, … ],
+  "advice": "The agents on this computer will find it in a new session." }
+```
+
+Asking twice is not an error. Something already sitting at one of those names is
+left alone, and named in the answer, unless you say `--force`.
 
 ## Finding the operation you want
 

@@ -329,7 +329,7 @@ in the app launcher, opens `.omashow` files, and uninstalls with
 git clone https://github.com/28allday/omashow.git
 cd omashow
 ./bin/install
-omashow skill --link   # optional: the Claude skill for the command line
+omashow skill --link   # optional: the agent skill for the command line
 ```
 
 ## Keys
@@ -395,14 +395,18 @@ writes nothing unless every one of them ran. `omashow ops` lists them all, with
 their arguments, by asking the app what it can do. The full reference is
 [docs/cli.md](docs/cli.md).
 
-A Claude skill for driving all this ships with the app. Installing OmaShow does
+An agent skill for driving all this ships with the app. Installing OmaShow does
 not put it in your home directory — a package has no business writing there —
 so ask for it when you want it:
 
 ```sh
-omashow skill          # where it is, and whether Claude has it
-omashow skill --link   # put it where Claude looks
+omashow skill          # where it is, and which agents have it
+omashow skill --link   # put it where they look
 ```
+
+`--link` follows the arrangement Omarchy uses for its own skills: one directory
+per agent (`~/.agents/skills`, `~/.claude/skills`, and Codex, Pi and Hermes when
+they are installed), each a link to the one copy that came with the app.
 
 The older render flags still work, and without a positional deck they use the
 built-in Morph fixture:
