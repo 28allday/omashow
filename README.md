@@ -239,6 +239,13 @@ newer edits. PDF and deck saves commit atomically.
 See [performance checks and limits](docs/performance.md) for reproduction commands,
 measurements and renderer fallback switches.
 
+## What ships
+
+`docs/release.md` is the release record: how it is built, what it is made of
+(`docs/sbom.md`), everything that has been tested and on what, and the limits
+that are deliberate. There is no telemetry: the application makes no network
+calls at all, and recovery journals never leave this computer.
+
 ## Build and run
 
 Requirements: Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-multimedia`),

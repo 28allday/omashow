@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+# Build twice, from scratch, in two different directories, and compare.
+#
+# Same machine, same toolchain, same sources: the binaries should be identical.
+# This is the check behind the claim in docs/release.md — run it before a
+# release and paste what it prints.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+WORK="${TMPDIR:-/tmp}/omashow-reproduce-$$"
+trap 'rm -rf "$WORK"' EXIT
+
+if command -v qmake6 >/dev/null 2>&1; then QMAKE=qmake6; else QMAKE=qmake; fi
+JOBS="$(nproc 2>/dev/null || echo 1)"
+
+for pass in one two; do
+    mkdir -p "$WORK/$pass"
+    (cd "$WORK/$pass" && "$QMAKE" "$ROOT/omashow.pro" >/dev/null && make -j"$JOBS" >/dev/null)
+    printf '%s: ' "$pass"
+    sha256sum "$WORK/$pass/omashow" | cut -d' ' -f1
+done
+
+if cmp -s "$WORK/one/omashow" "$WORK/two/omashow"; then
+    echo "Identical."
+else
+    echo "The two builds differ." >&2
+    exit 1
+fi

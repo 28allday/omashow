@@ -1,0 +1,77 @@
+#!/usr/bin/env sh
+# What this build was made of, and what it is allowed to be made of.
+#
+# Writes docs/sbom.md from the packages actually installed on this machine, the
+# compiler that will be used, and the licences of everything the binary links.
+# Run it before a release, and check the result in: it is the record that says
+# which versions the shipped numbers were measured against.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+OUT="$ROOT/docs/sbom.md"
+
+version() {
+    if command -v pacman >/dev/null 2>&1; then
+        pacman -Qi "$1" 2>/dev/null | awk -F': *' '/^Version/ { print $2; exit }'
+    fi
+}
+licence() {
+    if command -v pacman >/dev/null 2>&1; then
+        pacman -Qi "$1" 2>/dev/null | awk -F': *' '/^Licenses/ { print $2; exit }'
+    fi
+}
+
+{
+    echo "# What this build is made of"
+    echo
+    echo "Written by \`bin/sbom\` on $(date -u '+%Y-%m-%d') from the packages installed on the"
+    echo "build machine. Every number in \`docs/performance.md\` and"
+    echo "\`docs/hardware-validation.md\` was measured against these versions."
+    echo
+    echo "## OmaShow"
+    echo
+    echo "| Part | Value |"
+    echo "| --- | --- |"
+    echo "| Version | $(awk -F= '/^pkgver=/ { print $2 }' "$ROOT/pkgbuild/PKGBUILD") |"
+    echo "| Licence | GPL-3.0-or-later (\`LICENSE\`) |"
+    echo "| Source | github.com/28allday/omashow |"
+    echo "| Native deck format | $(awk -F'= ' '/constexpr int kFormatVersion/ { print $2 }' "$ROOT/src/io/bundle.h" | tr -d ';') |"
+    echo "| Lines of source | $(find "$ROOT/src" -name '*.cpp' -o -name '*.h' -o -name '*.qml' | xargs cat | wc -l) |"
+    echo
+    echo "## Build tools"
+    echo
+    echo "| Tool | Version |"
+    echo "| --- | --- |"
+    echo "| Compiler | $(${CXX:-g++} --version | head -1) |"
+    echo "| make | $(make --version | head -1) |"
+    echo "| qmake | $(qmake6 --version 2>/dev/null | tail -1) |"
+    echo "| Kernel | $(uname -sr) |"
+    echo
+    echo "## Libraries the binary links"
+    echo
+    echo "| Package | Version | Licence |"
+    echo "| --- | --- | --- |"
+    for package in qt6-base qt6-declarative qt6-svg qt6-multimedia qt6-shadertools \
+                   ffmpeg zlib glibc gcc-libs mesa; do
+        printf '| %s | %s | %s |\n' "$package" "$(version "$package")" "$(licence "$package")"
+    done
+    echo
+    echo "## Vendored source"
+    echo
+    echo "| What | Where | Licence |"
+    echo "| --- | --- | --- |"
+    echo "| Lucide icon geometry | \`src/ui/icons/Icons.qml\` | ISC (\`src/ui/icons/LICENSE.lucide\`) |"
+    echo
+    echo "## Run-time programs"
+    echo
+    echo "| Program | Version | Used for |"
+    echo "| --- | --- | --- |"
+    echo "| ffmpeg | $(ffmpeg -version 2>/dev/null | head -1 | cut -d' ' -f3) | film export and media compression |"
+    echo "| xdg-desktop-portal | $(version xdg-desktop-portal) | file choosers |"
+    echo
+    echo "Third-party notices are in \`THIRD-PARTY-NOTICES.md\`. Typefaces are not"
+    echo "shipped or packaged: a deck names the families it asks for, and a package"
+    echo "made by OmaShow says which of them were not installed."
+} > "$OUT"
+
+echo "Wrote $OUT"
