@@ -454,7 +454,7 @@ Rectangle {
     }
 
     // Named orders of the slides that already exist, never copies of them.
-    Dialog {
+    Sheet {
         id: showsDialog
         objectName: "customShowsDialog"
         parent: Overlay.overlay

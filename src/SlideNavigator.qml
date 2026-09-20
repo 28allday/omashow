@@ -356,7 +356,7 @@ FocusScope {
             Rectangle { x: card.x; y: root.dragFrom < row.slide ? card.y+card.height+Theme.s1 : card.y-Theme.s1-Theme.selectionRing; width: card.width; height: Theme.selectionRing; color: Theme.accent; visible: root.dragFrom >= 0 && root.dropIndex === row.slide }
         }
     }
-    Dialog {
+    Sheet {
         id: sectionName
         objectName: root.sorter ? "sorterSectionNameDialog" : "sectionNameDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; modal: true

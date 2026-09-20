@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
 
-Dialog {
+Sheet {
     id: root
     objectName: "layoutApplyDialog"
     parent: Overlay.overlay

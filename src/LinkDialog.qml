@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
-Dialog {
+Sheet {
     id: root
     objectName: "linkDialog"
     parent: Overlay.overlay; anchors.centerIn: parent
@@ -19,7 +19,7 @@ Dialog {
     ColumnLayout {
         width: parent.width; spacing: Theme.s3
         ComboBox { id: kind; objectName: "objectLinkKind"; Layout.fillWidth: true; model: [qsTr("No action"),qsTr("Web link"),qsTr("Email"),qsTr("Go to slide"),qsTr("Next"),qsTr("Previous"),qsTr("First slide"),qsTr("Last slide"),qsTr("End show")]; onActivated: issue.text="" }
-        TextField { id: destination; objectName: "objectLinkTarget"; Layout.fillWidth: true; visible: kind.currentIndex===1 || kind.currentIndex===2; placeholderText: kind.currentIndex===1?"https://example.com":"name@example.com"; Accessible.name: qsTr("Link destination") }
+        TextField { id: destination; objectName: "objectLinkTarget"; Layout.fillWidth: true; visible: kind.currentIndex===1 || kind.currentIndex===2; placeholderText: kind.currentIndex===1?"https://example.com":"name@example.com"; Accessible.name: qsTr("Link destination"); onAccepted: root.accept() }
         ComboBox { id: slide; objectName: "objectLinkSlide"; Layout.fillWidth: true; visible: kind.currentIndex===3; model: backend.navigator; textRole: "title"; valueRole: "id" }
         Label { Layout.fillWidth: true; visible: kind.currentIndex===1 || kind.currentIndex===2; wrapMode: Text.Wrap; color: Theme.textSecondary; text: qsTr("Clicking this object during the show asks the presenter to open the destination. The show pauses while the link is reviewed.") }
         Label { id: issue; objectName: "objectLinkIssue"; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warning }

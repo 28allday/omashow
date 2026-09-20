@@ -21,9 +21,9 @@ ApplicationWindow {
     readonly property bool editing: workspace === 0 && !backend.startVisible
     readonly property bool presenting: presenter.running
     // A modal dialog owns the keyboard while it is up.
-    readonly property bool dialogOpen: tableEditor.visible || diagramDialog.visible
-                                       || layoutApplyDialog.visible || importDesignDialog.visible
-                                       || commandPalette.visible
+    // Any sheet in front of the deck, wherever it was declared: the shell's own
+    // shortcuts stand down so the keyboard belongs to the dialog (see Sheet.qml).
+    readonly property bool dialogOpen: Sheets.count > 0
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fsControl
     color: Theme.windowBg
@@ -294,7 +294,7 @@ ApplicationWindow {
             else { mediaProgressDelay.stop(); mediaProgressDialog.close() }
         }
     }
-    Dialog {
+    Sheet {
         id: mediaProgressDialog; objectName: "mediaProgressDialog"; parent: Overlay.overlay; anchors.centerIn: parent
         width: 380; modal: true; closePolicy: Popup.NoAutoClose
         title: backend.mediaJobLabel
@@ -314,7 +314,7 @@ ApplicationWindow {
             else { operationDelay.stop(); operationDialog.close() }
         }
     }
-    Dialog {
+    Sheet {
         id: operationDialog; objectName: "documentOperationDialog"
         parent: Overlay.overlay; anchors.centerIn: parent
         width: 380; modal: true; closePolicy: Popup.NoAutoClose
@@ -325,7 +325,7 @@ ApplicationWindow {
         }
     }
     CombineShapesDialog { id: combineShapesDialog }
-    Dialog {
+    Sheet {
         id: templateName
         objectName: "keepTemplateDialog"
         parent: Overlay.overlay; anchors.centerIn: parent
@@ -337,7 +337,8 @@ ApplicationWindow {
         ColumnLayout {
             width: parent.width
             TextField { id: field; objectName: "templateNameField"; Layout.fillWidth: true
-                        placeholderText: qsTr("Name for the template") }
+                        placeholderText: qsTr("Name for the template")
+                        onAccepted: if (text.trim().length) templateName.accept() }
             Label {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
                 text: qsTr("The whole deck is kept, so whatever is on the slides becomes the starting point. Linked pictures and film stay linked and are not carried.")
@@ -993,8 +994,9 @@ ApplicationWindow {
 
     // Offered only when a previous session actually left work behind — a clean
     // quit leaves no journal, so an ordinary launch shows nothing.
-    Dialog {
+    Sheet {
         id: recoverySheet
+        objectName: "recoveryDialog"
         title: qsTr("Unsaved work was found")
         modal: true
         closePolicy: Popup.NoAutoClose
@@ -1081,7 +1083,7 @@ ApplicationWindow {
         }
     }
 
-    Dialog {
+    Sheet {
         id: discardSheet
         width: Theme.wInspector + Theme.s5 * 2
         objectName: "discardDialog"
@@ -1102,8 +1104,9 @@ ApplicationWindow {
         onRejected: win.pendingAction = null
     }
 
-    Dialog {
+    Sheet {
         id: errorSheet
+        objectName: "errorDialog"
         width: Theme.wInspector + Theme.s5 * 2
         title: qsTr("That did not work")
         modal: true
@@ -1136,8 +1139,9 @@ ApplicationWindow {
         }
     }
 
-    Dialog {
+    Sheet {
         id: helpSheet
+        objectName: "keysDialog"
         title: qsTr("Keys")
         modal: true
         anchors.centerIn: parent

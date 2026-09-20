@@ -7,7 +7,7 @@ import Omashow 1.0
 //
 // Commands carry the words people actually use for them as well as their own
 // label, so "film", "movie" and "video" all find the same thing.
-Dialog {
+Sheet {
     id: root
     objectName: "commandPalette"
     parent: Overlay.overlay

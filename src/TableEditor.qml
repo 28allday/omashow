@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
-Dialog {
+Sheet {
     id: root
     objectName: "tableEditor"
     parent: Overlay.overlay; anchors.centerIn: parent
@@ -260,7 +260,7 @@ Dialog {
             }
         }
     }
-    Dialog {
+    Sheet {
         id: pasteDialog; objectName: "tablePasteDialog"
         parent: Overlay.overlay; anchors.centerIn: parent; width: Math.min(parent.width-Theme.s5*2,780); height: Math.min(parent.height-Theme.s5*2,610)
         Overlay.modal: Rectangle { color: Theme.withAlpha(Theme.showBg,.65) }
@@ -294,7 +294,7 @@ Dialog {
             Label { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.Wrap; text: qsTr("Values stay as written, including decimal separators and leading zeros. Formulas are stored as literal text and never run. Pasting replaces destination text in one undo step."); color: Theme.textMuted; font.pixelSize: Theme.fsCaption }
         }
     }
-    Dialog {
+    Sheet {
         id: sortDialog; objectName: "tableSortDialog"
         parent: Overlay.overlay; anchors.centerIn: parent
         width: Math.min(parent.width-Theme.s5*2,640); height: Math.min(parent.height-Theme.s5*2,580)

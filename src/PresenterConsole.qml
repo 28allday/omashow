@@ -19,7 +19,7 @@ ApplicationWindow {
         function onExternalLinkRequested(url) { externalLink.open(); presenterWindow.requestActivate() }
         function onStateChanged() { if(!presenter.running) externalLink.close() }
     }
-    Dialog {
+    Sheet {
         id: externalLink; objectName: "externalLinkDialog"
         parent: Overlay.overlay; anchors.centerIn: parent
         width: Math.min(parent.width-Theme.s5*2,600)

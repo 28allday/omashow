@@ -6,7 +6,7 @@ import Omashow 1.0
 // Slides and design from another deck. Everything here describes the import
 // that is already prepared behind it, so the slide on the right is the slide
 // that will arrive — not an impression of it.
-Dialog {
+Sheet {
     id: root
     objectName: "importDesignDialog"
     parent: Overlay.overlay

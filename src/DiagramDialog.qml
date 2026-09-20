@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
-Dialog {
+Sheet {
     id: root; objectName: "diagramDialog"
     parent: Overlay.overlay; anchors.centerIn: parent
     width: Math.min(parent.width-Theme.s5*2,1040)

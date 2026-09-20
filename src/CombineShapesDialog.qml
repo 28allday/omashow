@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
-Dialog {
+Sheet {
     id: root
     objectName: "combineShapesDialog"
     parent: Overlay.overlay; anchors.centerIn: parent

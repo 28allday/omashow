@@ -200,6 +200,10 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   undo, playback and export queue.
 - **Paste special:** keep what was copied, match this deck's text style, take
   the words only, or flatten it into a picture.
+- **Keyboard:** every sheet the app puts in front of you takes the keyboard and
+  keeps it: Tab stays inside, Escape dismisses it (except the two that must be
+  answered), Enter answers the ones that ask for a single thing, and the
+  shortcuts behind it stand down rather than reaching the deck underneath.
 - **Accessibility:** the interface names itself to assistive technology — the
   canvas says which slide it is showing and what is selected, slide rows say
   what is special about them, workspaces are tabs and the status line is
@@ -214,8 +218,11 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
   says so — advice, not a lock.
 
-Screen recording, interchange with other applications and other release features
-remain on the roadmap. Spell-checking and text on a path are not built yet.
+Screen recording is not here: capturing the screen on Wayland needs the
+desktop's own permission dialog, and it is not worth shipping a recorder whose
+permission, consent and recovery behaviour has not been through a real session.
+Interchange with other applications and other release features remain on the
+roadmap. Spell-checking and text on a path are not built yet.
 Shapes from other applications' plug-ins cannot arrive, because nothing is
 imported from them. Exported PDFs carry real text but not clickable link annotations. Notes are
 plain text, and reading order is not yet carried into exported PDF.

@@ -359,7 +359,7 @@ Rectangle {
                 visible: (root.sel.equationError ?? "").length > 0
                 text: root.sel.equationError ?? ""
             }
-            Dialog {
+            Sheet {
                 id: equationHelp
                 objectName: "equationHelpDialog"
                 parent: Overlay.overlay; anchors.centerIn: parent
@@ -513,7 +513,7 @@ Rectangle {
                 visible: (root.sel.textStyleId ?? "").length > 0
                 text: qsTr("This box follows a style. Changing something here is its own, and stays when the style changes.")
             }
-            Dialog {
+            Sheet {
                 id: textStyleName
                 objectName: "textStyleDialog"
                 parent: Overlay.overlay; anchors.centerIn: parent
@@ -525,7 +525,8 @@ Rectangle {
                 ColumnLayout {
                     width: parent.width
                     TextField { id: textStyleField; objectName: "textStyleNameField"; Layout.fillWidth: true
-                                placeholderText: qsTr("Name for the style") }
+                                placeholderText: qsTr("Name for the style")
+                                onAccepted: if (text.trim().length) textStyleName.accept() }
                     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
                             font.pixelSize: Theme.fsLabel
                             text: qsTr("Typeface, size, weight, colour, alignment, spacing, lists, tabs, columns and direction. Not the words.") }

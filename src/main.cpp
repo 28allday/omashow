@@ -275,6 +275,10 @@ int main(int argc, char *argv[]) {
     qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/ui/icons/Icons.qml")),
                              "Omashow", 1, 0, "Icons");
     qmlRegisterType(QUrl(QStringLiteral("qrc:/ui/Icon.qml")), "Omashow", 1, 0, "Icon");
+    // How many sheets are in front of the deck, so the shell's shortcuts can
+    // stand down while one has the keyboard (see src/Sheet.qml).
+    qmlRegisterSingletonType(QUrl(QStringLiteral("qrc:/ui/Sheets.qml")),
+                             "Omashow", 1, 0, "Sheets");
 
     // Carry the desktop's text size into the default font so every control
     // grows with `omarchy display text size`, without a restart.

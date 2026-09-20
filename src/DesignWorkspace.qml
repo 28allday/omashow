@@ -422,8 +422,9 @@ RowLayout {
         }
     }
 
-    Dialog {
+    Sheet {
         id: removal
+        objectName: "designRemovalDialog"
         parent: Overlay.overlay
         anchors.centerIn: parent
         modal: true
