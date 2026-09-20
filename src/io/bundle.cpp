@@ -110,6 +110,10 @@ QByteArray slideToJson(const Slide &slide) {
     json["backgroundOverride"] = slide.backgroundOverride;
     json["showMasterObjects"] = slide.showMasterObjects;
     json["showMasterFields"] = slide.showMasterFields;
+    json["transition"] = slide.transition;
+    json["transitionDirection"] = slide.transitionDirection;
+    json["transitionSeconds"] = slide.transitionSeconds;
+    json["advanceAfter"] = slide.advanceAfter;
     QJsonArray reading;
     for (const auto &id : slide.readingOrder) reading.append(id);
     json["readingOrder"] = reading;
@@ -140,6 +144,20 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
     if ((json.contains("showMasterObjects") && !json.value("showMasterObjects").isBool()) ||
         (json.contains("showMasterFields") && !json.value("showMasterFields").isBool()) ||
         (json.contains("readingOrder") && !json.value("readingOrder").isArray())) {
+        if (ok) *ok = false;
+        return slide;
+    }
+    for (const auto &key : {"transition", "transitionDirection", "transitionSeconds", "advanceAfter"})
+        if (json.contains(key) && !json.value(key).isDouble()) { if (ok) *ok = false; return slide; }
+    slide.transition = json.value("transition").toInt(-1);
+    slide.transitionDirection = json.value("transitionDirection").toInt(0);
+    slide.transitionSeconds = json.value("transitionSeconds").toDouble(-1);
+    slide.advanceAfter = json.value("advanceAfter").toDouble(-1);
+    if (slide.transition < -1 || slide.transition > 3 ||
+        slide.transitionDirection < 0 || slide.transitionDirection > 3 ||
+        !std::isfinite(slide.transitionSeconds) || slide.transitionSeconds < -1 ||
+        slide.transitionSeconds > 10 || !std::isfinite(slide.advanceAfter) ||
+        slide.advanceAfter < -1 || slide.advanceAfter > 3600) {
         if (ok) *ok = false;
         return slide;
     }
@@ -182,6 +200,7 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     manifest[QStringLiteral("width")] = document.size.width();
     manifest[QStringLiteral("height")] = document.size.height();
     manifest[QStringLiteral("transitionDuration")] = document.transitionDuration;
+    manifest[QStringLiteral("transition")] = document.transition;
 
     QJsonArray order;
     for (const Slide &slide : document.slides)
@@ -296,6 +315,11 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
                            manifest.value(QStringLiteral("height")).toDouble(1080.0));
     document.transitionDuration =
         manifest.value(QStringLiteral("transitionDuration")).toDouble(0.9);
+    document.transition = manifest.value(QStringLiteral("transition")).toInt(3);
+    if (!std::isfinite(document.transitionDuration) || document.transitionDuration < 0 ||
+        document.transitionDuration > 10 || document.transition < 0 || document.transition > 3) {
+        result.error = QStringLiteral("The deck has an invalid transition."); return result;
+    }
 
     if (!std::isfinite(document.size.width()) || !std::isfinite(document.size.height()) ||
         document.size.width()<=0 || document.size.height()<=0 ||

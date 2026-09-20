@@ -192,3 +192,75 @@ int Backend::addBuildForSelection(int phase, int effect) {
     }
     m_history.commit();touch();return first;
 }
+
+// --- transitions ------------------------------------------------------------
+QVariantMap Backend::slideTransition() const {
+  const bool has = m_currentSlide >= 0 && m_currentSlide < m_document.slides.size();
+  const auto &slide = has ? m_document.slides.at(m_currentSlide) : Slide();
+  return {{"kind", has ? slide.transition : -1},
+          {"effective", Presentation::transitionKind(m_document, m_currentSlide)},
+          {"direction", has ? slide.transitionDirection : 0},
+          {"seconds", has ? slide.transitionSeconds : -1},
+          {"effectiveSeconds", Presentation::transitionSeconds(m_document, m_currentSlide)},
+          {"advanceAfter", has ? slide.advanceAfter : -1},
+          {"first", m_currentSlide == 0},
+          {"deckKind", m_document.transition},
+          {"deckSeconds", m_document.transitionDuration},
+          {"names", QStringList{tr("Cut"), tr("Fade"), tr("Push"), tr("Morph")}},
+          {"directions", QStringList{tr("Left"), tr("Right"), tr("Up"), tr("Down")}}};
+}
+
+// `value` of -1 means "whatever the deck says", for every key but direction.
+bool Backend::setSlideTransition(const QString &key, const QVariant &value, bool everySlide) {
+  if (m_document.slides.isEmpty()) return false;
+  Slide probe = m_document.slides.at(qBound(0, m_currentSlide, int(m_document.slides.size()) - 1));
+  if (!applyTransition(probe, key, value)) return false;
+  m_history.begin(m_document, everySlide ? tr("Change every transition")
+                                         : tr("Change transition"));
+  bool changed = false;
+  for (int i = 0; i < m_document.slides.size(); ++i) {
+    if (!everySlide && i != m_currentSlide) continue;
+    Slide slide = m_document.slides.at(i);
+    if (!applyTransition(slide, key, value)) continue;
+    if (slide.transition == m_document.slides.at(i).transition &&
+        slide.transitionDirection == m_document.slides.at(i).transitionDirection &&
+        slide.transitionSeconds == m_document.slides.at(i).transitionSeconds &&
+        slide.advanceAfter == m_document.slides.at(i).advanceAfter)
+      continue;
+    m_document.slides[i].transition = slide.transition;
+    m_document.slides[i].transitionDirection = slide.transitionDirection;
+    m_document.slides[i].transitionSeconds = slide.transitionSeconds;
+    m_document.slides[i].advanceAfter = slide.advanceAfter;
+    changed = true;
+  }
+  if (!changed) {
+    // Valid, but already the case: nothing to record, nothing to report.
+    m_history.abandon();
+    return true;
+  }
+  m_history.commit();
+  touch();
+  return true;
+}
+
+bool Backend::applyTransition(Slide &slide, const QString &key, const QVariant &value) const {
+  bool ok = false;
+  const qreal number = value.toDouble(&ok);
+  if (!ok || !std::isfinite(number)) return false;
+  if (key == QLatin1String("kind")) {
+    if (number < -1 || number > Presentation::Morph || number != qRound(number)) return false;
+    slide.transition = int(number);
+  } else if (key == QLatin1String("direction")) {
+    if (number < 0 || number > 3 || number != qRound(number)) return false;
+    slide.transitionDirection = int(number);
+  } else if (key == QLatin1String("seconds")) {
+    if (number < -1 || number > 10) return false;
+    slide.transitionSeconds = number < 0 ? -1 : number;
+  } else if (key == QLatin1String("advanceAfter")) {
+    if (number < -1 || number > 3600) return false;
+    slide.advanceAfter = number < 0 ? -1 : number;
+  } else {
+    return false;
+  }
+  return true;
+}

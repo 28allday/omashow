@@ -32,6 +32,10 @@ Presenter::Presenter(Backend *backend, ShowGuard *guard, QObject *parent)
           &Presenter::timeChanged);
   m_timer.setInterval(100);
   connect(&m_timer, &QTimer::timeout, this, &Presenter::clockChanged);
+  m_advance.setSingleShot(true);
+  connect(&m_advance, &QTimer::timeout, this, [this] {
+    if (m_running && !m_userPaused && !m_frozen && m_blank == 0) next();
+  });
   m_status = tr("Ready to present");
 }
 Presenter::~Presenter() {
@@ -197,6 +201,7 @@ void Presenter::stop() {
   m_guard->release();
   m_frozen = false;
   m_blank = 0;
+  m_advance.stop();
   m_backend->setMediaSuppressed(false);
   if (m_audience)
     m_audience->hide();
@@ -231,6 +236,13 @@ void Presenter::runToBoundary() {
                              : slide.timeline.duration();
   m_boundary = m_backend->slideStart() + localEnd;
   m_userPaused = false;
+  // A slide that moves on by itself waits out its hold after the last build.
+  m_advance.stop();
+  if (m_consumedClicks >= clicks.size() && slide.advanceAfter >= 0 &&
+      nextSlideIndex() >= 0 && !m_frozen && m_blank == 0) {
+    const qreal remaining = qMax(qreal(0), m_boundary - m_backend->time());
+    m_advance.start(int((remaining + slide.advanceAfter) * 1000));
+  }
   if (m_boundary > m_backend->time() + .000001)
     m_backend->playUntil(m_boundary);
   else {
@@ -306,6 +318,7 @@ void Presenter::pauseResume() {
     return;
   if (m_backend->playing()) {
     m_userPaused = true;
+    m_advance.stop();
     m_backend->pause();
   } else if (m_userPaused) {
     m_userPaused = false;
@@ -316,6 +329,8 @@ void Presenter::pauseResume() {
 void Presenter::setBlankMode(int mode) {
   m_blank = qBound(0, mode, 2);
   m_backend->setMediaSuppressed(m_blank!=0 || m_frozen);
+  if (m_blank != 0) m_advance.stop();
+  else if (m_running && !m_userPaused) runToBoundary();
   emit stateChanged();
 }
 void Presenter::setFrozen(bool frozen) {
@@ -325,6 +340,8 @@ void Presenter::setFrozen(bool frozen) {
     m_frozenTime = m_backend->time();
   m_frozen = frozen;
   m_backend->setMediaSuppressed(m_blank!=0 || m_frozen);
+  if (m_frozen) m_advance.stop();
+  else if (m_running && !m_userPaused) runToBoundary();
   emit stateChanged();
   emit timeChanged();
 }

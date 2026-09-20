@@ -18,10 +18,10 @@ public:
 private:
     Document m_document;
     QVector<int> m_indices;
-    QVector<qreal> m_starts, m_holds;
+    QVector<qreal> m_starts, m_holds, m_transitions;
     qreal m_duration = 0;
     mutable QCache<int, Slide> m_slides{16};
-    mutable int m_from = -1, m_to = -1;
+    mutable int m_from = -1, m_to = -1, m_kind = Presentation::Morph;
     mutable Slide m_settled, m_arriving;
     mutable QVector<MorphPair> m_pairs;
 };

@@ -10,6 +10,7 @@ import Omashow 1.0
 RowLayout {
     id: root
     objectName: "animateWorkspace"
+    readonly property var transition: backend.slideTransition
     spacing: 0
     property int selectedBuild: 0
     property real pixelsPerSecond: 120
@@ -373,12 +374,99 @@ RowLayout {
 
                 Rectangle { Layout.fillWidth: true; Layout.topMargin: Theme.s2; implicitHeight: Theme.hairline; color: Theme.border }
                 Label { text: qsTr("Slide Transition"); font.pixelSize: Theme.fsSection; font.weight: Theme.wHeading; Layout.topMargin: Theme.s1 }
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    text: root.transition.first ? qsTr("The first slide has nothing to arrive from; this sets what the deck does elsewhere.")
+                                                : qsTr("How the show arrives at this slide.")
+                }
+                // The gallery: what each transition does, in the words it does it.
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: Theme.s2
+                    rowSpacing: Theme.s2
+                    Repeater {
+                        model: [{ kind: 0, icon: "scissors", detail: qsTr("No transition at all") },
+                                { kind: 1, icon: "sun", detail: qsTr("One slide fades into the next") },
+                                { kind: 2, icon: "arrow-left-right", detail: qsTr("The next slide pushes this one off") },
+                                { kind: 3, icon: "sparkles", detail: qsTr("Matching objects move into place") }]
+                        Button {
+                            required property var modelData
+                            objectName: "transitionKind" + modelData.kind
+                            Layout.fillWidth: true
+                            icon.name: modelData.icon
+                            text: root.transition.names[modelData.kind]
+                            checked: root.transition.effective === modelData.kind
+                            ToolTip.visible: hovered
+                            ToolTip.delay: Theme.tooltipDelay
+                            ToolTip.text: modelData.detail
+                            onClicked: backend.setSlideTransition("kind", modelData.kind)
+                        }
+                    }
+                }
+                FieldRow {
+                    label: qsTr("Towards")
+                    visible: root.transition.effective === 2
+                    ComboBox {
+                        objectName: "transitionDirection"
+                        Layout.fillWidth: true
+                        model: root.transition.directions
+                        currentIndex: root.transition.direction ?? 0
+                        onActivated: backend.setSlideTransition("direction", currentIndex)
+                    }
+                }
+                FieldRow {
+                    label: qsTr("Takes")
+                    visible: root.transition.effective !== 0
+                    NumField {
+                        objectName: "transitionSeconds"
+                        Layout.fillWidth: true
+                        step: .1; suffix: " s"
+                        value: root.transition.effectiveSeconds ?? 0.9
+                        onCommitted: v => backend.setSlideTransition("seconds", v)
+                    }
+                }
+                CheckBox {
+                    objectName: "transitionAutoAdvance"
+                    text: qsTr("Move on by itself")
+                    checked: (root.transition.advanceAfter ?? -1) >= 0
+                    onToggled: backend.setSlideTransition("advanceAfter", checked ? 5 : -1)
+                }
+                FieldRow {
+                    label: qsTr("After")
+                    visible: (root.transition.advanceAfter ?? -1) >= 0
+                    NumField {
+                        objectName: "transitionAdvanceSeconds"
+                        Layout.fillWidth: true
+                        step: 1; suffix: " s"
+                        value: root.transition.advanceAfter ?? 5
+                        onCommitted: v => backend.setSlideTransition("advanceAfter", v)
+                    }
+                }
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Theme.s2
-                    Icon { name: "sparkles"; color: Theme.accent; Layout.alignment: Qt.AlignTop }
-                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                            text: qsTr("Morph — objects that match between slides move into place; the rest cross-fade.") }
+                    Button {
+                        objectName: "transitionApplyAll"
+                        Layout.fillWidth: true
+                        text: qsTr("Use on every slide")
+                        onClicked: {
+                            backend.setSlideTransition("kind", root.transition.effective, true)
+                            backend.setSlideTransition("direction", root.transition.direction ?? 0, true)
+                            backend.setSlideTransition("seconds", root.transition.effectiveSeconds ?? 0.9, true)
+                            backend.setSlideTransition("advanceAfter", root.transition.advanceAfter ?? -1, true)
+                        }
+                    }
+                    Button {
+                        objectName: "transitionFollowDeck"
+                        Layout.fillWidth: true
+                        text: qsTr("Follow the deck")
+                        enabled: (root.transition.kind ?? -1) >= 0 || (root.transition.seconds ?? -1) >= 0
+                        onClicked: { backend.setSlideTransition("kind", -1); backend.setSlideTransition("seconds", -1) }
+                    }
+                }
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    text: qsTr("Preview, present and export all read the same clock, so a transition looks the same everywhere.")
                 }
             }
         }

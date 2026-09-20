@@ -35,7 +35,8 @@ namespace Bundle {
 // Format 11 adds explicit local CSV links with cached data. Opening never reads them.
 // Format 12 adds master number/date/footer fields and per-slide artwork/field visibility.
 // Format 13 adds review comments, alternative text, reading order and dismissed findings.
-constexpr int kFormatVersion = 13;
+// Format 14 adds per-slide transitions, directions, durations and automatic advance.
+constexpr int kFormatVersion = 14;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

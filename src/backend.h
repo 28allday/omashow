@@ -100,6 +100,7 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList readingOrder READ readingOrder NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList outline READ outline NOTIFY documentChanged)
     Q_PROPERTY(QVariantMap findState READ findState NOTIFY findChanged)
+    Q_PROPERTY(QVariantMap slideTransition READ slideTransition NOTIFY selectionChanged)
     Q_PROPERTY(QString reviewAuthor READ reviewAuthor WRITE setReviewAuthor NOTIFY reviewAuthorChanged)
 
 public:
@@ -431,6 +432,9 @@ public:
     Q_INVOKABLE bool replaceMatch(int index, const QString &replacement);
     Q_INVOKABLE int replaceAllMatches(const QString &replacement);
     Q_INVOKABLE void clearFind();
+    QVariantMap slideTransition() const;
+    Q_INVOKABLE bool setSlideTransition(const QString &key, const QVariant &value,
+                                        bool everySlide = false);
 
 signals:
     void opened();
@@ -545,6 +549,7 @@ private:
     bool m_busy = false;
 
     void touch();
+    bool applyTransition(Slide &slide, const QString &key, const QVariant &value) const;
     SceneObject *selectedObject();
     const SceneObject *selectedObject() const;
 

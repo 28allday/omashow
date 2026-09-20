@@ -92,4 +92,7 @@ private:
   int m_blank = 0, m_consumedClicks = 0, m_targetMinutes = 20;
   QElapsedTimer m_clock;
   QTimer m_timer;
+  // A slide that moves on by itself: armed when its builds finish, and stopped
+  // by anything that takes the show out of the speaker's hands.
+  QTimer m_advance;
 };

@@ -102,6 +102,11 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Animate:** Fade and Rise builds in/out, individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
+- **Transitions:** cut, fade, push (in any of four directions) or morph, chosen
+  per slide or handed to the whole deck, with their own duration. A slide can
+  also move on by itself after a set number of seconds; blanking, freezing or
+  pausing holds it where it is. Preview, present and export read the same clock,
+  so a transition looks the same in all three.
 - **Slides:** range/toggle/select-all, batch duplicate/delete, multi-slide drag
   and keyboard reorder. Thumbnail, compact and outline navigation share the
   selection with the large Sorter workspace. Named sections travel with whole

@@ -9,13 +9,20 @@ void PresentationCache::reset(const Document &document, bool includeSkipped) {
     m_starts.clear(); m_holds.clear(); m_slides.clear();
     m_from = m_to = -1; m_settled = {}; m_arriving = {}; m_pairs.clear();
     qreal cursor = 0;
-    for (int index : m_indices) {
+    m_transitions.clear();
+    for (int n = 0; n < m_indices.size(); ++n) {
+        const int index = m_indices.at(n);
         m_starts.append(cursor);
         const auto hold = Presentation::slideDuration(document, index);
         m_holds.append(hold);
-        cursor += hold + document.transitionDuration;
+        // The transition belongs to the slide being arrived at, so slide n's
+        // entry is what follows slide n-1.
+        const qreal seconds = n + 1 < m_indices.size()
+            ? Presentation::transitionSeconds(document, m_indices.at(n + 1)) : 0;
+        m_transitions.append(seconds);
+        cursor += hold + seconds;
     }
-    m_duration = m_indices.isEmpty() ? 0 : cursor - document.transitionDuration;
+    m_duration = m_indices.isEmpty() ? 0 : cursor - (m_transitions.isEmpty() ? 0 : m_transitions.last());
 }
 
 Frame PresentationCache::frameAt(qreal time) const {
@@ -26,10 +33,11 @@ Frame PresentationCache::frameAt(qreal time) const {
     frame.slideIndex = m_indices[n];
     frame.slideTime = time - m_starts[n];
     if (n + 1 < m_indices.size() && frame.slideTime >= m_holds[n]) {
+        const qreal seconds = m_transitions[n];
         frame.inTransition = true;
         frame.fromSlide = frame.slideIndex;
         frame.slideIndex = m_indices[n + 1];
-        frame.transitionProgress = (frame.slideTime - m_holds[n]) / m_document.transitionDuration;
+        frame.transitionProgress = seconds > 0 ? (frame.slideTime - m_holds[n]) / seconds : 1;
         frame.slideTime = 0;
     }
     return frame;
@@ -48,11 +56,9 @@ QColor PresentationCache::backgroundAt(qreal time) const {
     const auto to = slide(frame.slideIndex).background;
     if (!frame.inTransition) return to;
     const auto from = slide(frame.fromSlide).background;
-    const auto p = QEasingCurve(QEasingCurve::InOutCubic).valueForProgress(frame.transitionProgress);
-    return QColor::fromRgbF(from.redF() + (to.redF()-from.redF())*p,
-                           from.greenF() + (to.greenF()-from.greenF())*p,
-                           from.blueF() + (to.blueF()-from.blueF())*p,
-                           from.alphaF() + (to.alphaF()-from.alphaF())*p);
+    return Presentation::blendBackground(from, to,
+                                         Presentation::transitionKind(m_document, frame.slideIndex),
+                                         frame.transitionProgress);
 }
 
 QVector<SceneObject> PresentationCache::statesAt(qreal time) const {
@@ -73,7 +79,11 @@ QVector<SceneObject> PresentationCache::statesAt(qreal time) const {
                     buildsIn = true;
             if (!buildsIn) m_arriving.objects.append(object);
         }
-        m_pairs = Morph::match(m_settled, m_arriving);
+        m_kind = Presentation::transitionKind(m_document, m_to);
+        m_pairs = m_kind == Presentation::Morph ? Morph::match(m_settled, m_arriving)
+                                                : QVector<MorphPair>();
     }
-    return Morph::stateAt(m_settled, m_arriving, m_pairs, frame.transitionProgress);
+    return Presentation::blend(m_document, m_settled, m_arriving, m_pairs, m_kind,
+                               m_document.slides.at(m_to).transitionDirection,
+                               frame.transitionProgress);
 }

@@ -124,6 +124,13 @@ struct Slide {
     // Object ids in the order they should be read. Anything not listed keeps
     // its place in the stacking order, after those that are.
     QStringList readingOrder;
+    // How the show arrives at this slide. -1 follows the deck's own choice.
+    int transition = -1;
+    int transitionDirection = 0;    // push: 0 left, 1 right, 2 up, 3 down
+    qreal transitionSeconds = -1;
+    // Seconds to hold after the last build before moving on by itself.
+    // -1 waits for the speaker.
+    qreal advanceAfter = -1;
     bool backgroundOverride = false;
     bool showMasterObjects = true;
     bool showMasterFields = true;
@@ -196,7 +203,8 @@ struct Document {
     // Review findings the author has looked at and does not want raised again.
     QStringList dismissedIssues;
 
-    // Seconds spent on the cross-slide transition into each slide after the
-    // first. Gate 0 keeps one global value; the real model puts it per slide.
+    // What a slide does unless it says otherwise: the kind of transition into
+    // it, and how long that takes.
+    int transition = 3;   // Presentation::Morph
     qreal transitionDuration = 0.9;
 };
