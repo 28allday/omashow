@@ -17,9 +17,17 @@ work, each under its own licence.
 | [Qt 6](https://www.qt.io) — Core, Gui, Qml, Quick, Quick Controls, Svg, Multimedia, Concurrent, DBus | LGPL-3.0 / GPL-3.0 |
 | [FFmpeg](https://ffmpeg.org) — libavformat, libavcodec, libavutil, libswscale | LGPL-2.1-or-later; GPL-3.0 as built with `--enable-gpl --enable-version3` by Arch Linux |
 | [zlib](https://zlib.net) | zlib licence |
+| [Hunspell](https://hunspell.github.io) | GPL-2.0-or-later / LGPL-2.1-or-later / MPL-1.1 |
 
 Because the FFmpeg build OmaShow links against is GPL-3.0, OmaShow as a whole
 is distributed under GPL-3.0-or-later terms. No "nonfree" component is used.
+
+## Spelling dictionaries
+
+OmaShow bundles no dictionaries. It reads the Hunspell dictionaries installed on
+the system, each under its own licence, and says so when there are none for the
+language a deck is written in. `tests/fixtures/dictionaries` holds a ten-word
+dictionary written for the tests; it is not a language.
 
 ## Fonts
 

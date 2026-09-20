@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "core/spelling.h"
 #include "core/design.h"
 #include "core/findreplace.h"
 #include "core/review.h"
@@ -308,6 +309,53 @@ bool Backend::dismissIssue(const QString &key, bool dismissed) {
     m_history.commit();
     touch();
     return true;
+}
+
+// --- language and the words this deck knows ---------------------------------
+QString Backend::deckLanguage() const { return Review::language(m_document); }
+QStringList Backend::spellingLanguages() const { return Spelling::installed(); }
+bool Backend::spellingAvailable() const { return Spelling::available(deckLanguage()); }
+QStringList Backend::knownWords() const { return m_document.knownWords; }
+bool Backend::smartPunctuation() const { return m_document.smartPunctuation; }
+
+bool Backend::setDeckLanguage(const QString &language) {
+    if (language.size() > 32 || language == m_document.language) return false;
+    m_history.begin(m_document, tr("Change the deck's language"));
+    m_document.language = language;
+    m_history.commit();
+    touch();
+    return true;
+}
+bool Backend::setSmartPunctuation(bool on) {
+    if (on == m_document.smartPunctuation) return false;
+    m_history.begin(m_document, tr("Change smart punctuation"));
+    m_document.smartPunctuation = on;
+    m_history.commit();
+    touch();
+    return true;
+}
+// A word the deck should know travels with the deck, not with the computer:
+// somebody else opening it sees the same review.
+bool Backend::teachWord(const QString &word) {
+    const auto tidy = word.trimmed();
+    if (tidy.isEmpty() || tidy.size() > 120 || m_document.knownWords.contains(tidy)) return false;
+    m_history.begin(m_document, tr("Teach the deck a word"));
+    m_document.knownWords.append(tidy);
+    m_document.knownWords.sort();
+    m_history.commit();
+    touch();
+    return true;
+}
+bool Backend::forgetWord(const QString &word) {
+    if (!m_document.knownWords.contains(word)) return false;
+    m_history.begin(m_document, tr("Forget a word"));
+    m_document.knownWords.removeAll(word);
+    m_history.commit();
+    touch();
+    return true;
+}
+QStringList Backend::spellingSuggestions(const QString &word) const {
+    return Spelling::suggest(word, deckLanguage(), 6);
 }
 
 void Backend::goToIssue(const QString &key) {

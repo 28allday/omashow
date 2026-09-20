@@ -33,12 +33,14 @@ struct TextRun {
     qreal fontSize = 0;          // 0 inherits
     QString fontFamily;
     QColor color;                // invalid inherits
+    QString language;            // empty inherits: what this stretch is written in
     bool operator==(const TextRun &other) const {
         return start == other.start && length == other.length && weight == other.weight &&
                italic == other.italic && underline == other.underline &&
                strike == other.strike && baseline == other.baseline &&
                qFuzzyCompare(fontSize + 1, other.fontSize + 1) &&
-               fontFamily == other.fontFamily && color == other.color;
+               fontFamily == other.fontFamily && color == other.color &&
+               language == other.language;
     }
 };
 
@@ -122,7 +124,8 @@ struct SceneObject {
     int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
     int listStart = 1;   // where a numbered list starts counting
     int textFit = 0;         // clip with overflow warning, shrink to fit
-    int textKind = 0;        // 0 the words as typed, 1 an equation
+    int textKind = 0;        // 0 the words as typed, 1 an equation, 2 along a path
+    QString language;        // what this box is written in; empty follows the deck
     qreal tabStop = 0;       // 0 uses four times the type size
     int columns = 1;         // text flows down one column, then into the next
     qreal columnGap = 0;     // 0 uses one line of space between columns
@@ -242,6 +245,13 @@ struct Document {
     QStringList activeShow;
     // Review findings the author has looked at and does not want raised again.
     QStringList dismissedIssues;
+    // What the deck is written in, as "en_GB"; empty follows the computer. The
+    // words it has been taught are its own, not the computer's, so they travel
+    // with the file.
+    QString language;
+    QStringList knownWords;
+    // Straight quotes and double hyphens become the real marks as you type.
+    bool smartPunctuation = true;
 
     // What a slide does unless it says otherwise: the kind of transition into
     // it, and how long that takes.

@@ -324,6 +324,24 @@ public:
     bool applyTable(const QString &slideId,const QString &objectId,const TableData &table,const QString &label,const DataSource *source=nullptr);
     Q_INVOKABLE void addText();
     Q_INVOKABLE void addEquation();
+    Q_INVOKABLE bool putTextOnShape();
+    // What the deck is written in, what it has been taught, and whether it
+    // smartens the punctuation as words are committed.
+    Q_PROPERTY(QString deckLanguage READ deckLanguage NOTIFY documentChanged)
+    Q_PROPERTY(QStringList knownWords READ knownWords NOTIFY documentChanged)
+    Q_PROPERTY(bool smartPunctuation READ smartPunctuation NOTIFY documentChanged)
+    Q_PROPERTY(bool spellingAvailable READ spellingAvailable NOTIFY documentChanged)
+    QString deckLanguage() const;
+    QStringList knownWords() const;
+    bool smartPunctuation() const;
+    bool spellingAvailable() const;
+    Q_INVOKABLE QStringList spellingLanguages() const;
+    Q_INVOKABLE QStringList spellingSuggestions(const QString &word) const;
+    Q_INVOKABLE bool setDeckLanguage(const QString &language);
+    Q_INVOKABLE bool setSmartPunctuation(bool on);
+    Q_INVOKABLE bool teachWord(const QString &word);
+    Q_INVOKABLE bool forgetWord(const QString &word);
+    Q_INVOKABLE bool takeTextOffPath();
     Q_INVOKABLE void addRect();
     Q_INVOKABLE QString setObjectLink(int kind, const QString &target);
     Q_INVOKABLE void editSelectedLink() { if(hasSelection()) emit linkEditorRequested(); }

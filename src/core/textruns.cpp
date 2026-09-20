@@ -15,7 +15,7 @@ bool sameLook(const TextRun &a, const TextRun &b) {
 bool blank(const TextRun &run) {
     return run.weight == 0 && run.italic == 0 && run.underline == 0 && run.strike == 0 &&
            run.baseline == 0 && run.fontSize <= 0 && run.fontFamily.isEmpty() &&
-           !run.color.isValid();
+           !run.color.isValid() && run.language.isEmpty();
 }
 
 } // namespace
@@ -64,7 +64,7 @@ bool TextRuns::apply(SceneObject &object, int start, int end, const QString &key
     end = qBound(0, end, length);
     if (start >= end) return false;
     static const QStringList keys{"weight", "italic", "underline", "strike",
-                                  "baseline", "fontSize", "fontFamily", "color"};
+                                  "baseline", "fontSize", "fontFamily", "color", "language"};
     if (!keys.contains(key)) return false;
 
     // Work per character, then put the stretches back together.
@@ -87,6 +87,9 @@ bool TextRuns::apply(SceneObject &object, int start, int end, const QString &key
             } else if (key == "fontFamily") {
                 if (value.toString().size() > 120) return false;
                 run.fontFamily = value.toString();
+            } else if (key == "language") {
+                if (value.toString().size() > 32) return false;
+                run.language = value.toString();
             } else if (key == "color") {
                 const QColor color(value.toString());
                 if (!value.toString().isEmpty() && !color.isValid()) return false;
@@ -157,7 +160,8 @@ QVariantList TextRuns::encode(const QVector<TextRun> &runs) {
                                 {"baseline", run.baseline}, {"fontSize", run.fontSize},
                                 {"fontFamily", run.fontFamily},
                                 {"color", run.color.isValid() ? run.color.name(QColor::HexArgb)
-                                                              : QString()}});
+                                                              : QString()},
+                                {"language", run.language}});
     return rows;
 }
 
@@ -168,7 +172,8 @@ bool TextRuns::decode(const QVariant &value, QVector<TextRun> &runs) {
         if (row.metaType().id() != QMetaType::QVariantMap) return false;
         const auto map = row.toMap();
         static const QSet<QString> known{"start", "length", "weight", "italic", "underline",
-                                         "strike", "baseline", "fontSize", "fontFamily", "color"};
+                                         "strike", "baseline", "fontSize", "fontFamily", "color",
+                                         "language"};
         for (auto it = map.cbegin(); it != map.cend(); ++it)
             if (!known.contains(it.key())) return false;
         TextRun run;
@@ -196,6 +201,8 @@ bool TextRuns::decode(const QVariant &value, QVector<TextRun> &runs) {
             run.color = QColor(colour);
             if (!run.color.isValid()) return false;
         }
+        run.language = map.value("language").toString();
+        if (run.language.size() > 32) return false;
         parsed.append(run);
     }
     runs = parsed;

@@ -43,6 +43,7 @@ SceneObject objectFromJson(const QJsonObject &json) {
     object.type = type == "text" ? ObjectType::Text : type == "image" ? ObjectType::Image : type == "rect" ? ObjectType::Rect : type == "media" ? ObjectType::Media : type == "table" ? ObjectType::Table : type == "chart" ? ObjectType::Chart : ObjectType(-1);
     const auto known=Design::properties(object);
     const QSet<QString> structural={"id","type","placeholderId","textStyleId","groups","overrides","runs"};
+    // (language is an ordinary property: it goes through setProperty.)
     for (auto it = json.begin(); it != json.end(); ++it) {
         if(structural.contains(it.key())) continue;
         if(!known.contains(it.key()) || !Design::setProperty(object,it.key(),it.value().toVariant(),false)) object.type=ObjectType(-1);
@@ -247,6 +248,11 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     manifest[QStringLiteral("height")] = document.size.height();
     manifest[QStringLiteral("transitionDuration")] = document.transitionDuration;
     manifest[QStringLiteral("transition")] = document.transition;
+    manifest[QStringLiteral("language")] = document.language;
+    manifest[QStringLiteral("smartPunctuation")] = document.smartPunctuation;
+    QJsonArray taught;
+    for (const auto &word : document.knownWords) taught.append(word);
+    manifest[QStringLiteral("knownWords")] = taught;
 
     QJsonArray order;
     for (const Slide &slide : document.slides)
@@ -371,6 +377,19 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
     document.transitionDuration =
         manifest.value(QStringLiteral("transitionDuration")).toDouble(0.9);
     document.transition = manifest.value(QStringLiteral("transition")).toInt(3);
+    document.language = manifest.value(QStringLiteral("language")).toString();
+    if (document.language.size() > 32) {
+        result.error = QStringLiteral("The deck names an impossible language."); return result;
+    }
+    document.smartPunctuation =
+        manifest.value(QStringLiteral("smartPunctuation")).toBool(true);
+    for (const auto &value : manifest.value(QStringLiteral("knownWords")).toArray()) {
+        const auto word = value.toString();
+        if (word.isEmpty() || word.size() > 120 || document.knownWords.contains(word)) {
+            result.error = QStringLiteral("The deck's own words are damaged."); return result;
+        }
+        document.knownWords.append(word);
+    }
     if (!std::isfinite(document.transitionDuration) || document.transitionDuration < 0 ||
         document.transitionDuration > 10 || document.transition < 0 || document.transition > 3) {
         result.error = QStringLiteral("The deck has an invalid transition."); return result;

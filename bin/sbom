@@ -52,7 +52,7 @@ licence() {
     echo "| Package | Version | Licence |"
     echo "| --- | --- | --- |"
     for package in qt6-base qt6-declarative qt6-svg qt6-multimedia qt6-shadertools \
-                   ffmpeg zlib glibc gcc-libs mesa; do
+                   ffmpeg zlib hunspell glibc gcc-libs mesa; do
         printf '| %s | %s | %s |\n' "$package" "$(version "$package")" "$(licence "$package")"
     done
     echo
@@ -68,6 +68,9 @@ licence() {
     echo "| --- | --- | --- |"
     echo "| ffmpeg | $(ffmpeg -version 2>/dev/null | head -1 | cut -d' ' -f3) | film export and media compression |"
     echo "| xdg-desktop-portal | $(version xdg-desktop-portal) | file choosers |"
+    echo
+    echo "Spelling dictionaries are not shipped either: OmaShow reads whichever"
+    echo "Hunspell dictionaries are installed, and says so when there are none."
     echo
     echo "Third-party notices are in \`THIRD-PARTY-NOTICES.md\`. Typefaces are not"
     echo "shipped or packaged: a deck names the families it asks for, and a package"

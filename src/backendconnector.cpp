@@ -47,6 +47,52 @@ bool Backend::connectSelected(int route) {
   touch();
   return true;
 }
+// One text box and one shape: the words leave their box and follow the shape's
+// outline. The text takes a copy of the path, so it can be reshaped afterwards
+// with the ordinary node tools, and the shape itself is left exactly where it
+// is — hide it or delete it if only the words should show.
+bool Backend::putTextOnShape() {
+  const auto ids = selectedIds();
+  if (ids.size() != 2) return false;
+  const auto slide = Design::resolve(m_document, m_currentSlide);
+  const auto *first = slide.find(ids[0]), *second = slide.find(ids[1]);
+  if (!first || !second) return false;
+  const SceneObject *words = first->type == ObjectType::Text    ? first
+                             : second->type == ObjectType::Text ? second
+                                                                : nullptr;
+  const SceneObject *shape = words == first ? second : first;
+  if (!words || shape->type != ObjectType::Rect || shape->connector) return false;
+  const auto outline = Shape::worldPath(*shape);
+  if (outline.isEmpty()) return false;
+  m_history.begin(m_document, tr("Put the text on a shape"));
+  auto *target = m_document.slides[m_currentSlide].find(words->id);
+  if (!target) { m_history.abandon(); return false; }
+  if (!Shape::assignPath(*target, outline)) { m_history.abandon(); return false; }
+  target->textKind = 2;
+  target->rotation = 0;   // the path already carries where the shape was turned
+  for (const auto &key : {"textKind", "shapeKind", "pathData", "pathWinding",
+                          "x", "y", "w", "h", "rotation"})
+    Design::markOverride(*target, QString::fromLatin1(key));
+  m_history.commit();
+  m_selectedId = words->id;
+  m_selectedIds = {words->id};
+  touch();
+  return true;
+}
+bool Backend::takeTextOffPath() {
+  const auto ids = selectedIds();
+  if (ids.size() != 1) return false;
+  const auto *shown = Design::resolve(m_document, m_currentSlide).find(ids.first());
+  if (!shown || shown->textKind != 2) return false;
+  m_history.begin(m_document, tr("Take the text off the path"));
+  auto *target = m_document.slides[m_currentSlide].find(ids.first());
+  if (!target) { m_history.abandon(); return false; }
+  target->textKind = 0;
+  Design::markOverride(*target, QStringLiteral("textKind"));
+  m_history.commit();
+  touch();
+  return true;
+}
 void Backend::attachConnector(bool start, const QString &target, int side) {
   if (selectionCount() != 1)
     return;

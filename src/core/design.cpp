@@ -59,6 +59,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"lineHeight",o.lineHeight},{"paragraphSpacing",o.paragraphSpacing},{"textIndent",o.textIndent},
             {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},{"textKind",o.textKind},
             {"tabStop",o.tabStop},{"columns",o.columns},{"columnGap",o.columnGap},{"direction",o.direction},
+            {"language",o.language},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
             {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
             {"altTitle", o.altTitle}, {"altText", o.altText}, {"runs", TextRuns::encode(o.runs)},
@@ -179,7 +180,8 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),8);
     else if (key == "listStart") o.listStart = qBound(1,v.toInt(),9999);
     else if (key == "textFit") o.textFit = qBound(0,v.toInt(),1);
-    else if (key == "textKind") o.textKind = qBound(0,v.toInt(),1);
+    else if (key == "textKind") o.textKind = qBound(0,v.toInt(),2);
+    else if (key == "language") { if(v.toString().size()>32) return false; o.language = v.toString(); }
     else if (key == "tabStop") o.tabStop = qBound(0.0,n,4000.0);
     else if (key == "columns") o.columns = qBound(1,v.toInt(),6);
     else if (key == "columnGap") o.columnGap = qBound(0.0,n,4000.0);

@@ -247,6 +247,9 @@ ApplicationWindow {
             { group: qsTr("Slides"), name: qsTr("Skip this slide in the show"), also: "hide omit", enabled: !backend.startVisible, run: () => backend.setSlidesSkipped(true) },
             { group: qsTr("Slides"), name: qsTr("Change the slide size"), also: "aspect ratio widescreen portrait", enabled: !backend.startVisible, run: () => slideSizeDialog.open() },
             { group: qsTr("Insert"), name: qsTr("Text"), also: "words box type", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addText() } },
+            { group: qsTr("Format"), name: qsTr("Smart punctuation"), also: "quotes dashes ellipsis curly", run: () => backend.setSmartPunctuation(!backend.smartPunctuation) },
+            { group: qsTr("Review"), name: qsTr("Check the spelling"), also: "dictionary language words typo", run: () => { win.workspace = 3 } },
+            { group: qsTr("Arrange"), name: qsTr("Put the text on a shape"), also: "along path curve circle words", enabled: backend.selectionCount === 2, run: () => { win.workspace = 0; backend.putTextOnShape() } },
             { group: qsTr("Insert"), name: qsTr("An equation"), also: "maths math formula latex fraction", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addEquation() } },
             { group: qsTr("Insert"), name: qsTr("A shape"), also: "rectangle circle arrow", enabled: !backend.startVisible, run: () => { win.workspace = 0; shapeGallery.open() } },
             { group: qsTr("Insert"), name: qsTr("A picture"), also: "image photo png", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertImageDialog() } },
@@ -461,6 +464,33 @@ ApplicationWindow {
                         MenuItem { text: qsTr("Link or action…"); icon.name: "link"; enabled: backend.hasSelection; onTriggered: linkDialog.show() }
                         MenuItem { text: qsTr("Combine shapes…"); enabled: backend.selectionCount > 1; onTriggered: { win.commitEditors(); combineShapesDialog.open() } }
                         MenuItem { text: qsTr("Themes and layouts"); icon.name: "palette"; onTriggered: { win.commitEditors(); win.workspace = 1 } }
+                        MenuSeparator {}
+                        MenuItem {
+                            objectName: "smartPunctuationItem"
+                            text: qsTr("Smart punctuation")
+                            checkable: true; checked: backend.smartPunctuation
+                            onTriggered: backend.setSmartPunctuation(!backend.smartPunctuation)
+                        }
+                        Menu {
+                            objectName: "deckLanguageMenu"
+                            title: qsTr("The deck is written in")
+                            Repeater {
+                                model: backend.spellingLanguages()
+                                MenuItem {
+                                    required property string modelData
+                                    text: modelData
+                                    checkable: true
+                                    checked: backend.deckLanguage === modelData
+                                    onTriggered: backend.setDeckLanguage(modelData)
+                                }
+                            }
+                            MenuItem {
+                                objectName: "noDictionaries"
+                                enabled: false
+                                visible: backend.spellingLanguages().length === 0
+                                text: qsTr("No dictionaries are installed")
+                            }
+                        }
                     }
                     Menu {
                         title: qsTr("Arrange")
@@ -712,6 +742,8 @@ ApplicationWindow {
                     MenuItem { objectName: "objectLinkAction"; text: qsTr("Link or action…"); icon.name: "link"; enabled: backend.hasSelection; onTriggered: linkDialog.show() }
                     MenuItem { objectName: "connectObjectsAction"; text: qsTr("Connect objects"); icon.name: "spline"; enabled: backend.selectionCount===2; onTriggered: backend.connectSelected() }
                     MenuItem { objectName: "combineShapesAction"; text: qsTr("Combine shapes…"); enabled: backend.selectionCount>1; onTriggered: { win.commitEditors(); combineShapesDialog.open() } }
+                    MenuItem { objectName: "textOnShapeAction"; text: qsTr("Put the text on this shape"); icon.name: "spline"
+                               enabled: backend.selectionCount===2; onTriggered: { win.commitEditors(); backend.putTextOnShape() } }
                     MenuSeparator {}
                     MenuItem { objectName: "slideSizeAction"; text: qsTr("Slide size…"); icon.name: "scan"; onTriggered: { win.commitEditors(); slideSizeDialog.show() } }
                 }

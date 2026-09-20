@@ -4,6 +4,8 @@
 #include "core/edit.h"
 #include "render/textlayout.h"
 #include "render/mathlayout.h"
+#include "core/spelling.h"
+#include <QLocale>
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QSet>
@@ -57,6 +59,25 @@ QString nameFor(const SceneObject &o) {
 }
 
 using Review::needsDescription;
+
+// A box is written in one language unless a stretch of it says otherwise.
+struct Stretch {
+    QString words;
+    QString language;
+};
+QVector<Stretch> languageStretches(const Document &d, const SceneObject &o) {
+    const auto boxLanguage = Review::language(d, &o);
+    QVector<Stretch> stretches;
+    int at = 0;
+    for (const auto &run : o.runs) {
+        if (run.language.isEmpty()) continue;
+        if (run.start > at) stretches.append({o.text.mid(at, run.start - at), boxLanguage});
+        stretches.append({o.text.mid(run.start, run.length), run.language});
+        at = run.start + run.length;
+    }
+    if (at < o.text.size()) stretches.append({o.text.mid(at), boxLanguage});
+    return stretches;
+}
 
 int wordsIn(const QString &text) {
     return text.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts).size();
@@ -310,14 +331,23 @@ bool Review::resetReading(Document &d, int index) {
     return true;
 }
 
+QString Review::language(const Document &d, const SceneObject *object) {
+    if (object && !object->language.isEmpty()) return object->language;
+    if (!d.language.isEmpty()) return d.language;
+    return QLocale::system().name();
+}
+
 QVariantList Review::issues(const Document &d) {
     QVariantList rows;
+    QSet<QString> spelt;
     const auto add = [&](const QString &key, int slide, const QString &slideId,
                          const QString &objectId, const QString &severity,
-                         const QString &check, const QString &title, const QString &detail) {
+                         const QString &check, const QString &title, const QString &detail,
+                         const QString &word = QString()) {
         rows.append(QVariantMap{{"key", key}, {"slide", slide}, {"slideId", slideId},
                                 {"objectId", objectId}, {"severity", severity},
                                 {"check", check}, {"title", title}, {"detail", detail},
+                                {"word", word},
                                 {"dismissed", d.dismissedIssues.contains(key)}});
     };
     const qreal scale = d.size.height() / 1080.0;
@@ -374,6 +404,31 @@ QVariantList Review::issues(const Document &d) {
                             nameFor(o) + " is not read as maths",
                             equation.error + QStringLiteral(" Until then the box shows what was "
                                                             "typed, as ordinary text."));
+                }
+                // Spelling, in whatever the box says it is written in. One
+                // finding per word, wherever it first appears: fixing it once
+                // is usually fixing it everywhere.
+                if (o.textKind != 1 && authoredHere) {
+                    for (const auto &stretch : languageStretches(d, o)) {
+                        if (!Spelling::available(stretch.language)) continue;
+                        for (const auto &word :
+                             Spelling::check(stretch.words, stretch.language, d.knownWords)) {
+                            const auto key = QStringLiteral("spelling/") + word.word.toCaseFolded();
+                            if (spelt.contains(key)) continue;
+                            spelt.insert(key);
+                            const auto offered =
+                                Spelling::suggest(word.word, stretch.language, 4);
+                            add(key, i, authored.id, o.id, "info", "spelling",
+                                QStringLiteral("\u201c%1\u201d is not in the %2 dictionary")
+                                    .arg(word.word, stretch.language),
+                                offered.isEmpty()
+                                    ? QStringLiteral("Nothing close was suggested. Teach the deck "
+                                                     "this word if it is right.")
+                                    : QStringLiteral("Perhaps %1. Teach the deck this word if it "
+                                                     "is right.").arg(offered.join(", ")),
+                                word.word);
+                        }
+                    }
                 }
                 if (TextLayout::measure(o).overflow && o.textFit == 0)
                     add("overflow/" + o.id, i, authored.id, o.id, "should", "overflow",

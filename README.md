@@ -39,6 +39,18 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   tabs, columns and direction, but never the words. Update the style and every
   box following it changes, except where a box was given its own value, which
   stays. Unlinking keeps the look the box had.
+- **Words on a path:** select a text box and a shape, and Arrange ▸ "Put the
+  text on this shape" hands the words the shape's outline. The text keeps its own
+  copy of the line, so it can be reshaped with the ordinary node tools, and the
+  shape stays where it is. Align decides where the words start along the line and
+  which side of it they sit on.
+- **Language and spelling:** a deck says what it is written in, and a box or a
+  stretch of text can say something else. Spelling is checked against the
+  Hunspell dictionaries already installed — none are shipped — and a word the
+  dictionary does not know becomes a finding in Review with what it would suggest
+  instead. A word the deck should know is taught to the deck, so it travels with
+  the file rather than living on one computer. Straight quotes, double hyphens and
+  three full stops become the marks that were meant, and that can be turned off.
 - **Equations:** a text box can hold maths instead of words, written the way it
   is written by hand — `^` and `_`, `\frac`, `\sqrt`, `\sum`, `\int`, `\lim`,
   Greek letters, brackets that grow with what is inside them, accents and
@@ -220,13 +232,20 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
   says so — advice, not a lock.
 
+Other writing systems are laid out by the same text engine: right to left, both
+directions in one box, combining marks and CJK are shaped by the system's own
+fonts, and a word composed through an input method reaches the deck only once it
+is settled.
+
 Screen recording is not here: capturing the screen on Wayland needs the
 desktop's own permission dialog, and it is not worth shipping a recorder whose
 permission, consent and recovery behaviour has not been through a real session.
 Interchange with other applications and other release features remain on the
-roadmap. Spell-checking and text on a path are not built yet.
-Shapes from other applications' plug-ins cannot arrive, because nothing is
-imported from them. Exported PDFs carry real text but not clickable link annotations. Notes are
+roadmap. Shapes from other applications' plug-ins cannot arrive, because nothing
+is imported from them. Embedding a typeface in a deck is not offered either: a
+licence to use a typeface on this computer is rarely a licence to send it to
+someone else, so a package says which typefaces a deck asks for instead of
+carrying them. Exported PDFs carry real text but not clickable link annotations. Notes are
 plain text, and reading order is not yet carried into exported PDF.
 
 ## Shared design and time

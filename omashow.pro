@@ -107,6 +107,11 @@ SOURCES += src/core/imagecrop.cpp
 QT += multimedia concurrent printsupport
 CONFIG += link_pkgconfig
 PKGCONFIG += libavformat libavcodec libavutil libswscale
+PKGCONFIG += hunspell
+HEADERS += src/core/spelling.h
+SOURCES += src/core/spelling.cpp
+HEADERS += src/core/punctuation.h
+SOURCES += src/core/punctuation.cpp
 HEADERS += src/core/mediaasset.h
 SOURCES += src/core/mediaasset.cpp
 

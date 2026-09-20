@@ -200,6 +200,13 @@ RowLayout {
                                     Button { objectName: "issueGo" + index; flat: true; text: qsTr("Show me")
                                              onClicked: backend.goToIssue(modelData.key) }
                                     Button {
+                                        objectName: "issueTeach" + index
+                                        flat: true
+                                        visible: modelData.check === "spelling"
+                                        text: qsTr("Teach the deck this word")
+                                        onClicked: backend.teachWord(modelData.word ?? "")
+                                    }
+                                    Button {
                                         objectName: "issueDismiss" + index
                                         flat: true
                                         text: modelData.dismissed ? qsTr("Raise it again") : qsTr("Not a problem")

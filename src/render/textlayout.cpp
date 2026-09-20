@@ -9,7 +9,9 @@
 #include <QCache>
 #include "core/textruns.h"
 #include "render/mathlayout.h"
+#include "core/shape.h"
 #include <QDataStream>
+#include <cmath>
 #include <memory>
 namespace {
 QFont fontFor(const SceneObject &o, qreal size) {
@@ -49,12 +51,92 @@ QTextListFormat::Style listStyleFor(int style, int level) {
 }
 bool numbered(int style) { return style == 2 || style >= 5; }
 bool maths(const SceneObject &o) { return o.textKind == 1; }
+bool onPath(const SceneObject &o) { return o.textKind == 2 && !o.pathData.isEmpty(); }
+
+// The words, laid along a line that bends. Each letter sits on the path at its
+// own angle, so the shape of the line is what the reader follows.
+struct PathRun {
+    QPointF where;
+    qreal angle = 0;
+    QString letter;
+};
+struct PathText {
+    QVector<PathRun> letters;
+    qreal wanted = 0;    // how much room the words asked for
+    qreal length = 0;    // how much the path has
+    qreal height = 0;
+    qreal lift = 0;      // across the line, not down the page
+};
+// A closed line has no beginning, so give it one people expect: the top, read
+// left to right. An open line is read the way it was drawn.
+qreal startOfClosedPath(QPainterPath &path, bool *closed) {
+    *closed = false;
+    if (path.elementCount() < 2) return 0;
+    const auto first = path.pointAtPercent(0), last = path.pointAtPercent(1);
+    if (QLineF(first, last).length() > qMax(1.0, path.boundingRect().width() * .01)) return 0;
+    *closed = true;
+    const int samples = 360;
+    const auto topmost = [&](const QPainterPath &candidate) {
+        int best = 0;
+        for (int i = 1; i < samples; ++i)
+            if (candidate.pointAtPercent(qreal(i) / samples).y() <
+                candidate.pointAtPercent(qreal(best) / samples).y())
+                best = i;
+        return best;
+    };
+    int top = topmost(path);
+    // Going forward from the top, the words should travel to the right.
+    const auto after = path.pointAtPercent(qreal((top + samples / 36) % samples) / samples);
+    if (after.x() < path.pointAtPercent(qreal(top) / samples).x()) {
+        path = path.toReversed();
+        top = topmost(path);
+    }
+    return path.length() * qreal(top) / samples;
+}
+PathText alongPath(const SceneObject &o, qreal size) {
+    PathText laid;
+    QPainterPath path = Shape::path(o);
+    laid.length = path.length();
+    if (laid.length <= 0) return laid;
+    bool closed = false;
+    const qreal begin = startOfClosedPath(path, &closed);
+    const QFont font = fontFor(o, size);
+    const QFontMetricsF metrics(font);
+    laid.height = metrics.height();
+    const QString words = (o.uppercase ? o.text.toUpper() : o.text).simplified();
+    for (const QChar &letter : words) laid.wanted += metrics.horizontalAdvance(letter);
+    // Where the words start is the box's own alignment, read along the line. A
+    // closed line is aligned about its top rather than about an end it has not
+    // got, so centred words sit at the top the way they are asked to.
+    const qreal spare = laid.length - laid.wanted;
+    qreal at = closed ? (o.textAlign == 1   ? -laid.wanted / 2
+                         : o.textAlign == 2 ? -laid.wanted
+                                            : 0)
+                      : (o.textAlign == 1   ? qMax(0.0, spare / 2)
+                         : o.textAlign == 2 ? qMax(0.0, spare)
+                                            : 0);
+    // And which side of the line they sit on is its vertical alignment.
+    laid.lift = o.verticalAlign == 0 ? -metrics.descent()
+              : o.verticalAlign == 2 ? metrics.ascent() : 0;
+    for (const QChar &letter : words) {
+        const qreal advance = metrics.horizontalAdvance(letter);
+        const qreal centre = at + advance / 2;
+        at += advance;
+        if (!closed && centre > laid.length) break;
+        const qreal along = std::fmod(std::fmod(centre + begin, laid.length) + laid.length,
+                                      laid.length);
+        const qreal percent = path.percentAtLength(along);
+        laid.letters.append({path.pointAtPercent(percent), path.angleAtPercent(percent),
+                             QString(letter)});
+    }
+    return laid;
+}
 // An equation drawn from the words that made it, at the box's own type size.
 MathLayout::Rendered equation(const SceneObject &o, qreal size) {
     return MathLayout::build(o.text, fontFor(o, size), size, o.textAlign);
 }
 bool legacy(const SceneObject &o) {
-    return !maths(o) && o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
+    return !maths(o) && !onPath(o) && o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
            o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0 &&
            o.tabStop == 0 && o.columns <= 1 && o.direction == 0;
 }
@@ -184,6 +266,12 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     return doc;
 }
 QSizeF contentSize(const SceneObject &o, qreal size) {
+    if (onPath(o)) {
+        const auto laid = alongPath(o, size);
+        // Along a path, running out of room is running off the end of the line.
+        return QSizeF(laid.wanted > laid.length ? o.rect.width() + 1 : o.rect.width(),
+                      laid.height);
+    }
     if (maths(o)) {
         const auto rendered = equation(o, size);
         // What could not be read is drawn as the words it was typed as, so the
@@ -247,6 +335,25 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     return m;
 }
 void TextLayout::paint(QPainter &painter, const SceneObject &o) {
+    if (onPath(o)) {
+        const auto metrics = measure(o);
+        const auto laid = alongPath(o, metrics.effectiveSize);
+        painter.save();
+        painter.setPen(o.textColor);
+        painter.setFont(fontFor(o, metrics.effectiveSize));
+        for (const auto &letter : laid.letters) {
+            painter.save();
+            painter.translate(letter.where);
+            painter.rotate(-letter.angle);
+            painter.drawText(QPointF(-QFontMetricsF(painter.font())
+                                          .horizontalAdvance(letter.letter) / 2,
+                                      laid.lift),
+                             letter.letter);
+            painter.restore();
+        }
+        painter.restore();
+        return;
+    }
     if (maths(o)) {
         const auto metrics = measure(o);
         const auto rendered = equation(o, metrics.effectiveSize);
@@ -311,7 +418,7 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
 QString TextLayout::editorHtml(const SceneObject &object) {
     auto content = object;
     content.uppercase = false;
-    // An equation is edited as what was typed, not as what it draws.
+    // An equation, or words on a path, are edited as what was typed.
     content.textKind = 0;
     return layout(content, measure(object).effectiveSize)->toHtml();
 }

@@ -44,7 +44,10 @@ namespace Bundle {
 // Format 20 adds text boxes whose content is an equation.
 // Format 21 adds the rest of the list markers: circles, squares, letters and
 // roman numerals.
-constexpr int kFormatVersion = 21;
+// Format 22 adds text that follows a path.
+// Format 23 adds the language a deck, a box or a stretch of text is written in,
+// the words the deck has been taught, and whether it smartens punctuation.
+constexpr int kFormatVersion = 23;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

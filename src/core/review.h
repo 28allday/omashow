@@ -45,6 +45,8 @@ QVariantList issues(const Document &document);
 // Whether a thing on a slide is the kind that has to be described for someone
 // who cannot see it. Cheap, so the slide list can say so too.
 bool needsDescription(const SceneObject &object);
+// What a box is written in: its own language, or the deck's, or the computer's.
+QString language(const Document &document, const SceneObject *object = nullptr);
 bool dismiss(Document &document, const QString &key, bool dismissed);
 // A plain-text report of the findings given, for sending to someone else.
 QByteArray report(const Document &document, const QVariantList &issues,

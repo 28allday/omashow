@@ -1,5 +1,6 @@
 #include "backend.h"
 #include "core/textruns.h"
+#include "core/punctuation.h"
 #include "core/mediaasset.h"
 #include "core/arrange.h"
 #include "core/design.h"
@@ -264,11 +265,18 @@ void Backend::nudgeSelected(qreal dx, qreal dy) {
   m_history.commit();
   touch();
 }
-void Backend::setSelectedProperty(const QString &key, const QVariant &value) {
+void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   if(key.startsWith("media")) return; // Media changes must keep the cue and source consistent.
   const auto ids = selectedIds();
   if (ids.isEmpty())
     return;
+  // The marks people mean rather than the ones on the keyboard, settled before
+  // anything is compared so retyping a straight quote is not an edit.
+  QVariant value = given;
+  if (key == QLatin1String("text") && m_document.smartPunctuation) {
+    const auto *first = m_document.slides.at(m_currentSlide).find(ids.first());
+    if (!first || first->textKind != 1) value = Punctuation::smarten(given.toString());
+  }
   if(ids.size()==1 && m_document.slides.at(m_currentSlide).find(ids.first())->connector && QStringList{"x","y","w","h","rotation","shapeKind","pathData"}.contains(key)) return;
   if (ids.size() > 1 &&
       (key == "x" || key == "y" || key == "w" || key == "h")) {
@@ -307,8 +315,12 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &value) {
   for (const auto &id : ids)
     if (auto *o = m_document.slides[m_currentSlide].find(id)) {
       // Rewriting the words takes their looks along with the letters.
-      if (key == QLatin1String("text") && o->type == ObjectType::Text)
+      if (key == QLatin1String("text") && o->type == ObjectType::Text) {
         o->runs = TextRuns::afterEdit(o->runs, o->text, value.toString());
+        Design::setProperty(*o, QStringLiteral("text"), value);
+        Design::markOverride(*o, QStringLiteral("text"));
+        continue;
+      }
       Design::setProperty(*o, propertyKey(*o), value);
       Design::markOverride(*o, propertyKey(*o));
     }
@@ -519,7 +531,9 @@ void Backend::commitTextDocument(const QString &slideId,const QString &id,QQuick
     if(authored->listStyle && block.textList()) prefix=QString(qMax(0,block.textList()->format().indent()-1),'\t');
     paragraphs.append(prefix+QString(block.text()).replace(QChar(0x2028),QChar('\n')));
   }
-  const auto text=paragraphs.join('\n');
+  auto text=paragraphs.join('\n');
+  // The marks people mean, settled when the words are, not under the cursor.
+  if(m_document.smartPunctuation && authored->textKind!=1) text=Punctuation::smarten(text);
   if(text==authored->text) return;
   m_history.begin(m_document,tr("Edit text"));
   auto *object=m_document.slides[index].find(id);
@@ -578,6 +592,7 @@ QVariantMap Backend::textSelection() const {
   qreal size = object->fontSize;
   QString family = object->fontFamily;
   QColor colour = object->textColor;
+  QString language = object->language;
   QStringList mixed;
   bool first = true;
   for (int i = start; i < end; ++i) {
@@ -591,10 +606,12 @@ QVariantMap Backend::textSelection() const {
     const QString thisFamily = run && !run->fontFamily.isEmpty() ? run->fontFamily
                                                                  : object->fontFamily;
     const QColor thisColour = run && run->color.isValid() ? run->color : object->textColor;
+    const QString thisLanguage = run && !run->language.isEmpty() ? run->language
+                                                                 : object->language;
     if (first) {
       weight = thisWeight; italic = thisItalic; underline = thisUnderline;
       strike = thisStrike; baseline = thisBaseline; size = thisSize;
-      family = thisFamily; colour = thisColour;
+      family = thisFamily; colour = thisColour; language = thisLanguage;
       first = false;
       continue;
     }
@@ -609,6 +626,7 @@ QVariantMap Backend::textSelection() const {
     if (!qFuzzyCompare(thisSize + 1, size + 1)) disagree("fontSize");
     if (thisFamily != family) disagree("fontFamily");
     if (thisColour != colour) disagree("color");
+    if (thisLanguage != language) disagree("language");
   }
   values["weight"] = weight;
   values["italic"] = italic;
@@ -618,6 +636,7 @@ QVariantMap Backend::textSelection() const {
   values["fontSize"] = size;
   values["fontFamily"] = family;
   values["color"] = colour.name(QColor::HexArgb);
+  values["language"] = language;
   values["mixed"] = mixed;
   return values;
 }

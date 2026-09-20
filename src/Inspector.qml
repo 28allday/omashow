@@ -341,10 +341,33 @@ Rectangle {
                     objectName: "textKind"
                     Layout.fillWidth: true
                     Layout.minimumWidth: Theme.s5 * 5
-                    model: [qsTr("Words"), qsTr("An equation")]
+                    // Along a path is not something to choose here: it needs a
+                    // shape to follow, so it arrives through Arrange.
+                    model: [qsTr("Words"), qsTr("An equation"), qsTr("Along a path")]
                     currentIndex: root.sel.textKind ?? 0
+                    delegate: ItemDelegate {
+                        required property int index
+                        required property string modelData
+                        width: parent.width
+                        text: modelData
+                        enabled: index < 2 || (root.sel.textKind ?? 0) === 2
+                        highlighted: ListView.isCurrentItem
+                    }
                     onActivated: backend.setSelectedProperty("textKind", currentIndex)
                 }
+            }
+            Button {
+                objectName: "takeTextOffPath"
+                Layout.fillWidth: true
+                visible: (root.sel.textKind ?? 0) === 2
+                text: qsTr("Take the words off the path")
+                onClicked: backend.takeTextOffPath()
+            }
+            Label {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                font.pixelSize: Theme.fsLabel
+                visible: (root.sel.textKind ?? 0) === 2
+                text: qsTr("Align decides where the words start along the line, and the up-and-down alignment which side of it they sit on. Edit the line itself with the node tools.")
             }
             Button {
                 objectName: "equationHelp"
@@ -460,6 +483,36 @@ Rectangle {
                 text: (root.range.mixed ?? []).length > 0
                       ? qsTr("The selected text is not all the same. Changing something here settles it.")
                       : qsTr("These apply to the selected text, not the whole box.")
+            }
+            FieldRow {
+                label: qsTr("Language")
+                ComboBox {
+                    objectName: "textLanguage"
+                    Layout.fillWidth: true
+                    editable: true
+                    model: [qsTr("Follow the deck")].concat(backend.spellingLanguages())
+                    // A stretch of text can be in another language; with nothing
+                    // selected it is the whole box.
+                    displayText: {
+                        const chosen = root.range.active ? (root.range.language ?? "")
+                                                         : (root.sel.language ?? "")
+                        return chosen.length > 0 ? chosen : qsTr("Follow the deck")
+                    }
+                    onActivated: {
+                        const chosen = currentIndex === 0 ? "" : currentText
+                        root.range.active ? backend.formatSelection("language", chosen)
+                                          : backend.setSelectedProperty("language", chosen)
+                    }
+                    onAccepted: root.range.active ? backend.formatSelection("language", editText)
+                                                  : backend.setSelectedProperty("language", editText)
+                }
+            }
+            Label {
+                objectName: "spellingNote"
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted
+                font.pixelSize: Theme.fsLabel
+                visible: !backend.spellingAvailable
+                text: qsTr("No dictionary for %1 is installed, so spelling is not checked. Review says the same.").arg(backend.deckLanguage)
             }
             FieldRow {
                 label: qsTr("Tab stop")
