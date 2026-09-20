@@ -100,8 +100,11 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   film, with what each would give back. Removing the ones you pick is one undo
   step and never changes what a slide looks like.
 - **Animate:** builds in and out — fade, rise, move from an offset, scale, spin,
-  an emphasis that swells and settles in place, and text that arrives a
-  paragraph, a word or a character at a time. Individual or selected objects
+  an emphasis that swells and settles in place, text that arrives a paragraph,
+  a word or a character at a time, and travel along a path. A path is any shape
+  or pen drawing on the same slide: draw the route, hide it, and the object
+  follows it — editing its nodes changes the motion, and the object still lands
+  where you placed it. It can travel the other way, and turn as it goes. Individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
 - **Transitions:** cut, fade, push (in any of four directions) or morph, chosen

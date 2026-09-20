@@ -332,8 +332,8 @@ RowLayout {
                         ComboBox {
                             objectName: "buildEffect"
                             Layout.fillWidth: true
-                            property var effects: [1,2,4,5,6,7,8]
-                            model: [qsTr("Fade"),qsTr("Rise"),qsTr("Move"),qsTr("Scale"),qsTr("Spin"),qsTr("Emphasis"),qsTr("Reveal text")]
+                            property var effects: [1,2,4,5,6,7,8,9]
+                            model: [qsTr("Fade"),qsTr("Rise"),qsTr("Move"),qsTr("Scale"),qsTr("Spin"),qsTr("Emphasis"),qsTr("Reveal text"),qsTr("Along a path")]
                             currentIndex: Math.max(0,effects.indexOf(root.build.effect ?? 1))
                             onActivated: root.update("effect",effects[currentIndex])
                         }
@@ -362,6 +362,41 @@ RowLayout {
                             value: root.build.amount || (root.build.effect===5 ? .5 : root.build.effect===6 ? 180 : .15)
                             onCommitted: v => root.update("amount",v)
                         }
+                    }
+                    FieldRow {
+                        label: qsTr("Follows")
+                        visible: root.build.effect===9
+                        ComboBox {
+                            objectName: "buildPath"
+                            Layout.fillWidth: true
+                            textRole: "name"
+                            valueRole: "id"
+                            // Any other object on the slide can be the guide; a
+                            // drawn path hidden in Edit is the usual one.
+                            model: [{ id: "", name: qsTr("Choose a shape or path…") }]
+                                   .concat(backend.slideObjects.filter(o => o.id !== root.build.targetId))
+                            currentIndex: Math.max(0, model.findIndex(o => o.id === (root.build.pathId ?? "")))
+                            onActivated: root.update("pathId", currentValue)
+                        }
+                    }
+                    CheckBox {
+                        objectName: "buildPathReverse"
+                        visible: root.build.effect===9
+                        text: qsTr("Travel the other way")
+                        checked: root.build.pathReverse ?? false
+                        onToggled: root.update("pathReverse", checked)
+                    }
+                    CheckBox {
+                        objectName: "buildPathOrient"
+                        visible: root.build.effect===9
+                        text: qsTr("Turn with the path")
+                        checked: root.build.orient ?? false
+                        onToggled: root.update("orient", checked)
+                    }
+                    Label {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                        visible: root.build.effect===9
+                        text: qsTr("Draw the route with the Pen in Edit, then hide it there — the object still follows it, and editing its nodes changes the motion. The object lands where you placed it.")
                     }
                     FieldRow {
                         label: qsTr("One step is")

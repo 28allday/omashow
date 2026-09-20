@@ -65,6 +65,7 @@ QString effectToString(Effect effect) {
     case Effect::Spin: return QStringLiteral("spin");
     case Effect::Pulse: return QStringLiteral("pulse");
     case Effect::Reveal: return QStringLiteral("reveal");
+    case Effect::Path: return QStringLiteral("path");
     case Effect::None: break;
     }
     return QStringLiteral("none");
@@ -79,6 +80,7 @@ Effect effectFromString(const QString &value) {
     if (value == QLatin1String("spin")) return Effect::Spin;
     if (value == QLatin1String("pulse")) return Effect::Pulse;
     if (value == QLatin1String("reveal")) return Effect::Reveal;
+    if (value == QLatin1String("path")) return Effect::Path;
     return Effect::None;
 }
 
@@ -96,6 +98,9 @@ QJsonObject stepToJson(const BuildStep &step) {
     json["amountY"] = step.amountY;
     json["amount"] = step.amount;
     json["unit"] = step.unit;
+    json["pathId"] = step.pathId;
+    json["pathReverse"] = step.pathReverse;
+    json["orient"] = step.orient;
     return json;
 }
 
@@ -114,6 +119,9 @@ BuildStep stepFromJson(const QJsonObject &json) {
     step.amountY = json.value("amountY").toDouble();
     step.amount = json.value("amount").toDouble();
     step.unit = qBound(0, json.value("unit").toInt(), 2);
+    step.pathId = json.value("pathId").toString();
+    step.pathReverse = json.value("pathReverse").toBool();
+    step.orient = json.value("orient").toBool();
     return step;
 }
 
@@ -204,6 +212,8 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
         const auto object = value.toObject();
         for (const auto &key : {"amountX", "amountY", "amount", "unit"})
             if (object.contains(key) && !object.value(key).isDouble()) { if (ok) *ok = false; return slide; }
+        for (const auto &key : {"pathReverse", "orient"})
+            if (object.contains(key) && !object.value(key).isBool()) { if (ok) *ok = false; return slide; }
         const auto step = stepFromJson(object);
         if (!std::isfinite(step.amountX) || !std::isfinite(step.amountY) ||
             !std::isfinite(step.amount) || std::abs(step.amountX) > 100000 ||

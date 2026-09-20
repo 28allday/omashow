@@ -22,6 +22,7 @@ enum class Effect {
     Spin = 6,   // turns into place
     Pulse = 7,  // emphasis: swells and settles again, in place
     Reveal = 8, // text arriving by paragraph, word or character
+    Path = 9,   // travelling along another object's outline
 };
 
 enum class BuildPhase { In, Out };
@@ -44,6 +45,12 @@ struct BuildStep {
     qreal amountX = 0, amountY = 0;
     qreal amount = 0;
     int unit = 0;   // Reveal: 0 paragraphs, 1 words, 2 characters
+
+    // Path: another object on the same slide whose outline is travelled. It is
+    // referred to rather than copied, so editing the guide with the ordinary
+    // node handles changes the motion, and hiding it keeps it out of the show.
+    QString pathId;
+    bool pathReverse = false, orient = false;
 
     qreal end() const { return start + duration; }
 

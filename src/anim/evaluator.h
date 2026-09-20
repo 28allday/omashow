@@ -11,6 +11,7 @@
 
 struct Slide;
 struct SceneObject;
+struct BuildStep;
 
 namespace Evaluator {
 

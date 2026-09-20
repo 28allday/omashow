@@ -37,7 +37,8 @@ namespace Bundle {
 // Format 13 adds review comments, alternative text, reading order and dismissed findings.
 // Format 14 adds per-slide transitions, directions, durations and automatic advance.
 // Format 15 adds move/scale/spin/emphasis builds and text reveals.
-constexpr int kFormatVersion = 15;
+// Format 16 adds builds that travel along another object's outline.
+constexpr int kFormatVersion = 16;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

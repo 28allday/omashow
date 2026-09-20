@@ -31,6 +31,9 @@ QVariantList Backend::builds() const {
                             {"amountY", step.amountY},
                             {"amount", step.amount},
                             {"unit", step.unit},
+                            {"pathId", step.pathId},
+                            {"pathReverse", step.pathReverse},
+                            {"orient", step.orient},
                             {"text", o && o->type == ObjectType::Text}});
   }
   return list;
@@ -97,7 +100,7 @@ void Backend::previewBuild(int index) {
 int Backend::addBuild(const QString &targetId, int phase, int effect) {
   if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size() ||
       !m_document.slides.at(m_currentSlide).find(targetId) || phase < 0 ||
-      phase > 1 || effect < 1 || effect == int(Effect::Media) || effect > int(Effect::Reveal))
+      phase > 1 || effect < 1 || effect == int(Effect::Media) || effect > int(Effect::Path))
     return -1;
   m_history.begin(m_document, tr("Add build"));
   auto &timeline = m_document.slides[m_currentSlide].timeline;
@@ -137,6 +140,27 @@ void Backend::setBuildProperty(int index, const QString &key,
   BuildStep changed =
       m_document.slides.at(m_currentSlide).timeline.steps.at(index);
   if(changed.effect==Effect::Media && (key=="duration" || key=="effect" || key=="phase" || key=="easing")) return;
+  // The guide a path build follows is named, not measured.
+  if (key == "pathId" || key == "pathReverse" || key == "orient") {
+    if (key == "pathId") {
+      const auto id = value.toString();
+      if (!id.isEmpty() && (id == changed.targetId ||
+                            !m_document.slides.at(m_currentSlide).find(id)))
+        return;
+      if (changed.pathId == id) return;
+      changed.pathId = id;
+    } else {
+      if (value.metaType().id() != QMetaType::Bool) return;
+      auto &flag = key == "orient" ? changed.orient : changed.pathReverse;
+      if (flag == value.toBool()) return;
+      flag = value.toBool();
+    }
+    m_history.begin(m_document, tr("Edit build"));
+    m_document.slides[m_currentSlide].timeline.steps[index] = changed;
+    m_history.commit();
+    touch();
+    return;
+  }
   bool ok = false;
   const qreal number = value.toDouble(&ok);
   if (!ok || !std::isfinite(number))
@@ -152,7 +176,7 @@ void Backend::setBuildProperty(int index, const QString &key,
     changed.trigger = BuildTrigger(value.toInt());
   else if (key == "phase" && number >= 0 && number <= 1)
     changed.phase = BuildPhase(value.toInt());
-  else if (key == "effect" && number >= 1 && number <= int(Effect::Reveal) &&
+  else if (key == "effect" && number >= 1 && number <= int(Effect::Path) &&
            number != int(Effect::Media))
     changed.effect = Effect(value.toInt());
   else if (key == "amountX" && std::abs(number) <= 100000)

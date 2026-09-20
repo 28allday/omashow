@@ -4,6 +4,9 @@
 #include "core/mediaasset.h"
 #include "core/connector.h"
 #include "core/deckresize.h"
+#include "core/shape.h"
+
+#include <QTransform>
 
 #include <cmath>
 
@@ -35,7 +38,7 @@ QVector<int> unitEnds(const QString &text, int unit) {
     return ends;
 }
 
-void applyBuild(SceneObject &object, const BuildStep &step, qreal t) {
+void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide &slide) {
     const qreal progress = step.progressAt(t);
     const qreal p = step.phase == BuildPhase::Out ? 1.0 - progress : progress;
     switch (step.effect) {
@@ -69,6 +72,20 @@ void applyBuild(SceneObject &object, const BuildStep &step, qreal t) {
         DeckResize::scaleObject(object, 1.0 + swell * q, object.rect.center());
         break;
     }
+    case Effect::Path: {
+        const auto *guide = slide.find(step.pathId);
+        if (!guide || guide->id == object.id) break;
+        const auto path = Shape::worldPath(*guide);
+        if (path.isEmpty() || path.length() <= 0) break;
+        const qreal along = qBound(0.0, step.pathReverse ? 1.0 - p : p, 1.0);
+        const qreal landing = step.pathReverse ? 0.0 : 1.0;
+        // The object lands where it was authored: the path says how it gets
+        // there, not where "there" is.
+        const QPointF offset = object.rect.center() - path.pointAtPercent(landing);
+        object.rect.moveCenter(path.pointAtPercent(along) + offset);
+        if (step.orient) object.rotation -= path.angleAtPercent(along);
+        break;
+    }
     case Effect::Reveal: {
         if (object.type != ObjectType::Text) break;
         const auto ends = unitEnds(object.text, qBound(0, step.unit, 2));
@@ -90,7 +107,7 @@ QVector<SceneObject> Evaluator::stateAt(const Slide &slide, qreal t) {
     for (const SceneObject &source : slide.objects) {
         SceneObject state = source;
         for (const auto &step : builds)
-            if (step.targetId == source.id) applyBuild(state, step, t);
+            if (step.targetId == source.id) applyBuild(state, step, t, slide);
         states.append(state);
     }
     Connector::resolve(states);
