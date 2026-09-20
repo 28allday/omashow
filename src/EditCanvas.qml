@@ -64,6 +64,7 @@ Item {
         if (!root.editingText)
             return
         root.editingText = false
+        backend.setTextSelection(0, 0)
         backend.commitTextDocument(root.textSlideId,root.textObjectId,textEditor.textDocument)
         root.forceActiveFocus()
     }
@@ -360,6 +361,19 @@ Item {
                 }
             }
             selectByMouse: true
+            // The inspector formats whatever is selected here, so it needs to
+            // know what that is — and to be rebuilt when the looks change.
+            onSelectionStartChanged: backend.setTextSelection(selectionStart, selectionEnd)
+            onSelectionEndChanged: backend.setTextSelection(selectionStart, selectionEnd)
+            Connections {
+                target: backend
+                function onTextFormattingChanged() {
+                    if (!textEditor.activeFocus) return
+                    const from = textEditor.selectionStart, to = textEditor.selectionEnd
+                    textEditor.text = backend.selection.editHtml
+                    textEditor.select(from, to)
+                }
+            }
 
             Keys.onEscapePressed: root.commitTextEdit()
             onActiveFocusChanged: if (!activeFocus) root.commitTextEdit()

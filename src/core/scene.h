@@ -22,6 +22,26 @@
 
 enum class ObjectType { Rect, Text, Image, Media, Table, Chart };
 
+// A stretch of text that does not look like the rest of its box. Only what
+// differs is stored: an empty family, a zero size or weight and an invalid
+// colour all mean "as the box says", so changing the box still carries.
+struct TextRun {
+    int start = 0, length = 0;
+    int weight = 0;              // 0 inherits
+    int italic = 0, underline = 0, strike = 0;   // 0 inherits, 1 on, 2 off
+    int baseline = 0;            // 0 normal, 1 raised, 2 lowered
+    qreal fontSize = 0;          // 0 inherits
+    QString fontFamily;
+    QColor color;                // invalid inherits
+    bool operator==(const TextRun &other) const {
+        return start == other.start && length == other.length && weight == other.weight &&
+               italic == other.italic && underline == other.underline &&
+               strike == other.strike && baseline == other.baseline &&
+               qFuzzyCompare(fontSize + 1, other.fontSize + 1) &&
+               fontFamily == other.fontFamily && color == other.color;
+    }
+};
+
 // One thing on a slide. This doubles as the *resolved state* of that thing at a
 // given time: the evaluator returns a copy with the animated fields changed, so
 // there is exactly one shape flowing from document to renderer.
@@ -104,6 +124,8 @@ struct SceneObject {
     int textFit = 0;         // clip with overflow warning, shrink to fit
     QString fontFamily = QStringLiteral("Inter");
     QString fillToken, textColorToken, fontToken;
+    // Stretches of this text that differ from the box, in authored order.
+    QVector<TextRun> runs;
     // What a screen reader would be told this is. Never rendered.
     QString altTitle, altText;
     QString placeholderId;

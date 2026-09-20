@@ -5,6 +5,7 @@
 #include "core/connector.h"
 #include "core/deckresize.h"
 #include "core/shape.h"
+#include "core/textruns.h"
 
 #include <QTransform>
 
@@ -92,6 +93,7 @@ void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide
         const int shown = int(std::ceil(p * ends.size() - 1e-9));
         object.text = shown <= 0 ? QString()
                                  : object.text.left(ends.at(qMin(shown, int(ends.size())) - 1));
+        object.runs = TextRuns::tidy(object.runs, object.text.size());
         break;
     }
     }

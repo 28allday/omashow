@@ -5,6 +5,7 @@
 #include "core/chart.h"
 #include "core/link.h"
 #include "core/review.h"
+#include "core/textruns.h"
 #include <QRegularExpression>
 #include <cmath>
 #include <QSet>
@@ -41,7 +42,7 @@ SceneObject objectFromJson(const QJsonObject &json) {
     const auto type = json.value("type").toString();
     object.type = type == "text" ? ObjectType::Text : type == "image" ? ObjectType::Image : type == "rect" ? ObjectType::Rect : type == "media" ? ObjectType::Media : type == "table" ? ObjectType::Table : type == "chart" ? ObjectType::Chart : ObjectType(-1);
     const auto known=Design::properties(object);
-    const QSet<QString> structural={"id","type","placeholderId","groups","overrides"};
+    const QSet<QString> structural={"id","type","placeholderId","groups","overrides","runs"};
     for (auto it = json.begin(); it != json.end(); ++it) {
         if(structural.contains(it.key())) continue;
         if(!known.contains(it.key()) || !Design::setProperty(object,it.key(),it.value().toVariant(),false)) object.type=ObjectType(-1);
@@ -52,6 +53,11 @@ SceneObject objectFromJson(const QJsonObject &json) {
     object.placeholderId = json.value("placeholderId").toString();
     for (const auto &group : json.value("groups").toArray()) object.groups.append(group.toString());
     for (const auto &key : json.value("overrides").toArray()) object.overrides.append(key.toString());
+    if (json.contains("runs")) {
+        QVector<TextRun> runs;
+        if (!TextRuns::decode(json.value("runs").toVariant(), runs)) object.type = ObjectType(-1);
+        else object.runs = TextRuns::tidy(runs, object.text.size());
+    }
     return object;
 }
 

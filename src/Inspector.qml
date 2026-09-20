@@ -8,11 +8,18 @@ import Omashow 1.0
 // the slide's own settings rather than dead fields.
 Rectangle {
     id: root
+    objectName: "inspector"
     color: Theme.panelBg
 
     property bool stylesExpanded: false
     signal applyLayoutRequested(string layoutId)
     readonly property var sel: backend.selection
+    // While text is selected on the slide, formatting applies to that stretch.
+    readonly property var range: backend.textSelection
+    function style(key, on) {
+        if (range.active) backend.formatSelection(key, on ? 1 : 2)
+        else backend.setSelectedProperty(key, on)
+    }
     readonly property bool isMedia: backend.hasSelection && sel.type === "media"
     readonly property bool isImage: backend.hasSelection && sel.type === "image"
     readonly property bool isText: backend.hasSelection && sel.type === "text"
@@ -337,7 +344,8 @@ Rectangle {
                     currentIndex: model.indexOf(root.sel.fontFamily ?? "")
                     displayText: root.sel.fontFamily ?? Theme.fontFamily
                     onActivated: backend.setSelectedProperty("fontFamily",currentText)
-                    onAccepted: backend.setSelectedProperty("fontFamily",editText)
+                    onAccepted: root.range.active ? backend.formatSelection("fontFamily",editText)
+                                                  : backend.setSelectedProperty("fontFamily",editText)
                 }
             }
             FieldRow {
@@ -345,22 +353,52 @@ Rectangle {
                 NumField {
                     Layout.fillWidth: true
                     suffix: " pt"
-                    value: root.sel.fontSize ?? Theme.fsBase
-                    onCommitted: (v) => backend.setSelectedProperty("fontSize", v)
+                    value: root.range.active ? (root.range.fontSize ?? Theme.fsBase) : (root.sel.fontSize ?? Theme.fsBase)
+                    onCommitted: (v) => root.range.active ? backend.formatSelection("fontSize", v)
+                                                          : backend.setSelectedProperty("fontSize", v)
                 }
                 ComboBox {
                     Layout.preferredWidth: Theme.s5 * 5
                     model: [400, 500, 600, 700]
                     displayText: [qsTr("Regular"), qsTr("Medium"), qsTr("Semibold"), qsTr("Bold")][currentIndex] ?? currentText
-                    currentIndex: Math.max(0, model.indexOf(root.sel.fontWeight ?? 400))
-                    onActivated: backend.setSelectedProperty("fontWeight", model[currentIndex])
+                    currentIndex: Math.max(0, model.indexOf(root.range.active ? (root.range.weight ?? 400)
+                                                                              : (root.sel.fontWeight ?? 400)))
+                    onActivated: root.range.active ? backend.formatSelection("weight", model[currentIndex])
+                                                   : backend.setSelectedProperty("fontWeight", model[currentIndex])
                 }
             }
             FieldRow {
                 label: qsTr("Style")
-                Button { checkable: true; text: qsTr("Italic"); checked: root.sel.italic ?? false; onToggled: backend.setSelectedProperty("italic",checked) }
-                Button { checkable: true; text: qsTr("Underline"); checked: root.sel.underline ?? false; onToggled: backend.setSelectedProperty("underline",checked) }
+                Button { objectName: "textItalic"; checkable: true; text: qsTr("Italic")
+                         checked: root.range.active ? (root.range.italic ?? false) : (root.sel.italic ?? false)
+                         onToggled: root.style("italic", checked) }
+                Button { objectName: "textUnderline"; checkable: true; text: qsTr("Underline")
+                         checked: root.range.active ? (root.range.underline ?? false) : (root.sel.underline ?? false)
+                         onToggled: root.style("underline", checked) }
+                Button { objectName: "textStrike"; checkable: true; text: qsTr("Strike")
+                         visible: root.range.active
+                         checked: root.range.strike ?? false
+                         onToggled: backend.formatSelection("strike", checked ? 1 : 2) }
                 Item { Layout.fillWidth: true }
+            }
+            FieldRow {
+                label: qsTr("Baseline")
+                visible: root.range.active
+                ComboBox {
+                    objectName: "textBaseline"
+                    Layout.fillWidth: true
+                    model: [qsTr("Normal"), qsTr("Raised"), qsTr("Lowered")]
+                    currentIndex: root.range.baseline ?? 0
+                    onActivated: backend.formatSelection("baseline", currentIndex)
+                }
+            }
+            Label {
+                objectName: "textRangeNote"
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                visible: root.range.active
+                text: (root.range.mixed ?? []).length > 0
+                      ? qsTr("The selected text is not all the same. Changing something here settles it.")
+                      : qsTr("These apply to the selected text, not the whole box.")
             }
             Divider {}
             FieldRow {

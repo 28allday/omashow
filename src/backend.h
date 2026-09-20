@@ -69,6 +69,7 @@ class Backend : public QObject {
     Q_PROPERTY(int selectionCount READ selectionCount NOTIFY selectionChanged)
     Q_PROPERTY(int groupDepth READ groupDepth NOTIFY selectionChanged)
     Q_PROPERTY(QVariantMap selection READ selection NOTIFY selectionChanged)
+    Q_PROPERTY(QVariantMap textSelection READ textSelection NOTIFY textSelectionChanged)
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(int revision READ revision NOTIFY documentChanged)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY documentChanged)
@@ -263,6 +264,9 @@ public:
     Q_INVOKABLE void openRecent(const QString &path) { openAsync(QUrl::fromLocalFile(path)); }
     Q_INVOKABLE void fitSelectedTextBox();
     Q_INVOKABLE void commitTextDocument(const QString &slideId, const QString &id, QQuickTextDocument *editor);
+    QVariantMap textSelection() const;
+    Q_INVOKABLE void setTextSelection(int start, int end);
+    Q_INVOKABLE bool formatSelection(const QString &key, const QVariant &value);
     Q_INVOKABLE int pasteEditorText(QQuickTextDocument *editor, int start, int end);
     Q_INVOKABLE void resetImageCrop();
     Q_INVOKABLE void insertImageDialog();
@@ -488,6 +492,8 @@ signals:
     void playingChanged();
     void currentSlideChanged();
     void selectionChanged();
+    void textSelectionChanged();
+    void textFormattingChanged();
     void documentChanged();
     void snapEnabledChanged();
     void guidesChanged();
@@ -584,6 +590,7 @@ private:
     QString m_slideAnchor;
     int m_currentSlide = 0;
     QString m_selectedId;
+    int m_textSelectionStart = 0, m_textSelectionEnd = 0;
     QStringList m_selectedIds;
     QStringList m_groupScope;
     QVariantMap m_diagramPreview;

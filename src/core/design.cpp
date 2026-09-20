@@ -4,6 +4,7 @@
 #include "core/table.h"
 #include "core/chart.h"
 #include "core/shape.h"
+#include "core/textruns.h"
 #include "core/connector.h"
 #include <QSet>
 #include <cmath>
@@ -48,7 +49,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
             {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
-            {"altTitle", o.altTitle}, {"altText", o.altText},
+            {"altTitle", o.altTitle}, {"altText", o.altText}, {"runs", TextRuns::encode(o.runs)},
             {"placeholderId", o.placeholderId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
 }
 bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, bool constrainForEditing) {
@@ -174,6 +175,13 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "fillToken") o.fillToken = v.toString();
     else if (key == "textColorToken") o.textColorToken = v.toString();
     else if (key == "fontToken") o.fontToken = v.toString();
+    else if (key == "runs") {
+        // Not clipped here: the text may not have been set yet, and clipping
+        // an unset string would silently drop every stretch.
+        QVector<TextRun> runs;
+        if (!TextRuns::decode(v, runs)) return false;
+        o.runs = runs;
+    }
     else if (key == "altTitle" || key == "altText") {
         const auto text = v.toString();
         if (text.size() > (key == "altTitle" ? 200 : 2000)) return false;

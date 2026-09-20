@@ -15,7 +15,12 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   preserve appearance, groups, animation targets and embedded pictures.
 - **Canvas:** fit slide or selection, 100%, 10–800% zoom, pointer-centred Ctrl+wheel zoom, ordinary
   wheel/trackpad pan and middle-button drag. Zoom does not change the deck.
-- **Text:** font family, size, weight, italic, underline and colour; horizontal
+- **Text:** font family, size, weight, italic, underline and colour for a whole
+  box — or for any stretch of it: select words while editing on the slide and
+  the Text inspector formats just those, including strike-through and raised or
+  lowered baselines. It says when the selection is not all the same. Stretches
+  follow their letters when the words are rewritten, and survive saving,
+  reopening, export and text builds. Horizontal
   and vertical alignment, line/paragraph spacing, indent, bullets and numbering.
   Leading tabs nest list items. Clip with an overflow warning, shrink to fit,
   or resize the box to fit its text.
@@ -158,7 +163,9 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   rendering from the command line.
 
 Template-pack installation, recording, interchange with other applications and
-other release features remain on the roadmap. Exported PDFs carry real text but
+other release features remain on the roadmap. Tab stops, columns, text
+direction, reusable text styles, spell-checking and text on a path are not
+built yet. Exported PDFs carry real text but
 not clickable link annotations. Notes are plain
 text, and reading order is not yet carried into exported PDF. Text formatting applies to whole
 boxes; per-character styles and advanced typography remain planned.

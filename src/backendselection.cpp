@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "core/textruns.h"
 #include "core/mediaasset.h"
 #include "core/arrange.h"
 #include "core/design.h"
@@ -298,6 +299,9 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &value) {
   m_history.begin(m_document, tr("Change %1").arg(label));
   for (const auto &id : ids)
     if (auto *o = m_document.slides[m_currentSlide].find(id)) {
+      // Rewriting the words takes their looks along with the letters.
+      if (key == QLatin1String("text") && o->type == ObjectType::Text)
+        o->runs = TextRuns::afterEdit(o->runs, o->text, value.toString());
       Design::setProperty(*o, propertyKey(*o), value);
       Design::markOverride(*o, propertyKey(*o));
     }
@@ -511,7 +515,9 @@ void Backend::commitTextDocument(const QString &slideId,const QString &id,QQuick
   const auto text=paragraphs.join('\n');
   if(text==authored->text) return;
   m_history.begin(m_document,tr("Edit text"));
-  auto *object=m_document.slides[index].find(id); object->text=text; Design::markOverride(*object,"text");
+  auto *object=m_document.slides[index].find(id);
+  object->runs=TextRuns::afterEdit(object->runs,object->text,text);
+  object->text=text; Design::markOverride(*object,"text");
   m_history.commit(); touch();
 }
 
@@ -545,4 +551,94 @@ void Backend::resizeSelectionHandle(qreal hx,qreal hy,qreal dx,qreal dy) {
   const auto centre=before->rect.center()+rotation.map(QPointF((width-before->rect.width())*(hx-.5),(height-before->rect.height())*(hy-.5)));
   if(auto *o=m_document.slides[m_currentSlide].find(before->id)) Arrange::setRect(*o,before->rect,QRectF(centre-QPointF(width/2,height/2),QSizeF(width,height)));
   touch();
+}
+
+// --- character formatting over a stretch of text -----------------------------
+QVariantMap Backend::textSelection() const {
+  const auto *object = selectedObject();
+  const bool active = object && object->type == ObjectType::Text &&
+                      m_textSelectionEnd > m_textSelectionStart;
+  QVariantMap values{{"active", active},
+                     {"start", m_textSelectionStart},
+                     {"end", m_textSelectionEnd}};
+  if (!active) return values;
+  // What the whole stretch looks like, and where it disagrees with itself.
+  const int start = qBound(0, m_textSelectionStart, int(object->text.size()));
+  const int end = qBound(start, m_textSelectionEnd, int(object->text.size()));
+  int weight = object->fontWeight;
+  bool italic = object->italic, underline = object->underline, strike = false;
+  int baseline = 0;
+  qreal size = object->fontSize;
+  QString family = object->fontFamily;
+  QColor colour = object->textColor;
+  QStringList mixed;
+  bool first = true;
+  for (int i = start; i < end; ++i) {
+    const auto *run = TextRuns::at(object->runs, i);
+    const int thisWeight = run && run->weight ? run->weight : object->fontWeight;
+    const bool thisItalic = run && run->italic ? run->italic == 1 : object->italic;
+    const bool thisUnderline = run && run->underline ? run->underline == 1 : object->underline;
+    const bool thisStrike = run && run->strike == 1;
+    const int thisBaseline = run ? run->baseline : 0;
+    const qreal thisSize = run && run->fontSize > 0 ? run->fontSize : object->fontSize;
+    const QString thisFamily = run && !run->fontFamily.isEmpty() ? run->fontFamily
+                                                                 : object->fontFamily;
+    const QColor thisColour = run && run->color.isValid() ? run->color : object->textColor;
+    if (first) {
+      weight = thisWeight; italic = thisItalic; underline = thisUnderline;
+      strike = thisStrike; baseline = thisBaseline; size = thisSize;
+      family = thisFamily; colour = thisColour;
+      first = false;
+      continue;
+    }
+    const auto disagree = [&mixed](const char *name) {
+      if (!mixed.contains(QLatin1String(name))) mixed.append(QLatin1String(name));
+    };
+    if (thisWeight != weight) disagree("weight");
+    if (thisItalic != italic) disagree("italic");
+    if (thisUnderline != underline) disagree("underline");
+    if (thisStrike != strike) disagree("strike");
+    if (thisBaseline != baseline) disagree("baseline");
+    if (!qFuzzyCompare(thisSize + 1, size + 1)) disagree("fontSize");
+    if (thisFamily != family) disagree("fontFamily");
+    if (thisColour != colour) disagree("color");
+  }
+  values["weight"] = weight;
+  values["italic"] = italic;
+  values["underline"] = underline;
+  values["strike"] = strike;
+  values["baseline"] = baseline;
+  values["fontSize"] = size;
+  values["fontFamily"] = family;
+  values["color"] = colour.name(QColor::HexArgb);
+  values["mixed"] = mixed;
+  return values;
+}
+
+void Backend::setTextSelection(int start, int end) {
+  const int from = qMin(start, end), to = qMax(start, end);
+  if (from == m_textSelectionStart && to == m_textSelectionEnd) return;
+  m_textSelectionStart = from;
+  m_textSelectionEnd = to;
+  emit textSelectionChanged();
+}
+
+bool Backend::formatSelection(const QString &key, const QVariant &value) {
+  const auto *object = static_cast<const Backend *>(this)->selectedObject();
+  if (!object || object->type != ObjectType::Text ||
+      m_textSelectionEnd <= m_textSelectionStart)
+    return false;
+  SceneObject changed = *object;
+  if (!TextRuns::apply(changed, m_textSelectionStart, m_textSelectionEnd, key, value))
+    return false;
+  if (changed.runs == object->runs) return true;   // valid, nothing to record
+  m_history.begin(m_document, tr("Format text"));
+  auto *target = selectedObject();
+  target->runs = changed.runs;
+  Design::markOverride(*target, QStringLiteral("runs"));
+  m_history.commit();
+  touch();
+  emit textSelectionChanged();
+  emit textFormattingChanged();
+  return true;
 }

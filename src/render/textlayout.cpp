@@ -7,6 +7,7 @@
 #include <QTextDocument>
 #include <QTextList>
 #include <QCache>
+#include "core/textruns.h"
 #include <QDataStream>
 #include <memory>
 namespace {
@@ -17,6 +18,9 @@ QFont fontFor(const SceneObject &o, qreal size) {
     font.setItalic(o.italic);
     font.setUnderline(o.underline);
     font.setLetterSpacing(QFont::AbsoluteSpacing, o.letterSpacing);
+    // Capitals as a transform, not a different string: run offsets are against
+    // what was typed, and a few letters change length when uppercased.
+    font.setCapitalization(o.uppercase ? QFont::AllUppercase : QFont::MixedCase);
     return font;
 }
 Qt::Alignment alignment(int value) {
@@ -26,7 +30,7 @@ Qt::Alignment alignment(int value) {
                         : Qt::AlignLeft;
 }
 bool legacy(const SceneObject &o) {
-    return o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
+    return o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
            o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0;
 }
 std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
@@ -39,6 +43,9 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
            << o.italic << o.underline << o.letterSpacing << o.uppercase
            << o.textAlign << o.lineHeight << o.paragraphSpacing << o.textIndent
            << o.listStyle << o.listStart << o.textColor;
+    for (const auto &run : o.runs)
+        stream << run.start << run.length << run.weight << run.italic << run.underline
+               << run.strike << run.baseline << run.fontSize << run.fontFamily << run.color;
     if (auto *cached = cache.object(key)) return *cached;
     auto doc = std::make_shared<QTextDocument>();
     doc->setUndoRedoEnabled(false);
@@ -50,16 +57,22 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
     option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     doc->setDefaultTextOption(option);
     QTextCursor cursor(doc.get());
-    const auto paragraphs = (o.uppercase ? o.text.toUpper() : o.text).split('\n');
+    const auto paragraphs = o.text.split('\n');
     QMap<int, QTextList *> lists;
+    // Where each paragraph's text starts, in the string and in the document, so
+    // runs can be placed after the whole thing is built.
+    QVector<int> authoredStart, documentStart, strippedTabs;
+    int authored = 0;
     for (int i = 0; i < paragraphs.size(); ++i) {
         if (i)
             cursor.insertBlock();
         QString text = paragraphs.at(i);
         int level = 1;
+        int stripped = 0;
         if (o.listStyle)
             while (text.startsWith('\t')) {
                 ++level;
+                ++stripped;
                 text.remove(0, 1);
             }
         level = qMin(8, level);
@@ -73,6 +86,10 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
         chars.setFont(fontFor(o, size));
         chars.setForeground(o.textColor);
         cursor.setCharFormat(chars);
+        authoredStart.append(authored);
+        documentStart.append(cursor.position());
+        strippedTabs.append(stripped);
+        authored += paragraphs.at(i).size() + 1;   // the newline that split it
         cursor.insertText(text);
         if (o.listStyle && !text.isEmpty()) {
             if (!lists.contains(level)) {
@@ -89,6 +106,31 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
                     it = lists.erase(it);
                 else
                     ++it;
+        }
+    }
+    // Stretches that look different: mapped back onto the built document.
+    for (const auto &run : o.runs) {
+        for (int i = 0; i < paragraphs.size(); ++i) {
+            const int bodyStart = authoredStart.at(i) + strippedTabs.at(i);
+            const int bodyEnd = authoredStart.at(i) + paragraphs.at(i).size();
+            const int from = qMax(run.start, bodyStart);
+            const int to = qMin(run.start + run.length, bodyEnd);
+            if (from >= to) continue;
+            QTextCursor scope(doc.get());
+            scope.setPosition(documentStart.at(i) + (from - bodyStart));
+            scope.setPosition(documentStart.at(i) + (to - bodyStart), QTextCursor::KeepAnchor);
+            QTextCharFormat format;
+            QFont font = fontFor(o, run.fontSize > 0 ? run.fontSize : size);
+            if (!run.fontFamily.isEmpty()) font.setFamilies({run.fontFamily});
+            if (run.weight != 0) font.setWeight(QFont::Weight(run.weight));
+            if (run.italic != 0) font.setItalic(run.italic == 1);
+            if (run.underline != 0) font.setUnderline(run.underline == 1);
+            format.setFont(font);
+            if (run.strike != 0) format.setFontStrikeOut(run.strike == 1);
+            if (run.color.isValid()) format.setForeground(run.color);
+            if (run.baseline == 1) format.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
+            if (run.baseline == 2) format.setVerticalAlignment(QTextCharFormat::AlignSubScript);
+            scope.mergeCharFormat(format);
         }
     }
     cache.insert(key, new std::shared_ptr<QTextDocument>(doc), qMax(1, int((o.text.size()*10+4096)/1024)));
