@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "render/scenerenderer.h"
 #include "core/design.h"
 #include "core/edit.h"
 #include "core/imageasset.h"
@@ -120,7 +121,22 @@ void Backend::cutSelected() {
     if (copySelected())
         deleteSelected();
 }
-void Backend::paste() {
+// What the clipboard could become here, so the menu can offer only what is real.
+QVariantMap Backend::clipboardKinds() const {
+    const auto *data = QGuiApplication::clipboard()->mimeData();
+    const bool native = data && data->hasFormat(mimeType);
+    const bool picture = data && (data->hasImage() || data->hasFormat("image/svg+xml"));
+    const bool text = data && data->hasText() && !data->text().isEmpty();
+    return {{"objects", native}, {"picture", picture}, {"text", text || native},
+            {"any", native || picture || text}};
+}
+
+void Backend::paste() { pasteSpecial(0); }
+
+// 0 keeps what was copied, 1 takes this deck's text style, 2 takes the words
+// alone, 3 flattens the copied objects into a picture.
+void Backend::pasteSpecial(int mode) {
+    if (mode < 0 || mode > 3) return;
     const auto *data = QGuiApplication::clipboard()->mimeData();
     if (!data)
         return;
@@ -167,7 +183,65 @@ void Backend::paste() {
         o->fontFamily = m_document.theme.fonts.value("body", o->fontFamily);
     } else
         return;
-    m_history.begin(m_document, tr("Paste objects"));
+    if (mode == 2 && !fragment.slides.isEmpty()) {
+        // The words alone, in a box that belongs to this deck.
+        QStringList words;
+        for (const auto &object : fragment.slides.first().objects)
+            if (object.type == ObjectType::Text && !object.text.trimmed().isEmpty())
+                words.append(object.text);
+        if (words.isEmpty() && data->hasText()) words.append(data->text());
+        if (words.isEmpty()) { emit failed(tr("There are no words on the clipboard.")); return; }
+        Document plain;
+        plain.size = m_document.size;
+        plain.theme = m_document.theme;
+        Slide slide;
+        slide.id = QStringLiteral("text");
+        plain.slides.append(slide);
+        const auto id = Edit::addText(plain, 0, QPointF(m_document.size.width() / 2,
+                                                        m_document.size.height() / 2));
+        auto *object = plain.slides[0].find(id);
+        object->text = words.join('\n');
+        fragment = plain;
+    } else if (mode == 1) {
+        for (auto &object : fragment.slides.first().objects) {
+            if (object.type != ObjectType::Text) continue;
+            object.runs.clear();
+            // Pasted objects are independent of the layout they came from, so
+            // this hands them the values rather than a link to them.
+            object.fontFamily = m_document.theme.fonts.value("body", object.fontFamily);
+            object.textColor = m_document.theme.colors.value("foreground", object.textColor);
+            object.textColorToken.clear();
+            object.fontToken.clear();
+            object.italic = object.underline = false;
+        }
+    } else if (mode == 3) {
+        // A picture of what was copied, at the size it was copied at.
+        const auto objects = Design::resolve(fragment, 0).objects;
+        QRectF bounds;
+        for (const auto &object : objects) bounds = bounds.united(object.rect);
+        if (bounds.isEmpty()) { emit failed(tr("There is nothing to flatten.")); return; }
+        auto shifted = objects;
+        for (auto &object : shifted) object.rect.translate(-bounds.topLeft());
+        const QSize pixels(qBound(1, qRound(bounds.width()), 8192),
+                           qBound(1, qRound(bounds.height()), 8192));
+        const auto image = SceneRenderer::render(shifted, bounds.size(), pixels,
+                                                 QColor(Qt::transparent));
+        SceneObject picture;
+        QString error;
+        if (!ImageAsset::fromImage(picture, image, &error)) { emit failed(error); return; }
+        picture.id = Edit::newId("image");
+        picture.rect = bounds;
+        Document flattened;
+        flattened.size = m_document.size;
+        Slide slide;
+        slide.id = QStringLiteral("picture");
+        slide.objects.append(picture);
+        flattened.slides.append(slide);
+        fragment = flattened;
+    }
+    m_history.begin(m_document, mode == 2 ? tr("Paste the words")
+                                : mode == 3 ? tr("Paste as a picture")
+                                            : tr("Paste objects"));
     const auto ids = ObjectCopy::insert(m_document, m_currentSlide, fragment, m_groupScope);
     if (ids.isEmpty()) {
         m_history.cancel(m_document);

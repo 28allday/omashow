@@ -11,7 +11,28 @@ namespace {
 QString authorSettingsPath() {
     return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/review.ini";
 }
+QString panelSettingsPath() {
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/panels.ini";
+}
 } // namespace
+
+// Where the panels were left: their widths, and whether they were put away.
+QVariantMap Backend::panelState() const {
+    QSettings settings(panelSettingsPath(), QSettings::IniFormat);
+    QVariantMap state;
+    for (const auto &key : settings.childKeys()) state[key] = settings.value(key);
+    return state;
+}
+
+void Backend::setPanelState(const QString &key, const QVariant &value) {
+    static const QStringList known{"navigatorWidth", "inspectorWidth", "navigatorCollapsed",
+                                   "inspectorCollapsed", "notesOpen"};
+    if (!known.contains(key)) return;
+    QSettings settings(panelSettingsPath(), QSettings::IniFormat);
+    if (settings.value(key) == value) return;
+    settings.setValue(key, value);
+    settings.sync();
+}
 
 QString Backend::reviewAuthor() const {
     if (!m_reviewAuthor.isEmpty()) return m_reviewAuthor;

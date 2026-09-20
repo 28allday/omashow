@@ -23,12 +23,57 @@ ApplicationWindow {
     // A modal dialog owns the keyboard while it is up.
     readonly property bool dialogOpen: tableEditor.visible || diagramDialog.visible
                                        || layoutApplyDialog.visible || importDesignDialog.visible
+                                       || commandPalette.visible
     font.family: Theme.fontFamily
     font.pixelSize: Theme.fsControl
     color: Theme.windowBg
 
     // Presenter notes under the Edit canvas, as in the concept; View toggles it.
-    property bool notesOpen: true
+    property bool notesOpen: (backend.panelState.notesOpen ?? "true") === "true"
+    // Panels: dragged wider or narrower, collapsed out of the way, and put back
+    // where they were next time.
+    property real navigatorWidth: backend.panelState.navigatorWidth ?? Theme.wNavigator
+    property real inspectorWidth: backend.panelState.inspectorWidth ?? Theme.wInspector
+    property bool navigatorCollapsed: (backend.panelState.navigatorCollapsed ?? "false") === "true"
+    property bool inspectorCollapsed: (backend.panelState.inspectorCollapsed ?? "false") === "true"
+    onNavigatorWidthChanged: backend.setPanelState("navigatorWidth", Math.round(navigatorWidth))
+    onInspectorWidthChanged: backend.setPanelState("inspectorWidth", Math.round(inspectorWidth))
+    onNavigatorCollapsedChanged: backend.setPanelState("navigatorCollapsed", navigatorCollapsed)
+    onInspectorCollapsedChanged: backend.setPanelState("inspectorCollapsed", inspectorCollapsed)
+    onNotesOpenChanged: backend.setPanelState("notesOpen", notesOpen)
+    // A panel dragged to nothing, or a remembered width from a bigger screen,
+    // comes back to something usable rather than disappearing.
+    function sanePanels() {
+        const room = Math.max(320, win.width - 360)
+        win.navigatorWidth = Math.min(Math.max(Theme.wNavigatorMin, win.navigatorWidth), room / 2)
+        win.inspectorWidth = Math.min(Math.max(Theme.wInspectorMin, win.inspectorWidth), room / 2)
+    }
+    onWidthChanged: win.sanePanels()
+
+    // The grip between a panel and the canvas.
+    component PanelGrip: Item {
+        id: grip
+        property Item panel
+        property bool fromLeft: true
+        property bool collapsed: false
+        signal resized(real delta)
+        signal toggled()
+        objectName: "panelGrip"
+        implicitWidth: Theme.s2
+        Layout.fillHeight: true
+        Rectangle { anchors.fill: parent; color: hover.hovered || drag.active ? Theme.accent : "transparent"; opacity: .35 }
+        HoverHandler { id: hover; cursorShape: Qt.SplitHCursor }
+        DragHandler {
+            id: drag
+            target: null
+            yAxis.enabled: false
+            onTranslationChanged: {
+                if (!active) return
+                grip.resized(grip.fromLeft ? translation.x : -translation.x)
+            }
+        }
+        TapHandler { onDoubleTapped: grip.toggled() }
+    }
     // Below this width the toolbar drops its labels and keeps the icons.
     readonly property bool compactToolbar: width < 1440
     readonly property string aspectName: {
@@ -170,6 +215,61 @@ ApplicationWindow {
     function endShow() { presenter.stop() }
     SlideSizeDialog { id: slideSizeDialog }
     LayoutApplyDialog { id: layoutApplyDialog }
+    // Every command the menus offer, by name and by the words people use for it.
+    CommandPalette {
+        id: commandPalette
+        commands: [
+            { group: qsTr("File"), name: qsTr("New deck"), also: "create start blank", run: () => win.confirmThenNew() },
+            { group: qsTr("File"), name: qsTr("Open a deck"), also: "load file", shortcut: "Ctrl+O", run: () => win.confirmThenOpen() },
+            { group: qsTr("File"), name: qsTr("Open another window"), also: "second copy", run: () => backend.openInNewWindow() },
+            { group: qsTr("File"), name: qsTr("Import slides from another deck"), also: "borrow steal reuse", enabled: !backend.startVisible, run: () => backend.importDeckDialog() },
+            { group: qsTr("File"), name: qsTr("Save"), also: "write keep", shortcut: "Ctrl+S", run: () => { win.commitEditors(); backend.save() } },
+            { group: qsTr("File"), name: qsTr("Save as"), also: "copy elsewhere", shortcut: "Ctrl+Shift+S", run: () => { win.commitEditors(); backend.saveAsDialog() } },
+            { group: qsTr("File"), name: qsTr("Start centre"), also: "home recent", run: () => { win.commitEditors(); backend.showStart() } },
+            { group: qsTr("Export"), name: qsTr("Export a PDF"), also: "document handout print pages", shortcut: "Ctrl+E", run: () => { win.commitEditors(); backend.exportDialog({ kind: 0 }) } },
+            { group: qsTr("Export"), name: qsTr("Export pictures"), also: "png jpeg images slides", run: () => { win.workspace = 5 } },
+            { group: qsTr("Export"), name: qsTr("Export film"), also: "video movie mp4 record", run: () => { win.workspace = 5 } },
+            { group: qsTr("Export"), name: qsTr("Print"), also: "paper printer handout", run: () => { win.workspace = 5 } },
+            { group: qsTr("Export"), name: qsTr("Package the deck"), also: "zip send share assets", run: () => { win.workspace = 5 } },
+            { group: qsTr("Present"), name: qsTr("Present from the start"), also: "show play full screen", shortcut: "F5", run: () => win.startShow() },
+            { group: qsTr("Present"), name: qsTr("Present from this slide"), also: "show play current", run: () => { win.commitEditors(); win.workspace = 4; presenter.start(true,false) } },
+            { group: qsTr("Present"), name: qsTr("Rehearse in a window"), also: "practise timing", run: () => { win.commitEditors(); win.workspace = 4; presenter.start(false,true) } },
+            { group: qsTr("Workspace"), name: qsTr("Edit"), also: "canvas slide", run: () => win.workspace = 0 },
+            { group: qsTr("Workspace"), name: qsTr("Design"), also: "theme master layout template", run: () => win.workspace = 1 },
+            { group: qsTr("Workspace"), name: qsTr("Animate"), also: "build transition timeline motion", run: () => win.workspace = 2 },
+            { group: qsTr("Workspace"), name: qsTr("Review"), also: "comments findings outline statistics accessibility", run: () => win.workspace = 3 },
+            { group: qsTr("Workspace"), name: qsTr("Sorter"), also: "light table order overview", run: () => win.workspace = 6 },
+            { group: qsTr("Slides"), name: qsTr("Add a slide"), also: "new page", shortcut: "Ctrl+N", enabled: !backend.startVisible, run: () => backend.addSlide() },
+            { group: qsTr("Slides"), name: qsTr("Duplicate this slide"), also: "copy page", shortcut: "Ctrl+D", enabled: !backend.startVisible, run: () => backend.duplicateSlide() },
+            { group: qsTr("Slides"), name: qsTr("Delete this slide"), also: "remove page", enabled: backend.slideCount > 1, run: () => backend.deleteSlide() },
+            { group: qsTr("Slides"), name: qsTr("Skip this slide in the show"), also: "hide omit", enabled: !backend.startVisible, run: () => backend.setSlidesSkipped(true) },
+            { group: qsTr("Slides"), name: qsTr("Change the slide size"), also: "aspect ratio widescreen portrait", enabled: !backend.startVisible, run: () => slideSizeDialog.open() },
+            { group: qsTr("Insert"), name: qsTr("Text"), also: "words box type", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addText() } },
+            { group: qsTr("Insert"), name: qsTr("A shape"), also: "rectangle circle arrow", enabled: !backend.startVisible, run: () => { win.workspace = 0; shapeGallery.open() } },
+            { group: qsTr("Insert"), name: qsTr("A picture"), also: "image photo png", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertImageDialog() } },
+            { group: qsTr("Insert"), name: qsTr("Film or sound"), also: "video audio movie clip", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertMediaDialog() } },
+            { group: qsTr("Insert"), name: qsTr("A table"), also: "grid rows columns", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addTable() } },
+            { group: qsTr("Insert"), name: qsTr("A chart"), also: "graph bar line pie data", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addChart() } },
+            { group: qsTr("Insert"), name: qsTr("A diagram"), also: "process hierarchy flow", enabled: !backend.startVisible, run: () => { win.workspace = 0; diagramDialog.show() } },
+            { group: qsTr("Edit"), name: qsTr("Undo"), also: "back mistake", shortcut: "Ctrl+Z", enabled: backend.canUndo, run: () => backend.undo() },
+            { group: qsTr("Edit"), name: qsTr("Redo"), also: "forward again", shortcut: "Ctrl+Shift+Z", enabled: backend.canRedo, run: () => backend.redo() },
+            { group: qsTr("Edit"), name: qsTr("Paste the words only"), also: "plain text unformatted", enabled: backend.canPaste, run: () => backend.pasteSpecial(2) },
+            { group: qsTr("Edit"), name: qsTr("Paste as a picture"), also: "flatten image", enabled: backend.canPaste, run: () => backend.pasteSpecial(3) },
+            { group: qsTr("Edit"), name: qsTr("Find and replace"), also: "search words swap", enabled: !backend.startVisible, run: () => win.workspace = 3 },
+            { group: qsTr("Review"), name: qsTr("Comment on this slide"), also: "note remark feedback", enabled: !backend.startVisible, run: () => win.workspace = 3 },
+            { group: qsTr("Review"), name: qsTr("Check what would stop someone reading this"), also: "accessibility contrast alt text findings", enabled: !backend.startVisible, run: () => win.workspace = 3 },
+            { group: qsTr("Design"), name: qsTr("Apply a layout"), also: "master placeholder arrange", enabled: !backend.startVisible, run: () => { win.workspace = 1; layoutApplyDialog.show(backend.slideDesign.layoutId ?? "") } },
+            { group: qsTr("Design"), name: qsTr("Remove what nothing uses"), also: "unused tidy hygiene clean", enabled: !backend.startVisible, run: () => win.workspace = 1 },
+            { group: qsTr("View"), name: qsTr("Presenter notes"), also: "speaker script", run: () => win.notesOpen = !win.notesOpen },
+            { group: qsTr("View"), name: win.navigatorCollapsed ? qsTr("Show the slide list") : qsTr("Hide the slide list"), also: "navigator panel thumbnails sidebar", run: () => win.navigatorCollapsed = !win.navigatorCollapsed },
+            { group: qsTr("View"), name: win.inspectorCollapsed ? qsTr("Show the inspector") : qsTr("Hide the inspector"), also: "panel properties sidebar", run: () => win.inspectorCollapsed = !win.inspectorCollapsed },
+            { group: qsTr("View"), name: qsTr("Put the panels back"), also: "reset widths restore layout", run: () => { win.navigatorCollapsed = false; win.inspectorCollapsed = false; win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } },
+            { group: qsTr("View"), name: qsTr("Snap to guides"), also: "align magnet", run: () => backend.snapEnabled = !backend.snapEnabled },
+            { group: qsTr("Help"), name: qsTr("Keyboard shortcuts"), also: "keys help", shortcut: "?", run: () => helpSheet.open() }
+        ]
+    }
+    Shortcut { sequence: "Ctrl+K"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running
+               onActivated: { win.commitEditors(); commandPalette.show() } }
     ImportDesignDialog { id: importDesignDialog }
     Connections { target: backend; function onImportReady() { win.commitEditors(); importDesignDialog.show() } }
     ShapeGallery { id: shapeGallery }
@@ -262,6 +362,8 @@ ApplicationWindow {
                         title: qsTr("File")
                         MenuItem { text: qsTr("Start centre…"); icon.name: "house"; onTriggered: { win.commitEditors(); backend.showStart() } }
                         MenuItem { text: qsTr("Open…"); icon.name: "folder-open"; onTriggered: win.confirmThenOpen() }
+                        MenuItem { objectName: "newWindowMenuItem"; text: qsTr("New window"); icon.name: "square-plus"
+                                   onTriggered: backend.openInNewWindow() }
                         MenuItem { objectName: "importDeckMenuItem"; text: qsTr("Import from deck…"); icon.name: "folder-open"
                                    enabled: !backend.startVisible; onTriggered: { win.commitEditors(); backend.importDeckDialog() } }
                         MenuSeparator {}
@@ -281,6 +383,22 @@ ApplicationWindow {
                         MenuItem { text: qsTr("Cut"); icon.name: "scissors"; enabled: backend.hasSelection; onTriggered: backend.copyAsync(true) }
                         MenuItem { text: qsTr("Copy"); icon.name: "copy"; enabled: backend.hasSelection; onTriggered: backend.copyAsync() }
                         MenuItem { text: qsTr("Paste"); icon.name: "clipboard-paste"; enabled: backend.canPaste; onTriggered: backend.pasteAsync() }
+                        Menu {
+                            title: qsTr("Paste special")
+                            enabled: backend.canPaste
+                            MenuItem { objectName: "pasteKeeping"; text: qsTr("Keep its formatting")
+                                       enabled: backend.clipboardKinds.objects ?? false
+                                       onTriggered: backend.pasteSpecial(0) }
+                            MenuItem { objectName: "pasteMatching"; text: qsTr("Match this deck's text style")
+                                       enabled: backend.clipboardKinds.objects ?? false
+                                       onTriggered: backend.pasteSpecial(1) }
+                            MenuItem { objectName: "pasteWords"; text: qsTr("The words only")
+                                       enabled: backend.clipboardKinds.text ?? false
+                                       onTriggered: backend.pasteSpecial(2) }
+                            MenuItem { objectName: "pastePicture"; text: qsTr("As a picture")
+                                       enabled: backend.clipboardKinds.objects ?? false
+                                       onTriggered: backend.pasteSpecial(3) }
+                        }
                         MenuItem { text: qsTr("Duplicate"); enabled: backend.hasSelection; onTriggered: backend.duplicateSelected() }
                         MenuItem { text: qsTr("Delete"); icon.name: "trash-2"; enabled: backend.hasSelection; onTriggered: backend.deleteSelected() }
                         MenuSeparator {}
@@ -335,6 +453,14 @@ ApplicationWindow {
                         MenuItem { text: qsTr("Design"); icon.name: "palette"; onTriggered: { win.commitEditors(); win.workspace = 1 } }
                         MenuItem { text: qsTr("Animate"); icon.name: "sparkles"; onTriggered: { win.commitEditors(); win.workspace = 2 } }
                         MenuItem { text: qsTr("Slide sorter"); icon.name: "layout-grid"; onTriggered: { win.commitEditors(); win.workspace = 6; slideSorter.focusBrowser() } }
+                        MenuItem { objectName: "toggleNavigator"; text: win.navigatorCollapsed ? qsTr("Show the slide list") : qsTr("Hide the slide list")
+                                   onTriggered: win.navigatorCollapsed = !win.navigatorCollapsed }
+                        MenuItem { objectName: "toggleInspector"; text: win.inspectorCollapsed ? qsTr("Show the inspector") : qsTr("Hide the inspector")
+                                   onTriggered: win.inspectorCollapsed = !win.inspectorCollapsed }
+                        MenuItem { objectName: "resetPanels"; text: qsTr("Put the panels back")
+                                   onTriggered: { win.navigatorCollapsed = false; win.inspectorCollapsed = false
+                                                  win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } }
+                        MenuItem { objectName: "commandSearchMenuItem"; text: qsTr("Find a command…"); onTriggered: commandPalette.show() }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Zoom in"); icon.name: "zoom-in"; enabled: win.editing; onTriggered: editCanvas.zoomBy(1.25) }
                         MenuItem { text: qsTr("Zoom out"); icon.name: "zoom-out"; enabled: win.editing; onTriggered: editCanvas.zoomBy(1 / 1.25) }
@@ -563,11 +689,22 @@ ApplicationWindow {
 
             SlideNavigator {
                 id: slideNavigator
+                objectName: "slideNavigatorPanel"
                 onEditRequested: win.workspace = 0
-                Layout.preferredWidth: Theme.wNavigator
-                Layout.minimumWidth: Theme.wNavigatorMin
+                Layout.preferredWidth: win.navigatorCollapsed ? 0 : win.navigatorWidth
+                Layout.minimumWidth: win.navigatorCollapsed ? 0 : Theme.wNavigatorMin
+                Layout.maximumWidth: win.navigatorCollapsed ? 0 : Number.POSITIVE_INFINITY
                 Layout.fillHeight: true
+                clip: true
+                visible: (win.workspace === 0 || win.workspace === 2) && !win.navigatorCollapsed
+            }
+            PanelGrip {
+                objectName: "navigatorGrip"
                 visible: win.workspace === 0 || win.workspace === 2
+                collapsed: win.navigatorCollapsed
+                onResized: delta => { win.navigatorCollapsed = false
+                                      win.navigatorWidth += delta; win.sanePanels() }
+                onToggled: win.navigatorCollapsed = !win.navigatorCollapsed
             }
 
             SlideNavigator { id: slideSorter; sorter: true; Layout.fillWidth: true; Layout.fillHeight: true; visible: win.workspace === 6; onEditRequested: { win.workspace=0; editCanvas.forceActiveFocus() } }
@@ -679,12 +816,70 @@ ApplicationWindow {
                 visible: win.workspace === 5
             }
 
-            Inspector {
-                onApplyLayoutRequested: layoutId => { win.commitEditors(); layoutApplyDialog.show(layoutId) }
-                Layout.preferredWidth: Theme.wInspector
-                Layout.minimumWidth: Theme.wInspectorMin
-                Layout.fillHeight: true
+            PanelGrip {
+                objectName: "inspectorGrip"
+                fromLeft: false
                 visible: win.editing
+                collapsed: win.inspectorCollapsed
+                onResized: delta => { win.inspectorCollapsed = false
+                                      win.inspectorWidth += delta; win.sanePanels() }
+                onToggled: win.inspectorCollapsed = !win.inspectorCollapsed
+            }
+            Inspector {
+                objectName: "inspectorPanel"
+                onApplyLayoutRequested: layoutId => { win.commitEditors(); layoutApplyDialog.show(layoutId) }
+                Layout.preferredWidth: win.inspectorCollapsed ? 0 : win.inspectorWidth
+                Layout.minimumWidth: win.inspectorCollapsed ? 0 : Theme.wInspectorMin
+                Layout.maximumWidth: win.inspectorCollapsed ? 0 : Number.POSITIVE_INFINITY
+                Layout.fillHeight: true
+                clip: true
+                visible: win.editing && !win.inspectorCollapsed
+            }
+        }
+
+        // ── What happened to the file while you were working ────────────────
+        Rectangle {
+            objectName: "fileStateBar"
+            Layout.fillWidth: true
+            visible: (backend.fileState.changedOnDisk ?? false) || (backend.fileState.readOnly ?? false)
+                     || (backend.fileState.missing ?? false)
+            implicitHeight: Theme.hRow + Theme.s2
+            color: Theme.withAlpha(Theme.accent, 0.12)
+            Hairline { anchors.bottom: parent.bottom; width: parent.width }
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.s4
+                anchors.rightMargin: Theme.s4
+                spacing: Theme.s3
+                Icon { name: "triangle-alert"; color: Theme.accent }
+                Label {
+                    objectName: "fileStateMessage"
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: backend.fileState.missing
+                          ? qsTr("%1 is no longer on disk. Saving will write it again.").arg(backend.fileName)
+                          : backend.fileState.changedOnDisk
+                          ? qsTr("%1 has changed on disk since you opened it.").arg(backend.fileName)
+                          : qsTr("%1 is read-only. Saving will ask where to put it instead.").arg(backend.fileName)
+                }
+                Button {
+                    objectName: "reloadFromDisk"
+                    visible: backend.fileState.changedOnDisk ?? false
+                    text: backend.modified ? qsTr("Discard mine and reload") : qsTr("Reload")
+                    onClicked: win.guard(() => backend.reloadFromDisk())
+                }
+                Button {
+                    objectName: "keepMyVersion"
+                    visible: backend.fileState.changedOnDisk ?? false
+                    text: qsTr("Keep mine")
+                    onClicked: backend.keepMyVersion()
+                }
+                Button {
+                    objectName: "saveElsewhere"
+                    visible: (backend.fileState.readOnly ?? false) && !(backend.fileState.changedOnDisk ?? false)
+                    text: qsTr("Save as…")
+                    onClicked: { win.commitEditors(); backend.saveAsDialog() }
+                }
             }
         }
 
@@ -829,6 +1024,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        win.sanePanels()
         presenter.attach(audienceWindow,consoleWindow,win)
         const found = backend.recoveryCandidates()
         if (found.length > 0) {

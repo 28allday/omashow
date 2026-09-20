@@ -159,8 +159,17 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   print on paper, and a deck can be packaged as a zip carrying copies of
   everything it links to plus a manifest of what is inside, what was left out
   and why — nothing on your computer is changed by packaging.
+- **Shell:** Ctrl+K finds any command by name or by the words you would use for
+  it. The slide list and the inspector can be dragged wider, collapsed with a
+  double-click on their edge and put back where they were next time. A deck
+  opened in another window is another copy of the app, with its own selection,
+  undo, playback and export queue.
+- **Paste special:** keep what was copied, match this deck's text style, take
+  the words only, or flatten it into a picture.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
-  rendering from the command line.
+  rendering from the command line. A deck whose file is read-only, missing or
+  changed by something else says so in a bar across the top, with the way out of
+  it: reload, keep yours, or save somewhere else.
 
 Template-pack installation, recording, interchange with other applications and
 other release features remain on the roadmap. Tab stops, columns, text

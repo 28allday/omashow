@@ -1,6 +1,8 @@
 #pragma once
 
+#include <QDateTime>
 #include <QElapsedTimer>
+#include <QFileSystemWatcher>
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -45,6 +47,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList shapeNames READ shapeNames CONSTANT)
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
+    Q_PROPERTY(QVariantMap fileState READ fileState NOTIFY fileStateChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString operation READ operation NOTIFY operationChanged)
@@ -59,6 +62,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString timecode READ timecode NOTIFY timeChanged)
 
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
+    Q_PROPERTY(QVariantMap clipboardKinds READ clipboardKinds NOTIFY clipboardChanged)
     Q_PROPERTY(bool startVisible READ startVisible NOTIFY startChanged)
     Q_PROPERTY(bool hasDocument READ hasDocument NOTIFY startChanged)
     Q_PROPERTY(QVariantList recentFiles READ recentFiles NOTIFY recentsChanged)
@@ -103,6 +107,7 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList readingOrder READ readingOrder NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList outline READ outline NOTIFY documentChanged)
     Q_PROPERTY(QVariantMap findState READ findState NOTIFY findChanged)
+    Q_PROPERTY(QVariantMap panelState READ panelState CONSTANT)
     Q_PROPERTY(QVariantMap slideTransition READ slideTransition NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList exportQueue READ exportQueue NOTIFY exportQueueChanged)
     Q_PROPERTY(bool encoderAvailable READ encoderAvailable CONSTANT)
@@ -116,6 +121,9 @@ public:
 
     QUrl fileUrl() const { return m_fileUrl; }
     QString fileName() const;
+    QVariantMap fileState() const;
+    Q_INVOKABLE void keepMyVersion();
+    Q_INVOKABLE void reloadFromDisk();
     QString status() const { return m_status; }
     bool busy() const { return m_busy; }
     QString operation() const { return m_operation.isEmpty() && m_imageImportRunning ? tr("Importing pictures…") : m_operation; }
@@ -187,6 +195,7 @@ public:
     Q_INVOKABLE void removeRecent(const QString &path);
     Q_INVOKABLE void revealRecent(const QString &path);
     Q_INVOKABLE void newDeck();
+    Q_INVOKABLE bool openInNewWindow(const QUrl &url = QUrl());
     Q_INVOKABLE void save();          // straight to the current file, or asks
     Q_INVOKABLE void saveAsDialog();
     Q_INVOKABLE bool saveTo(const QString &path);
@@ -260,6 +269,8 @@ public:
     Q_INVOKABLE bool copySelected();
     Q_INVOKABLE void cutSelected();
     Q_INVOKABLE void paste();
+    QVariantMap clipboardKinds() const;
+    Q_INVOKABLE void pasteSpecial(int mode);
     Q_INVOKABLE void duplicateSelected();
     Q_INVOKABLE void openRecent(const QString &path) { openAsync(QUrl::fromLocalFile(path)); }
     Q_INVOKABLE void fitSelectedTextBox();
@@ -423,6 +434,8 @@ public:
     QVariantList readingOrder() const;
     QVariantList outline() const;
     QVariantMap findState() const;
+    QVariantMap panelState() const;
+    Q_INVOKABLE void setPanelState(const QString &key, const QVariant &value);
     Q_INVOKABLE bool setOutlineText(const QString &slideId, const QString &objectId, const QString &text);
     Q_INVOKABLE QString addComment(const QString &text, bool onSelection = true);
     Q_INVOKABLE QString replyToComment(const QString &parentId, const QString &text);
@@ -484,6 +497,7 @@ signals:
     void saveCanceled();
     void playbackRateChanged();
     void fileUrlChanged();
+    void fileStateChanged();
     void statusChanged();
     void busyChanged();
     void failed(const QString &message);
@@ -569,6 +583,11 @@ private:
     Pending m_pending = Pending::None;
     bool m_pendingPdfStages = false;
     QUrl m_fileUrl;
+    QFileSystemWatcher m_watcher;
+    QDateTime m_fileStamp;
+    qint64 m_fileBytes = -1;
+    bool m_fileChangedOnDisk = false;
+    void watchFile();
     QString m_status;
     bool m_busy = false;
 

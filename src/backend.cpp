@@ -3,6 +3,8 @@
 #include "core/design.h"
 #include "core/review.h"
 #include "io/exports.h"
+#include <QDateTime>
+#include <QProcess>
 #include <QFileInfo>
 
 #include <QDir>
@@ -24,6 +26,7 @@
 Backend::Backend(QObject *parent)
     : QObject(parent), m_chooser(new PortalFileChooser(this)) {
   connect(this,&Backend::documentChanged,this,&Backend::slideSelectionChanged);
+  connect(this,&Backend::documentChanged,this,&Backend::fileStateChanged);
   // A pending import is described against the document it would land in.
   connect(this,&Backend::documentChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::currentSlideChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
@@ -105,6 +108,20 @@ Backend::Backend(QObject *parent)
     for (const auto &entry : m_exports)
       if (entry.state == QLatin1String("running")) { emit exportQueueChanged(); return; }
     m_exportTicker.stop();
+  });
+  connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path) {
+    if (path != m_fileUrl.toLocalFile()) return;
+    const QFileInfo info(path);
+    // Our own atomic save renames a new file into place; re-arm and ignore it.
+    if (info.exists() && info.lastModified() == m_fileStamp && info.size() == m_fileBytes) {
+      if (!m_watcher.files().contains(path)) m_watcher.addPath(path);
+      return;
+    }
+    m_fileChangedOnDisk = true;
+    if (info.exists() && !m_watcher.files().contains(path)) m_watcher.addPath(path);
+    setStatus(info.exists() ? tr("%1 has changed on disk.").arg(fileName())
+                            : tr("%1 is no longer on disk.").arg(fileName()));
+    emit fileStateChanged();
   });
   m_comparisonTicker.setInterval(40);
   connect(&m_comparisonTicker,&QTimer::timeout,this,&Backend::syncMediaComparison);
@@ -295,11 +312,35 @@ void Backend::acceptOpen(const Document &document, const QUrl &url) {
 
 void Backend::newDeck() { createDeck(0, 1920, 1080); }
 
+// Another deck at the same time is another copy of the application: separate
+// selection, undo, playback, notes and export queue, with nothing shared.
+bool Backend::openInNewWindow(const QUrl &url) {
+  const auto program = QCoreApplication::applicationFilePath();
+  if (program.isEmpty()) return false;
+  QStringList arguments;
+  if (url.isLocalFile()) arguments << url.toLocalFile();
+  if (!QProcess::startDetached(program, arguments)) {
+    setStatus(tr("Could not open another window."));
+    emit failed(status());
+    return false;
+  }
+  setStatus(arguments.isEmpty() ? tr("Opened another window")
+                                : tr("Opened %1 in another window")
+                                      .arg(displayNameFor(url)));
+  return true;
+}
+
 void Backend::save() {
-  if (m_fileUrl.isLocalFile())
+  const QFileInfo info(m_fileUrl.toLocalFile());
+  // A file that cannot be written is not an error to discover halfway through
+  // saving: ask where it should go instead.
+  if (m_fileUrl.isLocalFile() && (!info.exists() || info.isWritable()))
     saveAsync(m_fileUrl.toLocalFile());
-  else
+  else {
+    if (m_fileUrl.isLocalFile())
+      setStatus(tr("%1 is read-only — choose where to save instead.").arg(fileName()));
     saveAsDialog();
+  }
 }
 
 void Backend::saveAsDialog() {
@@ -348,7 +389,52 @@ void Backend::setFileUrl(const QUrl &url) {
   if (m_fileUrl == url)
     return;
   m_fileUrl = url;
+  watchFile();
   emit fileUrlChanged();
+  emit fileStateChanged();
+}
+
+// The deck's file, as it stands on disk right now: whether it can be written
+// to, whether it is still there, and whether someone else has changed it.
+void Backend::watchFile() {
+  if (!m_watcher.files().isEmpty()) m_watcher.removePaths(m_watcher.files());
+  m_fileChangedOnDisk = false;
+  const auto path = m_fileUrl.toLocalFile();
+  if (path.isEmpty()) { m_fileStamp = QDateTime(); m_fileBytes = -1; return; }
+  const QFileInfo info(path);
+  m_fileStamp = info.lastModified();
+  m_fileBytes = info.exists() ? info.size() : -1;
+  if (info.exists()) m_watcher.addPath(path);
+}
+
+QVariantMap Backend::fileState() const {
+  const auto path = m_fileUrl.toLocalFile();
+  const QFileInfo info(path);
+  const bool saved = !path.isEmpty();
+  return {{"path", path},
+          {"saved", saved},
+          {"missing", saved && !info.exists()},
+          {"readOnly", saved && info.exists() && !info.isWritable()},
+          {"changedOnDisk", m_fileChangedOnDisk},
+          {"modified", m_modified}};
+}
+
+void Backend::keepMyVersion() {
+  if (!m_fileChangedOnDisk) return;
+  m_fileChangedOnDisk = false;
+  const QFileInfo info(m_fileUrl.toLocalFile());
+  m_fileStamp = info.lastModified();
+  m_fileBytes = info.exists() ? info.size() : -1;
+  setStatus(tr("Keeping your version — saving will replace what is on disk."));
+  emit fileStateChanged();
+}
+
+void Backend::reloadFromDisk() {
+  if (!m_fileUrl.isLocalFile()) return;
+  const auto url = m_fileUrl;
+  m_fileChangedOnDisk = false;
+  emit fileStateChanged();
+  openAsync(url);
 }
 
 void Backend::setDocument(const Document &document) {

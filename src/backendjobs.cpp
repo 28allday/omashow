@@ -101,6 +101,8 @@ void Backend::saveAsync(const QString &path) {
             return;
         }
         m_modified = false; m_autosave.stop(); cancelJournal(); Recovery::discard();
+        watchFile();
+        emit fileStateChanged();
         emit documentChanged();
         setStatus(tr("Saved %1").arg(fileName()));
         emit saved();
