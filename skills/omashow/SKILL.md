@@ -33,7 +33,9 @@ omashow ops [--filter <text>]
 2. **`inspect`** it. This is not optional: every edit needs the `id` of the thing
    it changes, and those ids are generated. A new deck's slides already carry
    placeholder text boxes — use them rather than adding new ones, because they
-   inherit the layout's typography and position.
+   inherit the layout's typography and position. Each says its role as
+   `placeholderId` (`"title"`, `"body"`), so find them by role, not by order.
+   `inspect` leaves out every property still at its default; `--full` gives all.
 3. **`apply`** a list of operations.
 4. **`inspect` or `review`** again to check what you actually made.
 5. **`export`** it.
@@ -55,6 +57,20 @@ omashow ops [--filter <text>]
   names and types for anything you are unsure of.
 - Nothing is written unless every operation ran. Use `--dry-run` to rehearse and
   `--keep-going` only when a refusal is acceptable.
+- Every result says `changed`. An edit that ran but changed nothing carries a
+  `warning` (also gathered in the top-level `warnings`): a key, value or
+  selection that did not suit it. Read them.
+- A `"slide"` that does not exist, a `"select"` id that is not on that slide, and
+  a `setSelectedProperty` key the object does not have are refused before
+  anything runs, with the reason.
+
+## The numbers and names
+
+`omashow ops` (no filter) ends with a **`vocabulary`**: theme and layout numbers,
+build effects/phases/triggers/easing, transition kinds/directions/keys, chart and
+shape kinds, chart properties, table cell-style keys, and every property each
+kind of object has. Look numbers up there — never guess `addChart(3)` or an
+effect number.
 
 ## The operations worth knowing
 
@@ -66,7 +82,7 @@ omashow ops [--filter <text>]
 | Geometry | `setSelectedProperty` with `x`, `y`, `w`, `h`, `rotation`, `opacity` |
 | Pictures and film | `insertImage` / `insertMedia` with a path |
 | Shapes | `addShape` (a number from the gallery), `addRect` |
-| Tables and charts | `addTable`, `addChart` |
+| Tables and charts | `addTable` / `addChart`, then **`table.setCells`** with a list of rows — the chart's row 0 is series names, column 0 categories. From the top-left it replaces the whole grid. Cell styling: `table.selectCell` then `table.formatCells`; `table.setTableOption headerRows true`. `inspect` shows the words as `cells` |
 | Equations | `addEquation`, then `setSelectedProperty` `text` with TeX-ish source |
 | Words on a shape | `putTextOnShape` with a text box and a shape selected |
 | Design | `applyTheme`, `applyLayout`, `setThemeToken` (a colour or font of the theme) |
@@ -76,6 +92,11 @@ omashow ops [--filter <text>]
 
 ## Things that will bite
 
+- **Charts and tables land in the body's place.** A new one takes the layout's
+  body area (or the space under the title), so delete the body placeholder first
+  if the chart replaces it.
+- **Describe charts, tables and pictures** with `setSelectedProperty altText` —
+  `review` flags any without.
 - **Placeholders beat new boxes.** `addText` puts an unstyled box in the middle
   of the slide. The placeholders a layout gives you are already the right size,
   font and position; set their `text` instead.

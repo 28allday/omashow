@@ -13,8 +13,8 @@ bool Backend::addChart(int kind) {
   o.id = Edit::newId("chart");
   o.chart.kind = kind;
   o.groups = m_groupScope;
-  o.rect = {m_document.size.width() * .12, m_document.size.height() * .14,
-            m_document.size.width() * .76, m_document.size.height() * .72};
+  o.rect = roomForContent({m_document.size.width() * .12, m_document.size.height() * .14,
+                           m_document.size.width() * .76, m_document.size.height() * .72});
   o.fontSize = m_document.size.height() * .027;
   o.fillToken = "background";
   o.textColorToken = "foreground";

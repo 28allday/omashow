@@ -708,6 +708,9 @@ private:
     QStringList m_diagramScope;
     Slide m_gestureBasis;
     QRectF m_gestureBounds;
+    // Where a new chart or table belongs on the current slide: the layout's
+    // body area if it has one, else the space under the title, else `fallback`.
+    QRectF roomForContent(const QRectF &fallback) const;
     bool m_gestureActive = false;
     bool m_gestureWasModified = false;
     int m_revision = 0;

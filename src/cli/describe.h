@@ -21,4 +21,9 @@ namespace Cli {
 QVariantMap describeDeck(const Document &document, bool full = false);
 QVariantMap describeSlide(const Document &document, int index, bool full = false);
 QVariantMap describeReview(const Document &document, bool includeDismissed = false);
+
+// The numbers and names the operations take — build effects, chart and shape
+// kinds, transition keys, each kind of object's properties — so nothing has to
+// be guessed or read out of the source.
+QVariantMap vocabulary();
 } // namespace Cli

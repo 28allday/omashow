@@ -49,8 +49,12 @@ $ omashow inspect talk.omashow --slide 0
 }
 ```
 
-Heavy properties — path data, table and chart contents, per-range formatting —
-are left out unless you ask for `--full`.
+By default each object lists only what differs from a new object of its kind,
+plus its id, type, geometry, text and `placeholderId` (the layout role it fills:
+`title`, `body`, …). Tables and charts add their words as `cells`, a list of
+rows. Heavy properties — path data, full table and chart structure, per-range
+formatting — and the defaults come back with `--full`. Each layout lists its
+placeholders by role.
 
 ## Changing one
 
@@ -83,6 +87,32 @@ $ omashow apply talk.omashow ops.json
 - `--out` writes the result somewhere else and leaves the original alone.
 - `--dry-run` runs everything and writes nothing, which is how to check a plan.
 - The ops file can be `-` to read from standard input.
+- Each result says whether the deck `changed`. An edit that ran and changed
+  nothing gets a `warning`, gathered again under the top-level `warnings`.
+- A `"slide"` out of range, a `"select"` id not on that slide, and a
+  `setSelectedProperty` key the selected object does not have are refused
+  before anything runs. When the backend explains a refusal (a missing file, an
+  unreadable picture) that explanation is the error.
+
+## Tables and chart data
+
+Cells belong to the table model, which follows the selection. Its operations
+are named `table.<method>`:
+
+```json
+{"ops": [
+  {"op": "addChart", "slide": 1, "args": [0]},
+  {"op": "table.setCells", "args": [[["Quarter", "2025", "2026"],
+                                     ["Q1", "12", "15"], ["Q2", "14", "19"]]]},
+  {"op": "table.selectCell", "args": [0, 0]},
+  {"op": "table.selectCell", "args": [0, 2, true]},
+  {"op": "table.formatCells", "args": ["fontWeight", 700]}
+]}
+```
+
+`table.setCells(rows, row, column)` writes a grid from that cell, growing the
+table; from the top-left corner it replaces the whole table. A new table or
+chart is placed in the layout's body area, or under the title.
 
 ## What it will not do
 
@@ -169,6 +199,12 @@ $ omashow ops --filter text
 ```
 
 The list comes from the backend's own meta-object, so it is never out of date: a
-feature added to the app appears here the day it is added. Property setters are
+feature added to the app appears here the day it is added.
+
+Without `--filter` the answer also carries a `vocabulary`: what the numbers mean
+(themes, new-deck layouts, build effects, phases, triggers, easing, transition
+kinds and directions, chart and shape kinds) and which keys each setter takes
+(object properties by kind, chart properties, build properties, transition
+keys, table cell styles and options). Property setters are
 listed under the name a script would guess (`setCurrentSlide`, `setSnapEnabled`),
 and `get`/`set` read and write any property directly.

@@ -301,8 +301,10 @@ int offerSkill(const Flags &flags) {
 }
 
 int describeOps(const Flags &flags) {
-    return say({{QStringLiteral("operations"),
-                 Cli::describeOperations(flags.value(QStringLiteral("filter")))}});
+    const auto filter = flags.value(QStringLiteral("filter"));
+    QVariantMap payload{{QStringLiteral("operations"), Cli::describeOperations(filter)}};
+    if (filter.isEmpty()) payload[QStringLiteral("vocabulary")] = Cli::vocabulary();
+    return say(payload);
 }
 
 int makeDeck(Backend &backend, const Flags &flags) {
@@ -380,7 +382,9 @@ int applyOps(Backend &backend, const Flags &flags) {
         QVariantMap row{{QStringLiteral("at"), i},
                         {QStringLiteral("op"), operation.value(QStringLiteral("op"))},
                         {QStringLiteral("ok"), result.ok}};
+        row[QStringLiteral("changed")] = result.changed;
         if (!result.error.isEmpty()) row[QStringLiteral("error")] = result.error;
+        if (!result.warning.isEmpty()) row[QStringLiteral("warning")] = result.warning;
         if (result.value.isValid()) row[QStringLiteral("returned")] = result.value;
         results.append(row);
         if (result.ok) { ++done; continue; }
@@ -391,6 +395,13 @@ int applyOps(Backend &backend, const Flags &flags) {
     QVariantMap payload{{QStringLiteral("applied"), done},
                         {QStringLiteral("of"), operations.size()},
                         {QStringLiteral("results"), results}};
+    // Warnings gathered where they cannot be missed.
+    QVariantList warnings;
+    for (const auto &row : results)
+        if (row.toMap().contains(QStringLiteral("warning")))
+            warnings.append(QVariantMap{{QStringLiteral("at"), row.toMap().value(QStringLiteral("at"))},
+                                        {QStringLiteral("warning"), row.toMap().value(QStringLiteral("warning"))}});
+    if (!warnings.isEmpty()) payload[QStringLiteral("warnings")] = warnings;
     if (!everything && !keepGoing) {
         payload[QStringLiteral("written")] = false;
         return refuse(QStringLiteral("operation %1 did not run; nothing was written. Use "

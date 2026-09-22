@@ -26,6 +26,8 @@ struct OpResult {
     bool ok = false;
     QString error;
     QVariant value;       // what the method returned, if anything
+    bool changed = false; // whether the deck is different afterwards
+    QString warning;      // ran, but probably not as meant
 };
 
 // Every operation, with its arguments and what it gives back. `filter` narrows

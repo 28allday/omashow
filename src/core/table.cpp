@@ -495,6 +495,11 @@ bool Table::setStyle(TableData &t, int top, int left, int bottom, int right,
     }
   return true;
 }
+QStringList Table::styleKeyNames() {
+  QStringList keys(styleKeys.cbegin(), styleKeys.cend());
+  keys.sort();
+  return keys;
+}
 void Table::scale(TableData &t, qreal factor) {
   t.padding *= factor;
   t.borderWidth *= factor;

@@ -1,6 +1,9 @@
 #include "cli/describe.h"
 
 #include "anim/presentation.h"
+#include "core/chart.h"
+#include "core/shape.h"
+#include "core/table.h"
 #include "core/design.h"
 #include "core/review.h"
 #include "core/spelling.h"
@@ -53,11 +56,80 @@ QString transitionName(int kind) {
     }
 }
 
+QString typeName(ObjectType type) {
+    switch (type) {
+    case ObjectType::Text: return QStringLiteral("text");
+    case ObjectType::Image: return QStringLiteral("image");
+    case ObjectType::Media: return QStringLiteral("media");
+    case ObjectType::Table: return QStringLiteral("table");
+    case ObjectType::Chart: return QStringLiteral("chart");
+    case ObjectType::Rect: break;
+    }
+    return QStringLiteral("rect");
+}
+
+// What a brand-new object of this kind says about itself. A property still at
+// that value tells a reader nothing, so the compact reading leaves it out.
+const QVariantMap &blank(ObjectType type) {
+    static QHash<int, QVariantMap> cache;
+    auto found = cache.find(int(type));
+    if (found == cache.end()) {
+        SceneObject object;
+        object.type = type;
+        found = cache.insert(int(type), Design::properties(object));
+    }
+    return *found;
+}
+
+// Always given, whatever their value: what an agent aims with.
+const QStringList &always() {
+    static const QStringList keys{QStringLiteral("id"), QStringLiteral("type"),
+                                  QStringLiteral("x"),  QStringLiteral("y"),
+                                  QStringLiteral("w"),  QStringLiteral("h"),
+                                  QStringLiteral("text"), QStringLiteral("placeholderId")};
+    return keys;
+}
+
+// A table's or chart's words as rows of text, which is how they are written
+// back (table.setCells). Covered cells of a merge read as empty.
+QVariantList grid(const TableData &table) {
+    QVariantList rows;
+    for (int r = 0; r < table.rows.size(); ++r) {
+        QVariantList row;
+        for (int c = 0; c < table.columns.size(); ++c) {
+            const int k = Table::anchor(table, r, c);
+            const bool own = k >= 0 && k == r * int(table.columns.size()) + c;
+            row.append(own ? table.cells.at(k).text : QString());
+        }
+        rows.append(QVariant(row));
+    }
+    return rows;
+}
+
 QVariantMap describeObject(const Document &d, const SceneObject &authored,
                            const SceneObject &shown, bool full) {
     auto values = Design::properties(shown);
-    if (!full)
+    if (!full) {
         for (const auto &key : heavy()) values.remove(key);
+        const auto &plain = blank(shown.type);
+        for (auto it = values.begin(); it != values.end();) {
+            if (!always().contains(it.key()) && plain.contains(it.key()) &&
+                plain.value(it.key()) == it.value())
+                it = values.erase(it);
+            else
+                ++it;
+        }
+        if (shown.type != ObjectType::Text && shown.text.isEmpty()) values.remove(QStringLiteral("text"));
+        if (authored.placeholderId.isEmpty()) values.remove(QStringLiteral("placeholderId"));
+        values.remove(QStringLiteral("groups"));
+        if (!shown.groups.isEmpty()) values[QStringLiteral("groups")] = shown.groups;
+    }
+    if (shown.type == ObjectType::Table || shown.type == ObjectType::Chart)
+        values[QStringLiteral("cells")] = grid(shown.table);
+    if (shown.type == ObjectType::Chart) {
+        values[QStringLiteral("chartKind")] = Chart::names().value(shown.chart.kind);
+        values[QStringLiteral("chartTitle")] = shown.chart.title;
+    }
     // What is the box's own, and what it is taking from a layout or a style.
     values[QStringLiteral("overrides")] = authored.overrides;
     values[QStringLiteral("fromPlaceholder")] = !authored.placeholderId.isEmpty();
@@ -133,9 +205,12 @@ QVariantMap Cli::describeDeck(const Document &d, bool full) {
                                    {QStringLiteral("name"), master.name}});
     for (const auto &layout : d.layouts) {
         QVariantList placeholders;
+        // A placeholder's id is its role ("title", "body", …); a slide's object
+        // names the role it fills as its placeholderId.
         for (const auto &object : layout.placeholders)
-            if (!object.placeholderId.isEmpty())
-                placeholders.append(object.placeholderId);
+            placeholders.append(QVariantMap{{QStringLiteral("id"), object.id},
+                                            {QStringLiteral("type"), typeName(object.type)},
+                                            {QStringLiteral("prompt"), object.text}});
         layouts.append(QVariantMap{{QStringLiteral("id"), layout.id},
                                    {QStringLiteral("name"), layout.name},
                                    {QStringLiteral("masterId"), layout.masterId},
@@ -172,6 +247,93 @@ QVariantMap Cli::describeDeck(const Document &d, bool full) {
         {QStringLiteral("textStyles"), styles},
         {QStringLiteral("slides"), slides},
         {QStringLiteral("statistics"), Review::statistics(d)}};
+}
+
+QVariantMap Cli::vocabulary() {
+    const auto indexed = [](const QStringList &names, int from = 0) {
+        QVariantMap map;
+        for (int i = 0; i < names.size(); ++i) map[QString::number(from + i)] = names.at(i);
+        return map;
+    };
+    QVariantMap objectProperties;
+    for (auto type : {ObjectType::Text, ObjectType::Rect, ObjectType::Image, ObjectType::Media,
+                      ObjectType::Table, ObjectType::Chart}) {
+        auto keys = blank(type).keys();
+        for (const auto &skip : {QStringLiteral("id"), QStringLiteral("type"),
+                                 QStringLiteral("overrides"), QStringLiteral("groups"),
+                                 QStringLiteral("placeholderId"), QStringLiteral("textStyleId")})
+            keys.removeAll(skip);
+        // Film and sound are changed through their own operations.
+        keys.erase(std::remove_if(keys.begin(), keys.end(),
+                                  [](const QString &k) { return k.startsWith(QStringLiteral("media")); }),
+                   keys.end());
+        objectProperties[typeName(type)] = keys;
+    }
+    auto chartKeys = Chart::encode(ChartData{}).keys();
+    chartKeys.removeAll(QStringLiteral("seriesColors"));
+    QVariantMap effects;
+    for (int e = int(Effect::Fade); e <= int(Effect::Path); ++e)
+        if (e != int(Effect::Media)) effects[QString::number(e)] = effectName(Effect(e));
+    return QVariantMap{
+        {QStringLiteral("themes"), indexed({QStringLiteral("Midnight"), QStringLiteral("Paper"),
+                                            QStringLiteral("Grove")})},
+        {QStringLiteral("newDeckLayouts"),
+         indexed({QStringLiteral("Title"), QStringLiteral("Title and body"), QStringLiteral("Blank")})},
+        {QStringLiteral("objectProperties"), objectProperties},
+        {QStringLiteral("shapes"),
+         QVariantMap{{QStringLiteral("for"), QStringLiteral("addShape(kind)")},
+                     {QStringLiteral("kinds"), indexed(Shape::names())}}},
+        {QStringLiteral("charts"),
+         QVariantMap{{QStringLiteral("for"), QStringLiteral("addChart(kind), setChartProperty(\"kind\", n)")},
+                     {QStringLiteral("kinds"), indexed(Chart::names())},
+                     {QStringLiteral("properties"), chartKeys},
+                     {QStringLiteral("data"), QStringLiteral("table.setCells with the chart selected: row 0 "
+                                                             "the series names, column 0 the categories")}}},
+        {QStringLiteral("tables"),
+         QVariantMap{{QStringLiteral("cells"), QStringLiteral("table.setCells(rows, row, column)")},
+                     {QStringLiteral("cellStyle"),
+                      QVariantMap{{QStringLiteral("for"),
+                                   QStringLiteral("table.selectCell(row, column[, extend]) then "
+                                                  "table.formatCells(key, value)")},
+                                  {QStringLiteral("keys"), Table::styleKeyNames()}}},
+                     {QStringLiteral("options"),
+                      QVariantMap{{QStringLiteral("for"), QStringLiteral("table.setTableOption(key, bool)")},
+                                  {QStringLiteral("keys"), QStringList{QStringLiteral("headerRows"),
+                                                                       QStringLiteral("headerColumns"),
+                                                                       QStringLiteral("banded")}}}}}},
+        {QStringLiteral("builds"),
+         QVariantMap{{QStringLiteral("for"),
+                      QStringLiteral("addBuild(targetId, phase, effect) returns the build's index; "
+                                     "setBuildProperty(index, key, value)")},
+                     {QStringLiteral("phases"), indexed({QStringLiteral("in"), QStringLiteral("out")})},
+                     {QStringLiteral("effects"), effects},
+                     {QStringLiteral("triggers"),
+                      indexed({QStringLiteral("absolute"), QStringLiteral("onClick"),
+                               QStringLiteral("withPrevious"), QStringLiteral("afterPrevious")})},
+                     {QStringLiteral("easing"),
+                      QVariantMap{{QString::number(int(QEasingCurve::Linear)), QStringLiteral("linear")},
+                                  {QString::number(int(QEasingCurve::OutCubic)), QStringLiteral("ease out")},
+                                  {QString::number(int(QEasingCurve::InOutCubic)), QStringLiteral("ease in and out")}}},
+                     {QStringLiteral("revealUnits"),
+                      indexed({QStringLiteral("paragraphs"), QStringLiteral("words"), QStringLiteral("characters")})},
+                     {QStringLiteral("properties"),
+                      QStringList{QStringLiteral("start"), QStringLiteral("duration"), QStringLiteral("delay"),
+                                  QStringLiteral("trigger"), QStringLiteral("phase"), QStringLiteral("effect"),
+                                  QStringLiteral("amountX"), QStringLiteral("amountY"), QStringLiteral("amount"),
+                                  QStringLiteral("unit"), QStringLiteral("easing"), QStringLiteral("pathId"),
+                                  QStringLiteral("pathReverse"), QStringLiteral("orient")}}}},
+        {QStringLiteral("transitions"),
+         QVariantMap{{QStringLiteral("for"),
+                      QStringLiteral("setSlideTransition(key, value[, everySlide]); -1 means follow the deck")},
+                     {QStringLiteral("kinds"),
+                      indexed({QStringLiteral("cut"), QStringLiteral("fade"), QStringLiteral("push"),
+                               QStringLiteral("morph")})},
+                     {QStringLiteral("directions"),
+                      indexed({QStringLiteral("left"), QStringLiteral("right"), QStringLiteral("up"),
+                               QStringLiteral("down")})},
+                     {QStringLiteral("keys"),
+                      QStringList{QStringLiteral("kind"), QStringLiteral("direction"),
+                                  QStringLiteral("seconds"), QStringLiteral("advanceAfter")}}}}};
 }
 
 QVariantMap Cli::describeReview(const Document &d, bool includeDismissed) {

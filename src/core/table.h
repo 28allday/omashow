@@ -19,4 +19,6 @@ bool changeAxis(TableData &table, bool rows, int index, bool remove);
 bool setStyle(TableData &table, int top, int left, int bottom, int right,
               const QString &key, const QVariant &value);
 void scale(TableData &table, qreal factor);
+// The per-cell style keys setStyle accepts, for anything describing them.
+QStringList styleKeyNames();
 } // namespace Table

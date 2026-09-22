@@ -9,6 +9,29 @@ TableModel *Backend::tableModel() {
     m_tableModel = new TableModel(this);
   return m_tableModel;
 }
+QRectF Backend::roomForContent(const QRectF &fallback) const {
+  if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size())
+    return fallback;
+  const auto &slide = m_document.slides.at(m_currentSlide);
+  // A layout with a body says where content goes, whether or not the body
+  // placeholder is still on the slide.
+  if (const auto *layout = Design::layout(m_document, slide.layoutId))
+    for (const auto &placeholder : layout->placeholders)
+      if (placeholder.id == QLatin1String("body") && placeholder.rect.isValid())
+        return placeholder.rect;
+  // Otherwise keep clear of the title: the space from under it to the
+  // bottom margin, as wide as the fallback.
+  const auto shown = Design::resolve(m_document, m_currentSlide);
+  for (const auto &object : shown.objects)
+    if (object.placeholderId == QLatin1String("title") && !object.hidden) {
+      const qreal margin = m_document.size.height() * .06;
+      const qreal top = object.rect.bottom() + margin * .5;
+      const qreal bottom = m_document.size.height() - margin;
+      if (bottom - top > m_document.size.height() * .25)
+        return QRectF(fallback.left(), top, fallback.width(), bottom - top);
+    }
+  return fallback;
+}
 bool Backend::addTable(int rows, int columns) {
   const auto data = Table::create(rows, columns);
   if (data.rows.isEmpty() || m_currentSlide < 0 ||
@@ -20,8 +43,8 @@ bool Backend::addTable(int rows, int columns) {
   object.table = data;
   object.groups = m_groupScope;
   const auto size = m_document.size;
-  object.rect = {size.width() * .15, size.height() * .25, size.width() * .7,
-                 size.height() * .5};
+  object.rect = roomForContent({size.width() * .15, size.height() * .25,
+                                size.width() * .7, size.height() * .5});
   object.fillToken = "background";
   object.textColorToken = "foreground";
   object.fontToken = "body";
