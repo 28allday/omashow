@@ -368,7 +368,7 @@ QVariantList Review::issues(const Document &d) {
             if (needsDescription(o) && o.altText.trimmed().isEmpty() && authoredHere)
                 add("alt/" + o.id, i, authored.id, o.id, "must", "description",
                     nameFor(o) + " has no description",
-                    "Add alternative text in the Review workspace so the content is not lost "
+                    "Add alternative text in Review so the content is not lost "
                     "to anyone who cannot see it.");
             if (o.type == ObjectType::Text && !o.text.trimmed().isEmpty()) {
                 const qreal ratio = Design::contrastRatio(o.textColor, shown.background);
@@ -460,7 +460,7 @@ QVariantList Review::issues(const Document &d) {
                 add("order/" + authored.id, i, authored.id, QString(), "should", "order",
                     QString("Slide %1 is read in a different order than it is laid out").arg(i + 1),
                     "Objects are read in the order they were added. Set a reading order in "
-                    "the Review workspace to match what the slide looks like.");
+                    "Review to match what the slide looks like.");
         }
     }
     return rows;

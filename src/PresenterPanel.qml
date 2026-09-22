@@ -54,8 +54,10 @@ Rectangle {
                 anchors.rightMargin: Theme.s4
                 spacing: Theme.s3
 
+                // Before the show the window's own bar already says where you are.
                 Label {
-                    text: presenter.running ? qsTr("Presenter Console") : qsTr("Present")
+                    visible: presenter.running
+                    text: qsTr("Presenter Console")
                     font.pixelSize: Theme.fsSection; font.weight: Theme.wHeading
                 }
                 Item { Layout.fillWidth: true }

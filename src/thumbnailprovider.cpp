@@ -40,6 +40,7 @@ void SlideThumbnailProvider::capture(Backend *backend) {
     next.importRevision = backend->deckImport().value("revision").toInt();
     next.diagram = backend->diagramObjects();
     next.current = backend->currentSlide();
+    next.revision = backend->revision();
     next.selected = backend->selectedIds();
     next.before = backend->m_mediaPreviewSource;
     next.after = backend->m_mediaPreview;
@@ -49,11 +50,13 @@ void SlideThumbnailProvider::capture(Backend *backend) {
 }
 
 SlideThumbnailProvider::Snapshot SlideThumbnailProvider::snapshotFor(int layoutRevision,
-                                                                    int importRevision) {
+                                                                    int importRevision,
+                                                                    int documentRevision) {
     QMutexLocker lock(&m_mutex);
     QDeadlineTimer deadline(250);
     while ((layoutRevision > 0 && m_snapshot.layoutRevision != layoutRevision) ||
-           (importRevision > 0 && m_snapshot.importRevision != importRevision)) {
+           (importRevision > 0 && m_snapshot.importRevision != importRevision) ||
+           (documentRevision > 0 && m_snapshot.revision < documentRevision)) {
         if (!m_captured.wait(&m_mutex, deadline)) break;
     }
     return m_snapshot;
@@ -70,7 +73,8 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
     };
     const Snapshot snapshot = snapshotFor(
         id.startsWith("layout-apply/") ? id.section('/', 2, 2).toInt() : 0,
-        id.startsWith("import/") || id.startsWith("import-source/") ? id.section('/', 2, 2).toInt() : 0);
+        id.startsWith("import/") || id.startsWith("import-source/") ? id.section('/', 2, 2).toInt() : 0,
+        !id.isEmpty() && id.at(0).isDigit() ? id.section('/', 1, 1).toInt() : 0);
     if(id.startsWith("media-comparison/")) {
         const auto &object = id.section('/',1,1)=="after" ? snapshot.after : snapshot.before;
         auto image = object.type == ObjectType::Media ? MediaAsset::frameAt(object, id.section('/',2,2).toDouble()) : object.image;

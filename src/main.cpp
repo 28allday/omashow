@@ -111,12 +111,19 @@ int captureInterface(QQmlApplicationEngine &engine, Backend &backend, Presenter 
         backend.createDeck(0, 1920, 1080, 0);
     }
     const struct { int workspace; const char *name; } views[] = {
-        {0, "edit"}, {1, "design"}, {2, "animate"}, {4, "present"}, {5, "export"}, {6, "sorter"}};
+        {0, "edit"}, {1, "design"}, {2, "animate"}, {3, "review"}, {4, "present"}, {6, "sorter"}};
     for (const auto &view : views) {
         window->setProperty("workspace", view.workspace);
         save(window, QString::fromLatin1(view.name));
     }
     window->setProperty("workspace", 0);
+    window->setProperty("sidebar", 1);
+    save(window, QStringLiteral("document"));
+    window->setProperty("sidebar", 0);
+    QMetaObject::invokeMethod(window, "showExport");
+    save(window, QStringLiteral("export"));
+    for (QObject *sheet : window->findChildren<QObject *>(QStringLiteral("exportSheet")))
+        QMetaObject::invokeMethod(sheet, "close");
     const QVariantList objects = backend.slideObjects();
     if (!objects.isEmpty()) {
         backend.select(objects.first().toMap().value(QStringLiteral("id")).toString());

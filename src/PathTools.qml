@@ -83,17 +83,22 @@ Item {
             }
         }
     }
-    // Drawing tools float at the canvas's top left; Snap sits opposite them.
+    // Pen and freehand start from the toolbar's Shape menu. This strip only
+    // appears when there is something for it to do: finishing a drawing,
+    // editing a path's nodes, or cropping the selected picture.
+    readonly property bool pathSelected: backend.selectionCount===1 && backend.selection.shapeKind===99 && !backend.selection.connector
+    readonly property bool pictureSelected: backend.selectionCount===1 && backend.selection.type==="image"
     Rectangle {
+        objectName: "drawingStrip"
         anchors.top: parent.top; anchors.left: parent.left; anchors.margins: Theme.s3
         color: Theme.panelBg; border.color: Theme.border; radius: Theme.rCard
-        visible: !canvas.cropMode
+        visible: !canvas.cropMode && (root.mode!==0 || root.pathSelected || root.pictureSelected)
         width: toolbar.implicitWidth + Theme.s1 * 2; height: toolbar.implicitHeight + Theme.s1 * 2
         RowLayout {
             id: toolbar; anchors.centerIn: parent; spacing: Theme.s1
-            Button { objectName: "penTool"; visible: root.mode===0; text: qsTr("Pen"); icon.name: "pen-tool"; flat: true; checkable: true; checked: root.mode===1; onClicked: root.start(checked?1:0) }
-            Button { objectName: "freehandTool"; visible: root.mode===0; text: qsTr("Freehand"); icon.name: "pencil-line"; flat: true; checkable: true; checked: root.mode===2; onClicked: root.start(checked?2:0) }
-            Button { objectName: "nodeTool"; visible: root.mode===0 || root.mode===3; text: qsTr("Nodes"); icon.name: "spline"; flat: true; checkable: true; checked: root.mode===3; enabled: backend.selectionCount===1 && backend.selection.shapeKind===99 && !backend.selection.connector; onClicked: root.start(checked?3:0) }
+            Label { visible: root.mode===1 || root.mode===2; leftPadding: Theme.s2; rightPadding: Theme.s2; color: Theme.textSecondary
+                    text: root.mode===1 ? qsTr("Pen") : qsTr("Freehand") }
+            Button { objectName: "nodeTool"; visible: (root.mode===0 && root.pathSelected) || root.mode===3; text: qsTr("Edit nodes"); icon.name: "spline"; flat: true; checkable: true; checked: root.mode===3; onClicked: root.start(checked?3:0) }
             Button { objectName: "cropPictureTool"; text: qsTr("Crop"); icon.name: "crop"; flat: true; visible: root.mode===0 && backend.selectionCount===1 && backend.selection.type==="image"; onClicked: backend.editSelectedImageCrop() }
             Button { objectName: "finishPath"; text: qsTr("Finish"); icon.name: "check"; highlighted: true; visible: root.mode===1; enabled: root.points.length>=2; onClicked: root.finish(false) }
             Button { objectName: "closeDrawnPath"; text: qsTr("Close"); visible: root.mode===1; enabled: root.points.length>=3; onClicked: root.finish(true) }

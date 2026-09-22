@@ -28,6 +28,7 @@ FocusScope {
         return thumbHeight
     }
     signal editRequested()
+    signal lightTableRequested()
     Item { id: keyboardFocus; focus: true }
     function focusBrowser() { keyboardFocus.forceActiveFocus() }
 
@@ -101,8 +102,11 @@ FocusScope {
             ComboBox {
                 objectName: "navigatorMode"; visible: !root.sorter; flat: true
                 implicitWidth: Theme.s5 * 4 + Theme.s2; implicitHeight: Theme.hControl
-                model: [qsTr("Thumbnails"),qsTr("Compact"),qsTr("Outline")]; currentIndex: root.mode; onActivated: root.mode = currentIndex
-                ToolTip.visible: hovered && !popup.visible; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Show slides as thumbnails, titles or an outline")
+                // The fourth choice is the light table: every slide at once,
+                // across the whole window, as Keynote's View menu offers it.
+                model: [qsTr("Thumbnails"),qsTr("Compact"),qsTr("Outline"),qsTr("Light table")]; currentIndex: root.mode
+                onActivated: index => { if (index === 3) { currentIndex = root.mode; root.lightTableRequested() } else root.mode = index }
+                ToolTip.visible: hovered && !popup.visible; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Show slides as thumbnails, titles, an outline or the light table")
             }
             ToolButton {
                 icon.name: "plus"; onClicked: backend.addSlide()

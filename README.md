@@ -3,6 +3,25 @@
 A native Qt 6 / QML presentation app for Omarchy: keyboard-first and offline.
 The app opens a Start centre with theme previews, slide-size presets and recent files.
 
+## The window
+
+One toolbar, the slide list on the left, the slide in the middle and a sidebar
+on the right:
+
+- **The toolbar** adds slides and things to put on them — text, shapes (and the
+  pen and freehand tools, under Shape), pictures, tables, charts, diagrams and
+  media — and has Arrange, Review, undo and Play.
+- **The sidebar** has three switches at the toolbar's right-hand end:
+  **Format** styles whatever is selected (or the slide, with nothing selected);
+  **Animate** shows builds and the slide's transition, with the build timeline
+  under the slide; **Document** holds the theme, slide size, language, and the
+  ways into the masters, presenter setup and review.
+- **Rooms you visit and leave:** editing masters and layouts, Review, presenter
+  setup and the light table replace the toolbar with a title and **Done**.
+  Escape does the same.
+- **Export** (File ▸ Export…) is a sheet over the deck. Play goes straight to
+  the show; presenter notes open from View ▸ Presenter notes.
+
 ## What works
 
 - **Start:** Midnight, Paper and Grove previews; widescreen, standard, portrait,
@@ -68,7 +87,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   animation. Detach into a path for free editing. Object links support web/email,
   stable slide targets, next/previous, first/last and end-show actions. External
   links pause the show and require a private presenter confirmation before opening.
-- **Drawing:** Pen creates point paths; Freehand creates smooth curves. Finish or
+- **Drawing:** Shape ▸ Draw with the pen creates point paths; Draw freehand
+  creates smooth curves. Finish or
   close a path, convert a shape to a path, drag anchors/control points, remove
   nodes, and open/close paths. Esc cancels; a drag is one undo step.
 - **Pictures:** insert PNG/JPEG/WebP or static self-contained SVG using the toolbar,
@@ -114,19 +134,20 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
 - **Diagrams:** preview and insert native process or hierarchy diagrams in
   either direction. Shapes, labels and attached connectors remain grouped and
   editable; outline validation and text-fit checks catch unreadable layouts.
-- **Design:** Midnight, Paper and Grove theme previews; editable colour/font
+- **Design:** Document ▸ theme switches Midnight, Paper and Grove; Edit masters
+  and layouts opens the room for previews, editable colour/font
   tokens with contrast feedback; master management; text/shape placeholder layouts.
   Apply layouts to the current, selected or all slides with placeholder mapping,
   before/after previews and overflow/displacement warnings. Keep local position
   edits, reapply layout positions or keep every current position. The whole batch
   undoes together. Reset position and style separately.
-- **Master fields:** Design → Fields controls slide numbers, a saved date and
+- **Master fields:** the masters room's Fields tab controls slide numbers, a saved date and
   footer text, the starting number and first-slide visibility. Numbers follow
   deck order, including skipped slides. Fields use the theme's body font and
   muted colour in a footer strip that follows slide size. In Edit, deselect
   objects to toggle master artwork or fields for that slide, independently of
   its background colour. Fields stay as selectable text in PDF.
-- **Import from another deck:** File → Import from deck, or Design → Import from
+- **Import from another deck:** File → Import from deck, or the masters room's Import from
   deck, brings slides across with their masters, layouts, theme and content.
   Choose the slides, then reuse matching masters and layouts, import copies of
   them, or keep each slide's own appearance with no design at all. Missing
@@ -134,7 +155,7 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   out, before anything is inserted. A different slide size is scaled to this
   deck, sections arrive by name, and the whole import is one undo step. The
   preview on the right is the slide that will arrive.
-- **Unused design:** Design → Unused lists masters no layout points at, layouts
+- **Unused design:** the masters room's Unused tab lists masters no layout points at, layouts
   no slide uses, empty sections and originals kept from optimising a picture or
   film, with what each would give back. Removing the ones you pick is one undo
   step and never changes what a slide looks like.
@@ -153,7 +174,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   so a transition looks the same in all three.
 - **Slides:** range/toggle/select-all, batch duplicate/delete, multi-slide drag
   and keyboard reorder. Thumbnail, compact and outline navigation share the
-  selection with the large Sorter workspace. Named sections travel with whole
+  selection with the light table (the slide list's fourth view, or View ▸
+  Light table). Named sections travel with whole
   section selections; notes, builds, pictures and skipped states have badges.
   Duplicated objects retain the identities used by Morph.
 - **Sections:** create, rename, select, move up/down, collapse/expand and remove
@@ -161,7 +183,7 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   also offers collapse/expand all. Collapsed summaries show hidden selection
   counts and share state between the navigator and sorter. Collapse is a session
   preference: it does not dirty the deck or change the show/export sequence.
-- **Slide size:** Arrange → Slide size previews proportional fit/centre or
+- **Slide size:** Document ▸ Slide size (or Arrange → Slide size) previews proportional fit/centre or
   unchanged content size/position. Applying resizes every slide, master and
   layout in one undo step.
 - **Skip slides:** Slides → Actions → Skip in show keeps slides editable while
@@ -196,7 +218,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   a slide simply takes it out of the show.
 - **Present:** separate audience and presenter windows, current/next previews,
   speaker notes, slide navigator, click-group navigation, elapsed/countdown,
-  black/white and freeze. Named display routing, swapping and windowed rehearsal.
+  black/white and freeze. Named display routing, swapping and windowed rehearsal
+  are in Present ▸ Presenter setup… (also Document ▸ Displays, timings and shows).
 - **Export:** PDF with real text — the slides, slides with their notes, the deck
   as an outline, or several slides a sheet — and build-stage handouts; pictures as PNG or
   JPEG at any width, with or without the slide background; and film as H.264,
@@ -220,7 +243,8 @@ The app opens a Start centre with theme previews, slide-size presets and recent 
   shortcuts behind it stand down rather than reaching the deck underneath.
 - **Accessibility:** the interface names itself to assistive technology — the
   canvas says which slide it is showing and what is selected, slide rows say
-  what is special about them, workspaces are tabs and the status line is
+  what is special about them, the Format / Animate / Document switches are tabs
+  and the status line is
   readable text. "Less movement" takes the animation out of the interface and
   makes a show arrive at each moment instead of travelling to it; "Stronger
   contrast" firms up edges and quiet text. Both are yours, not the deck's: a
@@ -344,12 +368,12 @@ omashow skill --link   # optional: the agent skill for the command line
 | `Ctrl++` / `Ctrl+-` | Zoom in / out |
 | `Ctrl+0` / `Ctrl+1` | Fit slide / 100% |
 | `Ctrl+Shift+0` | Fit selected objects |
-| Shift-click / Ctrl-click in Slides or Sorter | Range / toggle selection |
-| `Ctrl+A` / `Ctrl+D` / Delete in Slides or Sorter | Select all / duplicate / delete selected slides |
+| Shift-click / Ctrl-click in Slides or the light table | Range / toggle selection |
+| `Ctrl+A` / `Ctrl+D` / Delete in Slides or the light table | Select all / duplicate / delete selected slides |
 | `Ctrl+wheel` / middle-button drag | Zoom around pointer / pan |
 | `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Reorder selected slides |
-| `Ctrl+←` / `Ctrl+→` in Slides or Sorter | Collapse / expand current section |
-| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` in Slides or Sorter | Move current section up / down |
+| `Ctrl+←` / `Ctrl+→` in Slides or the light table | Collapse / expand current section |
+| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` in Slides or the light table | Move current section up / down |
 | `T` / `S` | Add text / shape in Edit |
 | `Shift-click` / drag empty canvas | Extend selection / box-select |
 | `Alt-click` | Select behind another object |
@@ -363,6 +387,7 @@ omashow skill --link   # optional: the agent skill for the command line
 | `←` / `PgUp` during show | Previous cue / slide |
 | `B` / `W` / `F` on audience output | Black / white / freeze |
 | `Escape` during show | End show |
+| `Escape` in a room | Back to the slide (same as Done) |
 | `Ctrl+E` | Export PDF |
 
 ## Presenter displays

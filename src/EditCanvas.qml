@@ -17,6 +17,7 @@ Item {
     CropOverlay { id: cropper; canvas: root; anchors.fill: parent; z: 16 }
     readonly property int pathMode: pathTools.mode
     function cancelPathTool() { pathTools.cancel() }
+    function startPathTool(mode) { pathTools.start(mode) }
     function deletePathNode() { pathTools.removeNode() }
     PathTools { id: pathTools; canvas: root; anchors.fill: parent; z: 15 }
 

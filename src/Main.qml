@@ -16,7 +16,26 @@ ApplicationWindow {
            + qsTr("slide %1 of %2").arg(backend.currentSlide + 1).arg(backend.slideCount)
            + " — " + Theme.appName
 
-    property int workspace: 0   // 0 Edit, 1 Design, 2 Animate, 3 Review, 4 Present, 5 Export, 6 Sorter
+    // What the body shows. 0 the slide, 2 the slide with its build timeline;
+    // 1 masters, 3 review, 4 presenter setup and 6 the light table are rooms
+    // visited from the slide and left with Done. (5 was Export, now a sheet.)
+    property int workspace: 0
+    readonly property bool inMode: workspace === 1 || workspace === 3 || workspace === 4 || workspace === 6
+    // The sidebar beside the slide: 0 Format, 1 Document. Animate is its own
+    // view, so the switch the toolbar shows lit is worked out from both.
+    property int sidebar: 0
+    readonly property int sidebarChoice: workspace === 2 ? 1 : workspace === 0 ? (sidebar === 1 ? 2 : 0) : -1
+    function chooseSidebar(choice) {
+        win.commitEditors()
+        if (choice === 1) { win.workspace = 2; return }
+        win.sidebar = choice === 2 ? 1 : 0
+        win.workspace = 0
+        win.inspectorCollapsed = false
+    }
+    // Adding something to the slide brings the slide and its Format sidebar back.
+    function toFormat() { win.commitEditors(); win.workspace = 0; win.sidebar = 0 }
+    function leaveMode() { win.commitEditors(); win.workspace = 0 }
+    function showExport() { win.commitEditors(); exportSheet.open() }
     readonly property bool slideFocus: (slideNavigator.activeFocus || slideSorter.activeFocus) && !textEntryFocused
     readonly property bool editing: workspace === 0 && !backend.startVisible
     readonly property bool presenting: presenter.running
@@ -29,7 +48,8 @@ ApplicationWindow {
     color: Theme.windowBg
 
     // Presenter notes under the Edit canvas, as in the concept; View toggles it.
-    property bool notesOpen: (backend.panelState.notesOpen ?? "true") === "true"
+    // Closed until asked for, as in Keynote: the slide gets the room.
+    property bool notesOpen: (backend.panelState.notesOpen ?? "false") === "true"
     // Panels: dragged wider or narrower, collapsed out of the way, and put back
     // where they were next time.
     property real navigatorWidth: backend.panelState.navigatorWidth ?? Theme.wNavigator
@@ -158,6 +178,7 @@ ApplicationWindow {
                    if (win.presenting) win.endShow()
                    else if(editCanvas.cropMode) editCanvas.cancelCrop()
                    else if(editCanvas.pathMode!==0) editCanvas.cancelPathTool()
+                   else if (win.inMode) win.leaveMode()
                    else { backend.cancelEdit(); backend.leaveGroup() }
                } }
     Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && (win.workspace === 2 || win.workspace === 4)
@@ -211,7 +232,7 @@ ApplicationWindow {
         discardSheet.open()
     }
 
-    function startShow() { win.commitEditors(); win.workspace = 4; presenter.start(false,false) }
+    function startShow() { win.commitEditors(); presenter.start(false,false) }
     function endShow() { presenter.stop() }
     SlideSizeDialog { id: slideSizeDialog }
     LayoutApplyDialog { id: layoutApplyDialog }
@@ -229,18 +250,20 @@ ApplicationWindow {
             { group: qsTr("File"), name: qsTr("Keep this deck as a template"), also: "template reuse starting point", enabled: !backend.startVisible, run: () => { win.commitEditors(); templateName.open() } },
             { group: qsTr("File"), name: qsTr("Install a template"), also: "template add pack", run: () => backend.installTemplateDialog() },
             { group: qsTr("Export"), name: qsTr("Export a PDF"), also: "document handout print pages", shortcut: "Ctrl+E", run: () => { win.commitEditors(); backend.exportDialog({ kind: 0 }) } },
-            { group: qsTr("Export"), name: qsTr("Export pictures"), also: "png jpeg images slides", run: () => { win.workspace = 5 } },
-            { group: qsTr("Export"), name: qsTr("Export film"), also: "video movie mp4 record", run: () => { win.workspace = 5 } },
-            { group: qsTr("Export"), name: qsTr("Print"), also: "paper printer handout", run: () => { win.workspace = 5 } },
-            { group: qsTr("Export"), name: qsTr("Package the deck"), also: "zip send share assets", run: () => { win.workspace = 5 } },
+            { group: qsTr("Export"), name: qsTr("Export pictures"), also: "png jpeg images slides", run: () => win.showExport() },
+            { group: qsTr("Export"), name: qsTr("Export film"), also: "video movie mp4 record", run: () => win.showExport() },
+            { group: qsTr("Export"), name: qsTr("Print"), also: "paper printer handout", run: () => win.showExport() },
+            { group: qsTr("Export"), name: qsTr("Package the deck"), also: "zip send share assets", run: () => win.showExport() },
             { group: qsTr("Present"), name: qsTr("Present from the start"), also: "show play full screen", shortcut: "F5", run: () => win.startShow() },
-            { group: qsTr("Present"), name: qsTr("Present from this slide"), also: "show play current", run: () => { win.commitEditors(); win.workspace = 4; presenter.start(true,false) } },
-            { group: qsTr("Present"), name: qsTr("Rehearse in a window"), also: "practise timing", run: () => { win.commitEditors(); win.workspace = 4; presenter.start(false,true) } },
-            { group: qsTr("Workspace"), name: qsTr("Edit"), also: "canvas slide", run: () => win.workspace = 0 },
-            { group: qsTr("Workspace"), name: qsTr("Design"), also: "theme master layout template", run: () => win.workspace = 1 },
-            { group: qsTr("Workspace"), name: qsTr("Animate"), also: "build transition timeline motion", run: () => win.workspace = 2 },
-            { group: qsTr("Workspace"), name: qsTr("Review"), also: "comments findings outline statistics accessibility", run: () => win.workspace = 3 },
-            { group: qsTr("Workspace"), name: qsTr("Sorter"), also: "light table order overview", run: () => win.workspace = 6 },
+            { group: qsTr("Present"), name: qsTr("Present from this slide"), also: "show play current", run: () => { win.commitEditors(); presenter.start(true,false) } },
+            { group: qsTr("Present"), name: qsTr("Rehearse in a window"), also: "practise timing", run: () => { win.commitEditors(); presenter.start(false,true) } },
+            { group: qsTr("View"), name: qsTr("Format"), also: "edit canvas slide style inspector", run: () => win.chooseSidebar(0) },
+            { group: qsTr("View"), name: qsTr("Animate"), also: "build transition timeline motion", run: () => win.chooseSidebar(1) },
+            { group: qsTr("View"), name: qsTr("Document"), also: "theme size language deck settings", run: () => win.chooseSidebar(2) },
+            { group: qsTr("View"), name: qsTr("Edit masters and layouts"), also: "design theme master layout template", run: () => win.workspace = 1 },
+            { group: qsTr("View"), name: qsTr("Review"), also: "comments findings outline statistics accessibility", run: () => win.workspace = 3 },
+            { group: qsTr("View"), name: qsTr("Light table"), also: "sorter order overview grid", run: () => { win.workspace = 6; slideSorter.focusBrowser() } },
+            { group: qsTr("Present"), name: qsTr("Presenter setup"), also: "displays console timings custom shows", run: () => win.workspace = 4 },
             { group: qsTr("Slides"), name: qsTr("Add a slide"), also: "new page", shortcut: "Ctrl+N", enabled: !backend.startVisible, run: () => backend.addSlide() },
             { group: qsTr("Slides"), name: qsTr("Duplicate this slide"), also: "copy page", shortcut: "Ctrl+D", enabled: !backend.startVisible, run: () => backend.duplicateSlide() },
             { group: qsTr("Slides"), name: qsTr("Delete this slide"), also: "remove page", enabled: backend.slideCount > 1, run: () => backend.deleteSlide() },
@@ -251,7 +274,9 @@ ApplicationWindow {
             { group: qsTr("Review"), name: qsTr("Check the spelling"), also: "dictionary language words typo", run: () => { win.workspace = 3 } },
             { group: qsTr("Arrange"), name: qsTr("Put the text on a shape"), also: "along path curve circle words", enabled: backend.selectionCount === 2, run: () => { win.workspace = 0; backend.putTextOnShape() } },
             { group: qsTr("Insert"), name: qsTr("An equation"), also: "maths math formula latex fraction", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addEquation() } },
-            { group: qsTr("Insert"), name: qsTr("A shape"), also: "rectangle circle arrow", enabled: !backend.startVisible, run: () => { win.workspace = 0; shapeGallery.open() } },
+            { group: qsTr("Insert"), name: qsTr("A shape"), also: "rectangle circle arrow", enabled: !backend.startVisible, run: () => { win.toFormat(); shapeGallery.open() } },
+            { group: qsTr("Insert"), name: qsTr("Draw with the pen"), also: "path bezier line vector", enabled: !backend.startVisible, run: () => { win.toFormat(); editCanvas.startPathTool(1) } },
+            { group: qsTr("Insert"), name: qsTr("Draw freehand"), also: "sketch scribble line", enabled: !backend.startVisible, run: () => { win.toFormat(); editCanvas.startPathTool(2) } },
             { group: qsTr("Insert"), name: qsTr("A picture"), also: "image photo png", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertImageDialog() } },
             { group: qsTr("Insert"), name: qsTr("Film or sound"), also: "video audio movie clip", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.insertMediaDialog() } },
             { group: qsTr("Insert"), name: qsTr("A table"), also: "grid rows columns", enabled: !backend.startVisible, run: () => { win.workspace = 0; backend.addTable() } },
@@ -348,6 +373,22 @@ ApplicationWindow {
             }
         }
     }
+    // Export is somewhere you go for a moment, as in Keynote: a sheet over
+    // the deck, not a room of its own.
+    Sheet {
+        id: exportSheet
+        objectName: "exportSheet"
+        parent: Overlay.overlay; anchors.centerIn: parent
+        width: Math.min(parent.width - Theme.s5 * 2, 900)
+        height: Math.min(parent.height - Theme.s5 * 2, 820)
+        modal: true
+        padding: 0
+        standardButtons: Dialog.Close
+        contentItem: Loader {
+            active: exportSheet.visible
+            sourceComponent: ExportWorkspace {}
+        }
+    }
     AudienceWindow { id: audienceWindow }
     PresenterConsole { id: consoleWindow }
 
@@ -403,7 +444,7 @@ ApplicationWindow {
                                    onTriggered: { win.commitEditors(); templateName.open() } }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Export PDF…"); icon.name: "file-output"; onTriggered: { win.commitEditors(); backend.exportDialog({ kind: 0 }) } }
-                        MenuItem { text: qsTr("Export…"); icon.name: "share"; onTriggered: { win.commitEditors(); win.workspace = 5 } }
+                        MenuItem { objectName: "exportMenuItem"; text: qsTr("Export…"); icon.name: "share"; onTriggered: win.showExport() }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Quit"); onTriggered: win.close() }
                     }
@@ -440,7 +481,9 @@ ApplicationWindow {
                         title: qsTr("Insert")
                         MenuItem { text: qsTr("Text"); icon.name: "type"; onTriggered: { win.workspace = 0; backend.addText() } }
                         MenuItem { objectName: "insertEquation"; text: qsTr("Equation"); icon.name: "sigma"; onTriggered: { win.workspace = 0; win.commitEditors(); backend.addEquation() } }
-                        MenuItem { text: qsTr("Shape…"); icon.name: "shapes"; onTriggered: { win.workspace = 0; win.commitEditors(); shapeGallery.open() } }
+                        MenuItem { text: qsTr("Shape…"); icon.name: "shapes"; onTriggered: { win.toFormat(); shapeGallery.open() } }
+                        MenuItem { text: qsTr("Pen drawing"); icon.name: "pen-tool"; onTriggered: { win.toFormat(); editCanvas.startPathTool(1) } }
+                        MenuItem { text: qsTr("Freehand drawing"); icon.name: "pencil-line"; onTriggered: { win.toFormat(); editCanvas.startPathTool(2) } }
                         MenuItem { text: qsTr("Picture…"); icon.name: "image"; onTriggered: { win.workspace = 0; win.commitEditors(); backend.insertImageDialog() } }
                         MenuSeparator {}
                         MenuItem { text: qsTr("Table…"); icon.name: "table"; onTriggered: { win.workspace = 0; win.commitEditors(); if (backend.addTable()) tableEditor.show() } }
@@ -463,7 +506,8 @@ ApplicationWindow {
                         title: qsTr("Format")
                         MenuItem { text: qsTr("Link or action…"); icon.name: "link"; enabled: backend.hasSelection; onTriggered: linkDialog.show() }
                         MenuItem { text: qsTr("Combine shapes…"); enabled: backend.selectionCount > 1; onTriggered: { win.commitEditors(); combineShapesDialog.open() } }
-                        MenuItem { text: qsTr("Themes and layouts"); icon.name: "palette"; onTriggered: { win.commitEditors(); win.workspace = 1 } }
+                        MenuItem { text: qsTr("Theme and slide size"); icon.name: "palette"; onTriggered: win.chooseSidebar(2) }
+                        MenuItem { text: qsTr("Edit masters and layouts"); onTriggered: { win.commitEditors(); win.workspace = 1 } }
                         MenuSeparator {}
                         MenuItem {
                             objectName: "smartPunctuationItem"
@@ -509,10 +553,12 @@ ApplicationWindow {
                     }
                     Menu {
                         title: qsTr("View")
-                        MenuItem { text: qsTr("Edit"); icon.name: "pencil"; onTriggered: { win.commitEditors(); win.workspace = 0 } }
-                        MenuItem { text: qsTr("Design"); icon.name: "palette"; onTriggered: { win.commitEditors(); win.workspace = 1 } }
-                        MenuItem { text: qsTr("Animate"); icon.name: "sparkles"; onTriggered: { win.commitEditors(); win.workspace = 2 } }
-                        MenuItem { text: qsTr("Slide sorter"); icon.name: "layout-grid"; onTriggered: { win.commitEditors(); win.workspace = 6; slideSorter.focusBrowser() } }
+                        MenuItem { text: qsTr("Format"); icon.name: "pencil"; checkable: true; checked: win.sidebarChoice === 0; onTriggered: win.chooseSidebar(0) }
+                        MenuItem { text: qsTr("Animate"); icon.name: "sparkles"; checkable: true; checked: win.sidebarChoice === 1; onTriggered: win.chooseSidebar(1) }
+                        MenuItem { text: qsTr("Document"); icon.name: "file-text"; checkable: true; checked: win.sidebarChoice === 2; onTriggered: win.chooseSidebar(2) }
+                        MenuSeparator {}
+                        MenuItem { objectName: "lightTableMenuItem"; text: qsTr("Light table"); icon.name: "layout-grid"; onTriggered: { win.commitEditors(); win.workspace = 6; slideSorter.focusBrowser() } }
+                        MenuItem { text: qsTr("Review"); icon.name: "message-square-text"; onTriggered: { win.commitEditors(); win.workspace = 3 } }
                         MenuItem { objectName: "toggleNavigator"; text: win.navigatorCollapsed ? qsTr("Show the slide list") : qsTr("Hide the slide list")
                                    onTriggered: win.navigatorCollapsed = !win.navigatorCollapsed }
                         MenuItem { objectName: "toggleInspector"; text: win.inspectorCollapsed ? qsTr("Show the inspector") : qsTr("Hide the inspector")
@@ -538,10 +584,10 @@ ApplicationWindow {
                     Menu {
                         title: qsTr("Present")
                         MenuItem { text: qsTr("Play from start"); icon.name: "play"; onTriggered: win.startShow() }
-                        MenuItem { text: qsTr("Play from this slide"); onTriggered: { win.commitEditors(); win.workspace = 4; presenter.start(true, false) } }
-                        MenuItem { text: qsTr("Rehearse"); icon.name: "timer"; onTriggered: { win.commitEditors(); win.workspace = 4; presenter.start(false, true) } }
+                        MenuItem { text: qsTr("Play from this slide"); onTriggered: { win.commitEditors(); presenter.start(true, false) } }
+                        MenuItem { text: qsTr("Rehearse"); icon.name: "timer"; onTriggered: { win.commitEditors(); presenter.start(false, true) } }
                         MenuSeparator {}
-                        MenuItem { text: qsTr("Presenter setup"); icon.name: "monitor"; onTriggered: { win.commitEditors(); win.workspace = 4 } }
+                        MenuItem { text: qsTr("Presenter setup…"); icon.name: "monitor"; onTriggered: { win.commitEditors(); win.workspace = 4 } }
                     }
                     Menu {
                         title: qsTr("Help")
@@ -569,120 +615,28 @@ ApplicationWindow {
             }
         }
 
-        // ── Workspaces ──────────────────────────────────────────────────────
+        // ── Toolbar ─────────────────────────────────────────────────────────
+        // One toolbar, as Keynote has it: add things on the left, play in the
+        // middle of the right-hand group, and the sidebar's three switches —
+        // Format, Animate, Document — at the far right. The occasional rooms
+        // (masters, review, presenter setup, the light table) replace it with
+        // a title and a Done button, so there is always a single way back.
         Rectangle {
+            objectName: "mainToolbar"
             Layout.fillWidth: true
-            objectName: "workspaceBar"
-            implicitHeight: Theme.hWorkspaceBar
-            color: Theme.windowBg
-            Hairline { anchors.top: parent.top; width: parent.width }
-            Hairline { anchors.bottom: parent.bottom; width: parent.width }
-
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.s3
-                height: parent.height
-                spacing: Theme.s1
-
-                Repeater {
-                    model: [
-                        { name: qsTr("EDIT"), icon: "pencil", on: true },
-                        { name: qsTr("DESIGN"), icon: "palette", on: true },
-                        { name: qsTr("ANIMATE"), icon: "sparkles", on: true },
-                        { name: qsTr("REVIEW"), icon: "message-square-text", on: true },
-                        { name: qsTr("PRESENT"), icon: "presentation", on: true },
-                        { name: qsTr("EXPORT"), icon: "share", on: true },
-                        { name: qsTr("SORTER"), icon: "layout-grid", on: true }
-                    ]
-
-                    // A tab not backed by anything is visibly disabled and says
-                    // why, rather than opening an empty room.
-                    Item {
-                        required property var modelData
-                        required property int index
-                        readonly property bool current: win.workspace === index
-                        Accessible.role: Accessible.PageTab
-                        Accessible.name: modelData.name
-                        Accessible.description: modelData.on ? qsTr("Workspace") : qsTr("Not built yet")
-                        Accessible.checkable: true
-                        Accessible.checked: current
-                        Accessible.onPressAction: if (modelData.on) win.workspace = index
-                        readonly property color ink: !modelData.on ? Theme.borderStrong
-                                                     : current ? Theme.accent
-                                                     : hover.hovered ? Theme.textPrimary : Theme.textSecondary
-                        width: tabRow.implicitWidth + Theme.s4 * 2
-                        height: parent.height
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.bottomMargin: Theme.hairline
-                            color: hover.hovered && modelData.on && !parent.current ? Theme.withAlpha(Theme.controlHover, 0.5) : "transparent"
-                        }
-                        Row {
-                            id: tabRow
-                            anchors.centerIn: parent
-                            spacing: Theme.s2
-                            Icon { name: modelData.icon; color: parent.parent.ink; anchors.verticalCenter: parent.verticalCenter }
-                            Text {
-                                text: modelData.name
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fsControl
-                                font.weight: parent.parent.current ? Theme.wHeading : Theme.wNormal
-                                font.letterSpacing: Theme.capsTracking
-                                color: parent.parent.ink
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-                        }
-                        Rectangle {
-                            visible: parent.current
-                            anchors.bottom: parent.bottom
-                            width: parent.width
-                            height: Theme.activeUnderline
-                            color: Theme.accent
-                        }
-                        HoverHandler {
-                            id: hover
-                            cursorShape: modelData.on ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        }
-                        TapHandler { onTapped: if (modelData.on) { win.commitEditors(); win.workspace = index; if(index === 6) slideSorter.focusBrowser() } }
-                        ToolTip.visible: hover.hovered && !modelData.on
-                        ToolTip.delay: Theme.tooltipDelay
-                        ToolTip.text: qsTr("%1 is not built yet").arg(modelData.name.toLowerCase())
-                    }
-                }
-            }
-        }
-
-        // ── Context toolbar ─────────────────────────────────────────────────
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: Theme.hToolbar
+            // A room's bar is only a title and Done, so it takes the slimmer height.
+            implicitHeight: win.inMode ? Theme.hWorkspaceBar : Theme.hToolbar
             color: Theme.panelBg
-            visible: win.editing
+            Hairline { anchors.top: parent.top; width: parent.width }
 
             RowLayout {
                 anchors.fill: parent
                 anchors.leftMargin: Theme.s3
                 anchors.rightMargin: Theme.s3
                 spacing: Theme.s1
+                visible: !win.inMode
 
-                ToolAction { icon.name: "house"; text: qsTr("Start centre"); display: AbstractButton.IconOnly; tip: qsTr("Start centre  Ctrl+Shift+N"); onClicked: { win.commitEditors(); backend.showStart() } }
-                ToolAction { icon.name: "folder-open"; text: qsTr("Open"); display: AbstractButton.IconOnly; tip: qsTr("Open  Ctrl+O"); onClicked: win.confirmThenOpen() }
-                ToolAction {
-                    icon.name: "save"
-                    text: qsTr("Save")
-                    display: AbstractButton.IconOnly
-                    tip: backend.modified ? qsTr("Save — unsaved changes  Ctrl+S") : qsTr("Save  Ctrl+S")
-                    onClicked: { win.commitEditors(); backend.save() }
-                    Rectangle {
-                        visible: backend.modified
-                        width: Theme.szStatusDot - 2; height: width; radius: width / 2
-                        color: Theme.warning
-                        anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Theme.s1
-                    }
-                }
-                ToolbarRule {}
-                ToolAction { icon.name: "square-plus"; text: qsTr("New Slide"); tip: qsTr("New slide  Ctrl+N"); onClicked: backend.addSlide() }
+                ToolAction { objectName: "toolbarNewSlide"; icon.name: "square-plus"; text: qsTr("New Slide"); tip: qsTr("New slide  Ctrl+N"); onClicked: backend.addSlide() }
                 ToolAction {
                     id: layoutButton
                     icon.name: "layout-template"
@@ -707,21 +661,27 @@ ApplicationWindow {
                     }
                 }
                 ToolbarRule {}
-                ToolAction { icon.name: "type"; text: qsTr("Text"); tip: qsTr("Text box  T"); onClicked: backend.addText() }
-                ToolAction { objectName: "insertShape"; icon.name: "shapes"; text: qsTr("Shape"); property bool opensMenu: true; tip: qsTr("Shape gallery  S adds a rectangle"); onClicked: { win.commitEditors(); shapeGallery.open() } }
-                ToolAction { objectName: "insertPicture"; icon.name: "image"; text: qsTr("Picture"); tip: qsTr("Insert a picture"); onClicked: { win.commitEditors(); backend.insertImageDialog() } }
-                ToolAction { objectName: "insertTable"; icon.name: "table"; text: qsTr("Table"); tip: qsTr("Insert a table"); onClicked: { win.commitEditors(); if(backend.addTable()) tableEditor.show() } }
-                ToolAction { objectName: "insertChart"; icon.name: "chart-column"; text: qsTr("Chart"); tip: qsTr("Insert a chart"); onClicked: { win.commitEditors(); backend.addChart() } }
-                ToolAction { objectName: "insertDiagram"; icon.name: "workflow"; text: qsTr("Diagram"); tip: qsTr("Insert a process or hierarchy diagram"); onClicked: { win.commitEditors(); diagramDialog.show() } }
+                ToolAction { objectName: "insertText"; icon.name: "type"; text: qsTr("Text"); tip: qsTr("Text box  T"); onClicked: { win.toFormat(); backend.addText() } }
+                ToolAction { id: shapeButton; objectName: "insertShape"; icon.name: "shapes"; text: qsTr("Shape"); property bool opensMenu: true; tip: qsTr("Shapes, the pen and freehand  S adds a rectangle"); onClicked: shapeMenu.popup(shapeButton, 0, shapeButton.height) }
+                Menu {
+                    id: shapeMenu
+                    MenuItem { objectName: "openShapeGallery"; text: qsTr("Shape gallery…"); icon.name: "shapes"; onTriggered: { win.toFormat(); shapeGallery.open() } }
+                    MenuSeparator {}
+                    MenuItem { objectName: "drawWithPen"; text: qsTr("Draw with the pen"); icon.name: "pen-tool"; onTriggered: { win.toFormat(); editCanvas.startPathTool(1) } }
+                    MenuItem { objectName: "drawFreehand"; text: qsTr("Draw freehand"); icon.name: "pencil-line"; onTriggered: { win.toFormat(); editCanvas.startPathTool(2) } }
+                }
+                ToolAction { objectName: "insertPicture"; icon.name: "image"; text: qsTr("Picture"); tip: qsTr("Insert a picture"); onClicked: { win.toFormat(); backend.insertImageDialog() } }
+                ToolAction { objectName: "insertTable"; icon.name: "table"; text: qsTr("Table"); tip: qsTr("Insert a table"); onClicked: { win.toFormat(); if(backend.addTable()) tableEditor.show() } }
+                ToolAction { objectName: "insertChart"; icon.name: "chart-column"; text: qsTr("Chart"); tip: qsTr("Insert a chart"); onClicked: { win.toFormat(); backend.addChart() } }
+                ToolAction { objectName: "insertDiagram"; icon.name: "workflow"; text: qsTr("Diagram"); tip: qsTr("Insert a process or hierarchy diagram"); onClicked: { win.toFormat(); diagramDialog.show() } }
                 ToolAction { id: mediaButton; objectName: "mediaMenuButton"; icon.name: "clapperboard"; text: qsTr("Media"); property bool opensMenu: true; tip: qsTr("Audio and video"); onClicked: mediaMenu.popup(mediaButton,0,mediaButton.height) }
                 Menu {
                     id: mediaMenu
-                    MenuItem { objectName: "insertEmbeddedMedia"; text: qsTr("Insert audio/video · embed…"); onTriggered: { win.commitEditors(); backend.insertMediaDialog(true) } }
-                    MenuItem { objectName: "insertLinkedMedia"; text: qsTr("Insert audio/video · link…"); onTriggered: { win.commitEditors(); backend.insertMediaDialog(false) } }
+                    MenuItem { objectName: "insertEmbeddedMedia"; text: qsTr("Insert audio/video · embed…"); onTriggered: { win.toFormat(); backend.insertMediaDialog(true) } }
+                    MenuItem { objectName: "insertLinkedMedia"; text: qsTr("Insert audio/video · link…"); onTriggered: { win.toFormat(); backend.insertMediaDialog(false) } }
                     MenuSeparator {}
                     MenuItem { objectName: "openMediaPreflight"; text: qsTr("Media preflight…"); onTriggered: mediaPreflight.open() }
                 }
-                ToolbarRule {}
                 ToolAction { id: arrangeButton; objectName: "arrangeMenuButton"; icon.name: "layers"; text: qsTr("Arrange"); property bool opensMenu: true; tip: qsTr("Arrange, group, lock and connect"); onClicked: arrangeMenu.popup(arrangeButton,0,arrangeButton.height) }
                 Menu {
                     id: arrangeMenu
@@ -747,11 +707,73 @@ ApplicationWindow {
                     MenuSeparator {}
                     MenuItem { objectName: "slideSizeAction"; text: qsTr("Slide size…"); icon.name: "scan"; onTriggered: { win.commitEditors(); slideSizeDialog.show() } }
                 }
+                ToolAction { objectName: "toolbarReview"; icon.name: "message-square-text"; text: qsTr("Review"); tip: qsTr("Comments, findings and spelling"); onClicked: { win.commitEditors(); win.workspace = 3 } }
                 Item { Layout.fillWidth: true }
                 ToolAction { icon.name: "undo-2"; text: qsTr("Undo"); display: AbstractButton.IconOnly; enabled: backend.canUndo; tip: qsTr("Undo %1  Ctrl+Z").arg(backend.undoLabel); onClicked: backend.undo() }
                 ToolAction { icon.name: "redo-2"; text: qsTr("Redo"); display: AbstractButton.IconOnly; enabled: backend.canRedo; tip: qsTr("Redo  Ctrl+Shift+Z"); onClicked: backend.redo() }
                 ToolbarRule {}
                 ToolAction { objectName: "toolbarPlay"; icon.name: "play"; text: qsTr("Play"); highlighted: true; flat: false; tip: qsTr("Play from the start  F5"); onClicked: win.startShow() }
+                ToolbarRule {}
+                // The sidebar's switches. Animate is also a view of the slide,
+                // with the build timeline under it, so it swaps the body too.
+                Repeater {
+                    model: [
+                        { name: qsTr("Format"), icon: "pencil", key: "sidebarFormat" },
+                        { name: qsTr("Animate"), icon: "sparkles", key: "sidebarAnimate" },
+                        { name: qsTr("Document"), icon: "file-text", key: "sidebarDocument" }
+                    ]
+                    ToolAction {
+                        required property var modelData
+                        required property int index
+                        objectName: modelData.key
+                        icon.name: modelData.icon
+                        text: modelData.name
+                        tip: modelData.name
+                        checkable: true
+                        checked: win.sidebarChoice === index
+                        onClicked: win.chooseSidebar(index)
+                        Accessible.role: Accessible.PageTab
+                        Accessible.description: qsTr("Sidebar")
+                    }
+                }
+            }
+
+            // A room you visit: its name, and the way back.
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.s4
+                anchors.rightMargin: Theme.s3
+                spacing: Theme.s3
+                visible: win.inMode
+                Label {
+                    objectName: "modeTitle"
+                    text: win.workspace === 1 ? qsTr("Masters and layouts")
+                        : win.workspace === 3 ? qsTr("Review")
+                        : win.workspace === 4 ? qsTr("Presenter setup")
+                        : qsTr("Light table")
+                    font.pixelSize: Theme.fsSection
+                    font.weight: Theme.wHeading
+                    color: Theme.textPrimary
+                }
+                Label {
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fsLabel
+                    text: win.workspace === 1 ? qsTr("Changes here reach every slide that uses the master or layout.")
+                        : win.workspace === 3 ? qsTr("Comments, findings, search and spelling across the whole deck.")
+                        : win.workspace === 4 ? qsTr("Choose the displays and rehearse. The console opens when the show starts.")
+                        : qsTr("Every slide at once. Drag to reorder; double-click one to edit it.")
+                }
+                ToolAction { visible: win.workspace === 6; icon.name: "play"; text: qsTr("Play"); tip: qsTr("Play from the start  F5"); onClicked: win.startShow() }
+                Button {
+                    objectName: "modeDone"
+                    text: qsTr("Done")
+                    highlighted: true
+                    onClicked: win.leaveMode()
+                    ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay
+                    ToolTip.text: qsTr("Back to the slide  Esc")
+                }
             }
             Hairline { anchors.bottom: parent.bottom; width: parent.width }
         }
@@ -765,6 +787,7 @@ ApplicationWindow {
                 id: slideNavigator
                 objectName: "slideNavigatorPanel"
                 onEditRequested: win.workspace = 0
+                onLightTableRequested: { win.commitEditors(); win.workspace = 6; slideSorter.focusBrowser() }
                 Layout.preferredWidth: win.navigatorCollapsed ? 0 : win.navigatorWidth
                 Layout.minimumWidth: win.navigatorCollapsed ? 0 : Theme.wNavigatorMin
                 Layout.maximumWidth: win.navigatorCollapsed ? 0 : Number.POSITIVE_INFINITY
@@ -797,30 +820,6 @@ ApplicationWindow {
                     color: Theme.pasteboard
                     EditCanvas { id: editCanvas; anchors.fill: parent }
 
-                    Rectangle {
-                        anchors.top: parent.top; anchors.right: parent.right; anchors.margins: Theme.s3
-                        z: 20
-                        visible: !editCanvas.cropMode
-                        color: Theme.panelBg; border.color: Theme.border; radius: Theme.rCard
-                        width: snapToggle.implicitWidth + Theme.s1 * 2; height: snapToggle.implicitHeight + Theme.s1 * 2
-                        Button {
-                            id: snapToggle
-                            objectName: "snapToggle"
-                            anchors.centerIn: parent
-                            flat: true
-                            checkable: true
-                            checked: backend.snapEnabled
-                            icon.name: "magnet"
-                            text: qsTr("Snap to guides")
-                            // On a narrow canvas the label would sit on top of
-                            // the drawing tools in the other corner.
-                            display: canvasArea.width < 640 ? AbstractButton.IconOnly
-                                                            : AbstractButton.TextBesideIcon
-                            onToggled: backend.snapEnabled = checked
-                            ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay
-                            ToolTip.text: backend.snapEnabled ? qsTr("Snapping to edges, centres and guides") : qsTr("Snapping is off")
-                        }
-                    }
                 }
 
                 // Presenter notes, as in the concept: a header strip and a well.
@@ -889,12 +888,6 @@ ApplicationWindow {
                 onStarting: win.commitEditors()
             }
 
-            ExportWorkspace {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: win.workspace === 5
-            }
-
             PanelGrip {
                 objectName: "inspectorGrip"
                 fromLeft: false
@@ -912,7 +905,19 @@ ApplicationWindow {
                 Layout.maximumWidth: win.inspectorCollapsed ? 0 : Number.POSITIVE_INFINITY
                 Layout.fillHeight: true
                 clip: true
-                visible: win.editing && !win.inspectorCollapsed
+                visible: win.editing && win.sidebar === 0 && !win.inspectorCollapsed
+            }
+            DocumentPanel {
+                onEditMastersRequested: { win.commitEditors(); win.workspace = 1 }
+                onSlideSizeRequested: { win.commitEditors(); slideSizeDialog.show() }
+                onPresenterSetupRequested: { win.commitEditors(); win.workspace = 4 }
+                onReviewRequested: { win.commitEditors(); win.workspace = 3 }
+                Layout.preferredWidth: win.inspectorCollapsed ? 0 : win.inspectorWidth
+                Layout.minimumWidth: win.inspectorCollapsed ? 0 : Theme.wInspectorMin
+                Layout.maximumWidth: win.inspectorCollapsed ? 0 : Number.POSITIVE_INFINITY
+                Layout.fillHeight: true
+                clip: true
+                visible: win.editing && win.sidebar === 1 && !win.inspectorCollapsed
             }
         }
 
@@ -1213,7 +1218,8 @@ ApplicationWindow {
                     qsTr("PgUp / PgDn — previous / next slide"),
                     qsTr("Ctrl+Z / Ctrl+Shift+Z — undo / redo"),
                     qsTr("F5 — start the show, Escape leaves"),
-                    qsTr("Space — play / pause outside Edit"),
+                    qsTr("Space — play / pause in Animate"),
+                    qsTr("Escape — leave masters, review, presenter setup or the light table"),
                     qsTr("Ctrl+Q — quit")
                 ]
                 Label {

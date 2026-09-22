@@ -138,7 +138,7 @@ Rectangle {
             spacing: Theme.s2
             Icon { name: "info"; color: Theme.textMuted }
             Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
-                    text: qsTr("Select an object to style it. Themes and shared layouts live in Design.") }
+                    text: qsTr("Select an object to style it. The theme and slide size are under Document.") }
         }
     }
 

@@ -27,14 +27,17 @@ private:
         QStringList selected;
         int current = 0;
         bool layoutOk = false, importOk = false;
-        int layoutRevision = 0, importRevision = 0;
+        int layoutRevision = 0, importRevision = 0, revision = 0;
     };
     void capture(Backend *backend);
     // QML property bindings are notified before ordinary connections, so a
     // preview's first request can reach this thread before the snapshot it
     // names does. Waiting for that revision beats painting a blank the view
     // would then keep until the next change.
-    Snapshot snapshotFor(int layoutRevision, int importRevision);
+    // The same goes for an ordinary slide picture ("<index>/<revision>"):
+    // opening a deck changes the revision the view asks for before the new
+    // document is captured, and without waiting the old deck is drawn.
+    Snapshot snapshotFor(int layoutRevision, int importRevision, int documentRevision = 0);
     QObject m_observer;
     QMutex m_mutex;
     QWaitCondition m_captured;
