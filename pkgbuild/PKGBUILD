@@ -10,9 +10,11 @@ license=('GPL-3.0-or-later')
 install='omashow.install'
 options=('!debug')
 depends=('hicolor-icon-theme' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-multimedia'
-         'ffmpeg' 'zlib' 'xdg-desktop-portal' 'hunspell')
-# Spelling uses whichever Hunspell dictionaries are installed; without one it
-# says so rather than guessing.
+         'ffmpeg' 'zlib' 'xdg-desktop-portal' 'hunspell' 'hunspell-dictionary')
+# Spelling needs a dictionary, but which one is the person's choice: every
+# hunspell-* language package provides hunspell-dictionary, and pacman asks
+# which. ./bin/install offers British English first. More can be added later;
+# the deck's language (Document ▸ Language) picks between them.
 optdepends=('hunspell-en_gb: British English spelling'
             'hunspell-en_us: American English spelling')
 makedepends=('gcc' 'make' 'pkgconf')

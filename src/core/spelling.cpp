@@ -104,16 +104,29 @@ QString Spelling::dictionaryFor(const QString &language) {
     // A dictionary for the same language in another place is better than none:
     // en_GB spelling checked against en_US is worth saying something about, and
     // the review says which dictionary answered.
+    // Packages install one real dictionary and link it under many regional
+    // names (hunspell-en_gb: en_GB and en_AG, en_BS, … all lead to
+    // en_GB-large), so the first name alphabetically is rarely the one to
+    // report. Prefer a plain name that its real file is named after, then any
+    // plain name, then whatever there is.
     const auto stem = wanted.section('_', 0, 0);
+    QString plainName, anything;
     for (const auto &folder : searchPaths()) {
         QDir directory(folder);
         if (!directory.exists()) continue;
         for (const auto &entry : directory.entryList({stem + QStringLiteral("*.dic")}, QDir::Files)) {
-            const auto base = folder + '/' + QFileInfo(entry).completeBaseName();
-            if (haveBoth(base)) return base;
+            const auto name = QFileInfo(entry).completeBaseName();
+            const auto base = folder + '/' + name;
+            if (!haveBoth(base)) continue;
+            const bool plain = !name.contains('-');
+            const auto real = QFileInfo(QFileInfo(base + QStringLiteral(".dic")).canonicalFilePath())
+                                  .completeBaseName();
+            if (plain && real.startsWith(name)) return base;
+            if (plain && plainName.isEmpty()) plainName = base;
+            if (anything.isEmpty()) anything = base;
         }
     }
-    return {};
+    return plainName.isEmpty() ? anything : plainName;
 }
 
 bool Spelling::available(const QString &language) {

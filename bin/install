@@ -11,5 +11,23 @@ fi
 
 "$ROOT/bin/build"
 
+# The package needs a spelling dictionary, and pacman would offer every language
+# in alphabetical order. Offer British English first instead, and take any other
+# hunspell-* package name if that is what the person wants. Nothing is asked if
+# a dictionary is already installed.
+if ! pacman -T hunspell-dictionary >/dev/null 2>&1; then
+  choice="hunspell-en_gb"
+  if [ -t 0 ]; then
+    echo "OmaShow checks spelling with a Hunspell dictionary. Which one?"
+    echo "  hunspell-en_gb  British English (press Enter)"
+    echo "  hunspell-en_us  American English"
+    echo "  …or any other: pacman -Ss '^hunspell-' lists them"
+    printf "Dictionary [hunspell-en_gb]: "
+    read -r answer || answer=""
+    [ -n "$answer" ] && choice="$answer"
+  fi
+  sudo pacman -S --needed --asdeps "$choice"
+fi
+
 cd "$PKGBUILD_DIR"
 exec makepkg -fsi "$@"

@@ -65,7 +65,11 @@ on the right:
   which side of it they sit on.
 - **Language and spelling:** a deck says what it is written in, and a box or a
   stretch of text can say something else. Spelling is checked against the
-  Hunspell dictionaries already installed — none are shipped — and a word the
+  Hunspell dictionaries on the computer. The package installs one (you choose
+  which; British English is offered first) and any other `hunspell-*` package
+  adds a language, chosen per deck in Document ▸ Language. A deck in a language
+  with no dictionary of its own is checked against the nearest one (US English
+  against British) and the finding names the dictionary that answered. A word the
   dictionary does not know becomes a finding in Review with what it would suggest
   instead. A word the deck should know is taught to the deck, so it travels with
   the file rather than living on one computer. Straight quotes, double hyphens and
@@ -345,7 +349,9 @@ H.264 (`libx264`) and AAC encoders.
 ### Install as a package
 
 On Arch / Omarchy, `./bin/install` builds the working tree and installs it
-with `makepkg -si`, pulling in the runtime dependencies. OmaShow then appears
+with `makepkg -si`, pulling in the runtime dependencies. If no spelling
+dictionary is installed it asks which one first, with British English as the
+answer to Enter. OmaShow then appears
 in the app launcher, opens `.omashow` files, and uninstalls with
 `sudo pacman -R omashow`.
 

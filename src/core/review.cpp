@@ -5,6 +5,7 @@
 #include "render/textlayout.h"
 #include "render/mathlayout.h"
 #include "core/spelling.h"
+#include <QFileInfo>
 #include <QLocale>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -419,8 +420,12 @@ QVariantList Review::issues(const Document &d) {
                             const auto offered =
                                 Spelling::suggest(word.word, stretch.language, 4);
                             add(key, i, authored.id, o.id, "info", "spelling",
+                                // Name the dictionary that answered, which is not
+                                // always the one asked for (en_US checked in en_GB).
                                 QStringLiteral("\u201c%1\u201d is not in the %2 dictionary")
-                                    .arg(word.word, stretch.language),
+                                    .arg(word.word,
+                                         QFileInfo(Spelling::dictionaryFor(stretch.language))
+                                             .fileName().section(QLatin1Char('-'), 0, 0)),
                                 offered.isEmpty()
                                     ? QStringLiteral("Nothing close was suggested. Teach the deck "
                                                      "this word if it is right.")

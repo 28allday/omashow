@@ -75,8 +75,12 @@ QString Templates::folder() {
 
 QStringList Templates::exampleFolders() {
     QStringList folders;
-    if (qEnvironmentVariableIsSet("OMASHOW_EXAMPLES"))
-        folders.append(QString::fromLocal8Bit(qgetenv("OMASHOW_EXAMPLES")));
+    // Set, it is the only place examples come from — as OMASHOW_DICTIONARIES is
+    // for spelling — so what is installed on this computer cannot leak in.
+    if (qEnvironmentVariableIsSet("OMASHOW_EXAMPLES")) {
+        const auto only = QString::fromLocal8Bit(qgetenv("OMASHOW_EXAMPLES"));
+        return QDir(only).exists() ? QStringList{only} : QStringList{};
+    }
     for (const auto &data : QStandardPaths::standardLocations(QStandardPaths::AppDataLocation))
         folders.append(data + QStringLiteral("/examples"));
     folders.append(QStringLiteral("/usr/share/omashow/examples"));
