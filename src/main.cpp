@@ -133,6 +133,8 @@ int captureInterface(QQmlApplicationEngine &engine, Backend &backend, Presenter 
     }
     // The presenter console, rehearsing so no display has to exist.
     presenter.start(false, true);
+    // Let the first slide's builds finish, so the console shows a settled slide.
+    for (int waited = 0; backend.playing() && waited < 15000; waited += 100) settle(100);
     for (QObject *root : engine.rootObjects())
         for (auto *console : root->findChildren<QQuickWindow *>(QStringLiteral("presenterConsole"))) {
             console->resize(size);
