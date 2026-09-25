@@ -54,7 +54,7 @@ Sheet {
                     objectName: "missingFont" + index
                     Layout.preferredWidth: root.width * .38
                     wrapMode: Text.Wrap
-                    text: modelData.family + " · " + qsTr("%n uses", "", modelData.uses)
+                    text: modelData.family + " · " + (modelData.uses === 1 ? qsTr("1 use") : qsTr("%1 uses").arg(modelData.uses))
                 }
                 ComboBox {
                     objectName: "fontChoice" + index

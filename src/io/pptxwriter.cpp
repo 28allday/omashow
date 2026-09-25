@@ -148,6 +148,13 @@ const char *patternFor(int style) {
     }
 }
 
+// 0 → A, 25 → Z, 26 → AA: how a spreadsheet names its columns.
+QString columnLetters(int index) {
+    QString out;
+    do { out.prepend(QChar('A' + index % 26)); index = index / 26 - 1; } while (index >= 0);
+    return out;
+}
+
 struct Writer {
     const Document &doc;
     Warnings warnings;
@@ -299,7 +306,7 @@ struct Writer {
             x.start("a:gs").attr("pos", 0); writeColor(x, o.fill, o.opacity); x.end();
             x.start("a:gs").attr("pos", 100000); writeColor(x, o.fillSecondary, o.opacity); x.end();
             x.end();
-            if (o.fillStyle == 1) x.start("a:lin").attr("ang", qRound64(std::fmod(o.fillAngle + 360.0, 360.0) * 60000)).attr("scaled", "0").end();
+            if (o.fillStyle == 1) x.start("a:lin").attr("ang", qRound64(std::fmod(std::fmod(o.fillAngle, 360.0) + 360.0, 360.0) * 60000)).attr("scaled", "0").end();
             else { x.start("a:path").attr("path", "circle"); x.start("a:fillToRect").attr("l", 50000).attr("t", 50000).attr("r", 50000).attr("b", 50000).end(); x.end(); }
             x.end();
             break;
@@ -378,7 +385,11 @@ struct Writer {
         writeSolidFill(x, color, o.opacity);
         const QString family = run && !run->fontFamily.isEmpty() ? run->fontFamily : o.fontFamily;
         x.start("a:latin").attr("typeface", family).end();
-        if (!linkRel.isEmpty()) x.start("a:hlinkClick").attr("r:id", linkRel).end();
+        if (!linkRel.isEmpty()) {
+            x.start("a:hlinkClick").attr("r:id", linkRel);
+            if (o.linkKind == 3) x.attr("action", "ppaction://hlinksldjump");
+            x.end();
+        }
         x.end();
     }
 
@@ -398,7 +409,7 @@ struct Writer {
             if (o.linkKind == 3) {
                 int index = -1;
                 for (int i = 0; i < doc.slides.size(); ++i) if (doc.slides[i].id == o.linkTarget) index = i;
-                if (index >= 0) linkRel = ctx.rels->add(relBase + QStringLiteral("slide"), QStringLiteral("slide%1.xml").arg(index + 1));
+                if (index >= 0) linkRel = ctx.rels->add(relBase + QStringLiteral("slide"), QStringLiteral("../slides/slide%1.xml").arg(index + 1));
             } else {
                 const auto target = o.linkKind == 2 ? QStringLiteral("mailto:") + o.linkTarget : o.linkTarget;
                 linkRel = ctx.rels->add(relBase + QStringLiteral("hyperlink"), target, true);
@@ -743,7 +754,7 @@ struct Writer {
         for (int s = 0; s < seriesCount; ++s) {
             c.start("c:ser");
             c.start("c:idx").attr("val", s).end(); c.start("c:order").attr("val", s).end();
-            c.start("c:tx"); c.start("c:strRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$1").arg(QChar('B' + s))).end();
+            c.start("c:tx"); c.start("c:strRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$1").arg(columnLetters(s + 1))).end();
             c.start("c:strCache"); c.start("c:ptCount").attr("val", 1).end(); c.start("c:pt").attr("idx", 0); c.start("c:v").text(layout.series.value(s)).end(); c.end(); c.end();
             c.end(); c.end();
             if (!pie) {
@@ -767,7 +778,7 @@ struct Writer {
             if (scatter) {
                 for (const auto *axis : {"c:xVal", "c:yVal"}) {
                     const int column = QLatin1String(axis) == QLatin1String("c:xVal") ? 0 : s + 1;
-                    c.start(axis); c.start("c:numRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$2:$%1$%2").arg(QChar('A' + column)).arg(rows)).end();
+                    c.start(axis); c.start("c:numRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$2:$%1$%2").arg(columnLetters(column)).arg(rows)).end();
                     c.start("c:numCache"); c.start("c:formatCode").text(QStringLiteral("General")).end(); c.start("c:ptCount").attr("val", categoryCount).end();
                     for (int k = 0; k < categoryCount; ++k) {
                         double v;
@@ -781,7 +792,7 @@ struct Writer {
                 c.start("c:strCache"); c.start("c:ptCount").attr("val", categoryCount).end();
                 for (int k = 0; k < categoryCount; ++k) { c.start("c:pt").attr("idx", k); c.start("c:v").text(layout.categories.value(k)).end(); c.end(); }
                 c.end(); c.end(); c.end();
-                c.start("c:val"); c.start("c:numRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$2:$%1$%2").arg(QChar('B' + s)).arg(rows)).end();
+                c.start("c:val"); c.start("c:numRef"); c.start("c:f").text(QStringLiteral("Sheet1!$%1$2:$%1$%2").arg(columnLetters(s + 1)).arg(rows)).end();
                 c.start("c:numCache"); c.start("c:formatCode").text(QStringLiteral("General")).end(); c.start("c:ptCount").attr("val", categoryCount).end();
                 for (int k = 0; k < categoryCount; ++k) {
                     double v;
@@ -865,7 +876,6 @@ struct Writer {
 
     void writeObjects(Xml &x, const QVector<SceneObject> &objects, SlideCtx &ctx) {
         for (const auto &o : objects) {
-            if (o.hidden) continue;
             if (canceled()) return;
             switch (o.type) {
             case ObjectType::Rect: writeShape(x, o, ctx); break;
@@ -896,6 +906,7 @@ struct Writer {
     struct MasterOut { QString path; int index; };
     QHash<QString, int> masterIndex;   // Master.id → 1-based
     QHash<QString, int> layoutIndex;   // SlideLayout.id → 1-based
+    qint64 nextLayoutId = 2147483649LL;
 
     void writeMaster(const Master &m, int index, const QVector<int> &layoutIndices) {
         const auto path = QStringLiteral("ppt/slideMasters/slideMaster%1.xml").arg(index);
@@ -913,10 +924,9 @@ struct Writer {
         x.start("p:clrMap").attr("bg1", "lt1").attr("tx1", "dk1").attr("bg2", "lt2").attr("tx2", "dk2").attr("accent1", "accent1").attr("accent2", "accent2")
             .attr("accent3", "accent3").attr("accent4", "accent4").attr("accent5", "accent5").attr("accent6", "accent6").attr("hlink", "hlink").attr("folHlink", "folHlink").end();
         x.start("p:sldLayoutIdLst");
-        qint64 layoutId = 2147483649LL + index * 100;
         for (int li : layoutIndices) {
             const auto rel = rels.add(relBase + QStringLiteral("slideLayout"), QStringLiteral("../slideLayouts/slideLayout%1.xml").arg(li));
-            x.start("p:sldLayoutId").attr("id", layoutId++).attr("r:id", rel).end();
+            x.start("p:sldLayoutId").attr("id", nextLayoutId++).attr("r:id", rel).end();
         }
         x.end();
         x.start("p:txStyles");
@@ -1034,9 +1044,10 @@ struct Writer {
     // ---- comments
 
     QStringList authors;
+    QVector<int> authorLastIdx;
     int authorOf(const QString &name) {
         const auto who = name.isEmpty() ? QStringLiteral("Unknown") : name;
-        if (!authors.contains(who)) authors.append(who);
+        if (!authors.contains(who)) { authors.append(who); authorLastIdx.append(0); }
         return authors.indexOf(who);
     }
 
@@ -1047,9 +1058,9 @@ struct Writer {
         const auto path = QStringLiteral("ppt/comments/comment%1.xml").arg(++commentCount);
         Xml x;
         x.start("p:cmLst").attr("xmlns:a", nsA).attr("xmlns:r", nsR).attr("xmlns:p", nsP);
-        int idx = 0;
         for (const auto *c : mine) {
-            x.start("p:cm").attr("authorId", authorOf(c->author)).attr("idx", ++idx);
+            const int author = authorOf(c->author);
+            x.start("p:cm").attr("authorId", author).attr("idx", ++authorLastIdx[author]);
             if (!c->created.isEmpty()) x.attr("dt", c->created);
             QPointF where(10, 10);
             if (const auto *o = slide.find(c->objectId)) where = QPointF(o->rect.x() * e / 12700.0, o->rect.y() * e / 12700.0);
@@ -1072,7 +1083,7 @@ struct Writer {
         for (int i = 0; i < authors.size(); ++i) {
             QString initials;
             for (const auto &word : authors[i].split(QLatin1Char(' '), Qt::SkipEmptyParts)) initials += word.at(0).toUpper();
-            x.start("p:cmAuthor").attr("id", i).attr("name", authors[i]).attr("initials", initials.left(3)).attr("lastIdx", 1).attr("clrIdx", i % 8).end();
+            x.start("p:cmAuthor").attr("id", i).attr("name", authors[i]).attr("initials", initials.left(3)).attr("lastIdx", qMax(1, authorLastIdx.value(i))).attr("clrIdx", i % 8).end();
         }
         x.end();
         part(QStringLiteral("ppt/commentAuthors.xml"), x.finish(), "application/vnd.openxmlformats-officedocument.presentationml.commentAuthors+xml");
@@ -1122,14 +1133,23 @@ struct Writer {
         bool clickOpen = false;
         qreal previousEnd = 0;
         const auto cond = [&](const char *delay) { x.start("p:stCondLst"); x.start("p:cond").attr("delay", delay).end(); x.end(); };
+        // A first step that starts by itself: the group waits for the slide,
+        // not for a click.
+        const auto groupCond = [&](bool automatic) {
+            x.start("p:stCondLst");
+            x.start("p:cond").attr("delay", "indefinite").end();
+            if (automatic) { x.start("p:cond").attr("evt", "onBegin").attr("delay", "0"); x.start("p:tn").attr("val", 2).end(); x.end(); }
+            x.end();
+        };
         const auto target = [&](int spid) { x.start("p:tgtEl"); x.start("p:spTgt").attr("spid", spid).end(); x.end(); };
         for (int i = 0; i < steps.size(); ++i) {
             const auto &s = *steps[i].step;
             const int spid = steps[i].spid;
+            const bool automatic = i == 0 && (s.trigger == BuildTrigger::WithPrevious || s.trigger == BuildTrigger::AfterPrevious);
             const bool click = i == 0 || s.trigger == BuildTrigger::OnClick || s.trigger == BuildTrigger::Absolute;
             if (click) {
                 if (clickOpen) { x.end(); x.end(); x.end(); x.end(); x.end(); x.end(); }
-                x.start("p:par"); x.start("p:cTn").attr("id", id++).attr("fill", "hold"); cond("indefinite"); x.start("p:childTnLst");
+                x.start("p:par"); x.start("p:cTn").attr("id", id++).attr("fill", "hold"); groupCond(automatic); x.start("p:childTnLst");
                 x.start("p:par"); x.start("p:cTn").attr("id", id++).attr("fill", "hold"); cond("0"); x.start("p:childTnLst");
                 clickOpen = true;
                 previousEnd = 0;
@@ -1141,7 +1161,7 @@ struct Writer {
             const int presetId = s.effect == Effect::Pulse ? 6 : s.effect == Effect::Rise ? 2 : s.effect == Effect::Scale ? 53 : s.effect == Effect::Spin ? 49 : 10;
             x.start("p:par");
             x.start("p:cTn").attr("id", id++).attr("presetID", presetId).attr("presetClass", presetClass).attr("presetSubtype", s.effect == Effect::Rise ? 4 : 0).attr("fill", "hold")
-                .attr("nodeType", click ? "clickEffect" : s.trigger == BuildTrigger::AfterPrevious ? "afterEffect" : "withEffect");
+                .attr("nodeType", click && !automatic ? "clickEffect" : s.trigger == BuildTrigger::AfterPrevious ? "afterEffect" : "withEffect");
             cond(QByteArray::number(delay).constData());
             x.start("p:childTnLst");
             if (s.effect == Effect::Pulse) {
@@ -1167,14 +1187,16 @@ struct Writer {
                         x.start("p:cBhvr").attr("additive", "base"); x.start("p:cTn").attr("id", id++).attr("dur", ms).attr("fill", "hold").end(); target(spid);
                         x.start("p:attrNameLst"); x.start("p:attrName").text(QString::fromLatin1(axis)).end(); x.end(); x.end();
                         x.start("p:tavLst");
-                        x.start("p:tav").attr("tm", 0); x.start("p:val"); x.start("p:strVal").attr("val", QStringLiteral("#%1%2%3").arg(QString::fromLatin1(axis), out ? "" : "+", QString::number(out ? 0 : offset, 'f', 4))).end(); x.end(); x.end();
-                        x.start("p:tav").attr("tm", 100000); x.start("p:val"); x.start("p:strVal").attr("val", QStringLiteral("#%1%2").arg(QString::fromLatin1(axis), out ? QStringLiteral("+") + QString::number(offset, 'f', 4) : QString())).end(); x.end(); x.end();
+                        const QString rest = QStringLiteral("#") + QString::fromLatin1(axis);
+                        const QString away = rest + QStringLiteral("+") + QString::number(offset, 'f', 4);
+                        x.start("p:tav").attr("tm", 0); x.start("p:val"); x.start("p:strVal").attr("val", out ? rest : away).end(); x.end(); x.end();
+                        x.start("p:tav").attr("tm", 100000); x.start("p:val"); x.start("p:strVal").attr("val", out ? away : rest).end(); x.end(); x.end();
                         x.end(); x.end();
                     }
                 } else if (s.effect == Effect::Scale) {
                     x.start("p:animScale"); x.start("p:cBhvr"); x.start("p:cTn").attr("id", id++).attr("dur", ms).attr("fill", "hold").end(); target(spid); x.end();
-                    x.start(out ? "p:to" : "p:from").attr("x", 10000).attr("y", 10000).end();
-                    x.start(out ? "p:from" : "p:to").attr("x", 100000).attr("y", 100000).end();
+                    x.start("p:from").attr("x", out ? 100000 : 10000).attr("y", out ? 100000 : 10000).end();
+                    x.start("p:to").attr("x", out ? 10000 : 100000).attr("y", out ? 10000 : 100000).end();
                     x.end();
                 } else if (s.effect == Effect::Spin) {
                     x.start("p:animRot").attr("by", qRound64((s.amount > 0 ? s.amount : 360) * 60000));

@@ -4,6 +4,7 @@
 #include "anim/presentation.h"
 #include "core/edit.h"
 #include "core/imageasset.h"
+#include "core/link.h"
 #include "core/mediaasset.h"
 #include "core/shape.h"
 #include "core/svgasset.h"
@@ -100,6 +101,9 @@ bool parseXml(const QByteArray &bytes, Node *root, QString *error) {
     while (!xml.atEnd()) {
         switch (xml.readNext()) {
         case QXmlStreamReader::StartElement: {
+            // A tree of any depth is a stack overflow waiting to happen; no
+            // real deck nests anywhere near this.
+            if (stack.size() > 256) { if (error) *error = QStringLiteral("nested too deeply"); return false; }
             Node *node;
             if (!started) { node = root; started = true; }
             else { stack.last()->kids.append(Node()); node = &stack.last()->kids.last(); }
@@ -594,7 +598,7 @@ TextOut convertText(const Node *txBody, const TextChain &chain, const TextContex
     int bulleted = 0, numbered = 0, plain = 0;
     for (const auto *p : txBody->all(QStringLiteral("p"))) {
         const Node *pPr = p->child(QStringLiteral("pPr"));
-        const int lvl = pPr ? pPr->attr(QStringLiteral("lvl"), QStringLiteral("0")).toInt() : 0;
+        const int lvl = qBound(0, pPr ? pPr->attr(QStringLiteral("lvl"), QStringLiteral("0")).toInt() : 0, 8);
         ParaLook para;
         RunLook base;
         resolveLevel(full, lvl, para, base, ctx);
@@ -835,7 +839,7 @@ struct Reader {
     Warnings warnings;
     const Node *presentation = nullptr;
     QString presentationPath;
-    QHash<QString, MasterInfo> masters;     // by part path
+    std::map<QString, MasterInfo> masters;  // by part path; a map so references stay put
     QHash<QString, QString> layoutIds;      // part path → SlideLayout.id
     QHash<QString, QString> slideIdByPath;
     QString scratchDir;
@@ -909,7 +913,7 @@ struct Reader {
         }
     }
 
-    void applyText(SceneObject &o, const TextOut &text, const RunLook &fallback) const {
+    void applyText(SceneObject &o, const TextOut &text, const RunLook &fallback) {
         o.type = ObjectType::Text;
         o.text = text.text;
         const auto &b = text.box;
@@ -943,6 +947,11 @@ struct Reader {
             if (text.link.startsWith(QLatin1String("slide:"))) { o.linkKind = 3; o.linkTarget = text.link.mid(6); }
             else if (text.link.startsWith(QLatin1String("mailto:"), Qt::CaseInsensitive)) { o.linkKind = 2; o.linkTarget = text.link.mid(7); }
             else if (text.link.startsWith(QLatin1String("http"), Qt::CaseInsensitive)) { o.linkKind = 1; o.linkTarget = text.link; }
+            // A link the deck would refuse to reopen with is no link.
+            if (o.linkKind && !Links::validate(o.linkKind, o.linkTarget, doc, true).isEmpty()) {
+                o.linkKind = 0; o.linkTarget.clear();
+                warnings.add(QStringLiteral("A link OmaShow cannot follow was left off: %1").arg(text.link.left(80)), 0);
+            }
         }
     }
 
@@ -1022,6 +1031,11 @@ struct Reader {
             const Node *c = nv ? nv->child(QStringLiteral("cNvPr")) : nullptr;
             return c ? c->attr(QStringLiteral("name")) : QString();
         }();
+        const bool hidden = [&] {
+            const Node *nv = sp->child(QStringLiteral("nvSpPr"));
+            const Node *c = nv ? nv->child(QStringLiteral("cNvPr")) : nullptr;
+            return c && c->attr(QStringLiteral("hidden")) == QLatin1String("1");
+        }();
 
         QStringList own = groups;
         QString firstId;
@@ -1069,6 +1083,7 @@ struct Reader {
                 box.groups = own;
             }
             if (!name.isEmpty()) box.altTitle = name;
+            box.hidden = hidden;
             scope.objects->append(box);
             firstId = box.id;
         }
@@ -1078,6 +1093,7 @@ struct Reader {
             finish(words, place, own);
             applyText(words, text, fallback);
             if (!name.isEmpty() && firstId.isEmpty()) words.altTitle = name;
+            words.hidden = hidden;
             scope.objects->append(words);
             if (firstId.isEmpty()) firstId = words.id;
         } else if (!visibleBox) {
@@ -1203,6 +1219,7 @@ struct Reader {
         }
         if (!name.isEmpty()) o.altTitle = name;
         if (!descr.isEmpty()) o.altText = descr;
+        o.hidden = cNvPr && cNvPr->attr(QStringLiteral("hidden")) == QLatin1String("1");
         scope.objects->append(o);
         if (scope.spidToObject && !spid.isEmpty()) scope.spidToObject->insert(spid, o.id);
     }
@@ -1355,6 +1372,7 @@ struct Reader {
             maxIdx = qMax(maxIdx, idx);
         }
         if (const Node *n = cache->child(QStringLiteral("ptCount"))) maxIdx = qMax(maxIdx, n->attr(QStringLiteral("val")).toInt() - 1);
+        maxIdx = qMin(maxIdx, Table::maxRows * 4);   // a count is a claim, not a budget
         for (int i = 0; i <= maxIdx; ++i) out.append(points.value(i));
         if (count) *count = maxIdx + 1;
         return out;
@@ -1414,6 +1432,11 @@ struct Reader {
             series.append(s);
         }
         if (series.isEmpty()) { warnings.add(QStringLiteral("A chart with no data was left out"), scope.slideNumber); return; }
+        int longest = 0;
+        for (const auto &s : series) longest = qMax(longest, kind == 9 ? s.xs.size() : s.vals.size());
+        if (longest < 1) { warnings.add(QStringLiteral("A chart whose data was not cached in the deck was left out"), scope.slideNumber); return; }
+        if (longest > Table::maxRows - 1 || series.size() > Table::maxColumns - 1)
+            warnings.add(QStringLiteral("A chart was cut to %1 points and %2 series").arg(Table::maxRows - 1).arg(Table::maxColumns - 1), scope.slideNumber);
 
         SceneObject o;
         o.id = Edit::newId(QStringLiteral("chart"));
@@ -1426,7 +1449,9 @@ struct Reader {
         if (kind == 9) {
             // Rows are the x values every series shares; blanks where one has none.
             QStringList xs;
-            for (const auto &s : series) for (const auto &x : s.xs) if (!xs.contains(x)) xs.append(x);
+            bool repeated = false;
+            for (const auto &s : series) { QSet<QString> seen; for (const auto &x : s.xs) { if (seen.contains(x)) repeated = true; seen.insert(x); if (!xs.contains(x)) xs.append(x); } }
+            if (repeated) warnings.add(QStringLiteral("A scatter chart repeats an x value; only the first point at each x was kept"), scope.slideNumber);
             std::sort(xs.begin(), xs.end(), [](const QString &a, const QString &b) { return a.toDouble() < b.toDouble(); });
             const int rows = qMin(Table::maxRows, xs.size() + 1), columns = qMin(Table::maxColumns, series.size() + 1);
             o.table = Table::create(rows, columns);
@@ -1641,8 +1666,8 @@ struct Reader {
     // ---- masters and layouts
 
     MasterInfo &masterFor(const QString &masterPath) {
-        auto it = masters.find(masterPath);
-        if (it != masters.end()) return *it;
+        auto found = masters.find(masterPath);
+        if (found != masters.end()) return found->second;
         MasterInfo info;
         info.path = masterPath;
         info.root = pkg.part(masterPath);
@@ -1651,8 +1676,8 @@ struct Reader {
         if (info.root)
             if (const Node *map = info.root->child(QStringLiteral("clrMap")))
                 for (auto a = map->attrs.cbegin(); a != map->attrs.cend(); ++a) info.color.clrMap.insert(a.key(), a.value());
-        it = masters.insert(masterPath, info);
-        it->color.theme = &it->theme;
+        MasterInfo &it = masters.emplace(masterPath, info).first->second;
+        it.color.theme = &it.theme;
 
         Master master;
         master.id = Edit::newId(QStringLiteral("master"));
@@ -1660,13 +1685,13 @@ struct Reader {
         master.name = cSld ? cSld->attr(QStringLiteral("name")) : QString();
         if (master.name.isEmpty()) master.name = QStringLiteral("Master %1").arg(doc.masters.size() + 1);
         QString picture;
-        const auto bg = backgroundOf(info.root, it->color, &picture, masterPath);
-        master.background = bg.isValid() ? bg : it->theme.colors.value(it->color.clrMap.value(QStringLiteral("bg1"), QStringLiteral("lt1")), QColor(Qt::white));
+        const auto bg = backgroundOf(info.root, it.color, &picture, masterPath);
+        master.background = bg.isValid() ? bg : it.theme.colors.value(it.color.clrMap.value(QStringLiteral("bg1"), QStringLiteral("lt1")), QColor(Qt::white));
         master.backgroundToken.clear();
-        it->id = master.id;
+        it.id = master.id;
         Scope scope;
         scope.partPath = masterPath;
-        scope.master = &*it;
+        scope.master = &it;
         scope.objects = &master.objects;
         if (!picture.isEmpty()) {
             SceneObject o;
@@ -1677,7 +1702,7 @@ struct Reader {
         convertDecoration(info.root, scope);
         if (presentation && presentation->attr(QStringLiteral("showSpecialPlsOnTitleSld")) == QLatin1String("0")) master.fields.hideOnFirst = true;
         doc.masters.append(master);
-        return *it;
+        return it;
     }
 
     QString layoutFor(const QString &layoutPath, MasterInfo &master) {
@@ -1716,7 +1741,9 @@ struct Reader {
             o.id = cls == QLatin1String("title") ? QStringLiteral("title")
                  : bodies == 0 ? QStringLiteral("body") : QStringLiteral("body-%1").arg(bodies + 1);
             if (cls == QLatin1String("body")) ++bodies;
-            if (cls == QLatin1String("title") && !layout.placeholders.isEmpty() && layout.placeholders.first().id == QLatin1String("title")) continue;
+            bool taken = false;
+            for (const auto &p : layout.placeholders) if (p.id == o.id) taken = true;
+            if (taken) continue;
             TextChain chain = chainFor(scope, ph, nullptr, masterSp);
             const TextOut text = convertText(sp->child(QStringLiteral("txBody")), chain, textContext(scope));
             RunLook fallback; { ParaLook para; resolveLevel(chain, 0, para, fallback, textContext(scope)); }
@@ -1737,14 +1764,16 @@ struct Reader {
     // ---- transitions and builds
 
     void convertTransition(const Node *slideRoot, Slide &slide, int number) {
-        const Node *transition = nullptr;
+        const Node *transition = nullptr, *newerNode = nullptr;
         QString newer;
+        const auto isEffect = [](const Node &k) { return k.name != QLatin1String("sndAc") && k.name != QLatin1String("extLst"); };
         for (const auto &k : slideRoot->kids) {
             if (k.name == QLatin1String("transition")) transition = &k;
             else if (k.name == QLatin1String("AlternateContent")) {
                 if (const Node *choice = k.child(QStringLiteral("Choice")))
                     if (const Node *t = choice->child(QStringLiteral("transition"))) {
-                        for (const auto &effect : t->kids) newer = effect.name;
+                        for (const auto &effect : t->kids) if (isEffect(effect)) newer = effect.name;
+                        newerNode = t;
                         if (!transition) transition = t;
                     }
                 if (const Node *fallback = k.child(QStringLiteral("Fallback")))
@@ -1753,7 +1782,7 @@ struct Reader {
         }
         if (!transition) { slide.transition = 0; return; }
         QString effect = newer;
-        if (effect.isEmpty()) for (const auto &k : transition->kids) if (k.name != QLatin1String("sndAc") && k.name != QLatin1String("extLst")) effect = k.name;
+        if (effect.isEmpty()) for (const auto &k : transition->kids) if (isEffect(k)) effect = k.name;
         const Node *effectNode = nullptr;
         for (const auto &k : transition->kids) if (k.name == effect) effectNode = &k;
         if (effect.isEmpty() || effect == QLatin1String("cut")) slide.transition = 0;
@@ -1767,7 +1796,9 @@ struct Reader {
         else { slide.transition = 1; warnings.add(QStringLiteral("The %1 transition was shown as a fade").arg(effect), number); }
         const auto speed = transition->attr(QStringLiteral("spd"), QStringLiteral("fast"));
         slide.transitionSeconds = speed == QLatin1String("slow") ? 1.0 : speed == QLatin1String("med") ? 0.75 : 0.5;
-        if (transition->has(QStringLiteral("dur"))) slide.transitionSeconds = qMax(0.05, transition->attr(QStringLiteral("dur")).toDouble() / 1000.0);
+        // The newer markup carries an exact duration the older one cannot.
+        for (const auto *t : {transition, newerNode})
+            if (t && t->has(QStringLiteral("dur"))) slide.transitionSeconds = qBound(0.05, t->attr(QStringLiteral("dur")).toDouble() / 1000.0, 30.0);
         if (transition->has(QStringLiteral("advTm"))) slide.advanceAfter = transition->attr(QStringLiteral("advTm")).toDouble() / 1000.0;
     }
 
@@ -1856,7 +1887,11 @@ struct Reader {
         QColor bg = backgroundOf(root, master.color, &picture, slidePath);
         if (!bg.isValid() && picture.isEmpty() && layoutRoot) bg = backgroundOf(layoutRoot, master.color, &picture, layoutPath);
         if (bg.isValid()) { slide.background = bg; slide.backgroundOverride = true; }
-        else if (!picture.isEmpty()) { slide.background = doc.masters.isEmpty() ? QColor(Qt::white) : doc.masters.last().background; slide.backgroundOverride = true; }
+        else if (!picture.isEmpty()) {
+            slide.background = QColor(Qt::white);
+            for (const auto &m : doc.masters) if (m.id == master.id) slide.background = m.background;
+            slide.backgroundOverride = true;
+        }
 
         QHash<QString, QString> spidToObject;
         Scope scope;
@@ -1964,7 +1999,10 @@ struct Reader {
             cy = size->attr(QStringLiteral("cy")).toDouble();
         }
         if (cx <= 0 || cy <= 0) { cx = 12192000; cy = 6858000; }
-        doc.size = QSizeF(1920, qRound(1920 * cy / cx));
+        // Any shape is allowed, within what a deck can hold.
+        const qreal ratio = qBound(0.125, cy / cx, 8.0);
+        doc.size = QSizeF(1920, qRound(1920 * ratio));
+        cy = cx * ratio;
         u.k = doc.size.width() / cx;
         u.pt = doc.size.height() / (cy / 12700.0);
 
@@ -1974,7 +2012,7 @@ struct Reader {
         if (const Node *list = presentation->child(QStringLiteral("sldIdLst"))) {
             for (const auto *id : list->all(QStringLiteral("sldId"))) {
                 const auto path = pkg.target(presentationPath, id->attr(QStringLiteral("r:id")));
-                if (path.isEmpty() || !pkg.has(path)) continue;
+                if (path.isEmpty() || !pkg.has(path) || slidePaths.contains(path)) continue;
                 slidePaths.append(path);
                 slidePathByNumericId.insert(id->attr(QStringLiteral("id")), path);
                 slideIdByPath.insert(path, Edit::newId(QStringLiteral("slide")));
@@ -1988,8 +2026,9 @@ struct Reader {
         // Theme colours and fonts for the deck's own palette.
         const auto masterPaths = pkg.relatedAll(presentationPath, QStringLiteral("slideMaster"));
         for (const auto &m : masterPaths) masterFor(m);
-        if (!masters.isEmpty()) {
-            const MasterInfo &first = masters.value(masterPaths.value(0, masters.keys().first()));
+        if (!masters.empty()) {
+            const auto firstPath = masterPaths.value(0, masters.begin()->first);
+            const MasterInfo &first = masters.count(firstPath) ? masters.at(firstPath) : masters.begin()->second;
             const auto &t = first.theme;
             auto mapped = [&](const QString &key, const QString &fallback) {
                 return t.colors.value(first.color.clrMap.value(key, fallback), t.colors.value(fallback));

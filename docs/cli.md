@@ -173,6 +173,10 @@ the file argument), `saveAsync` (`saveTo`), `pasteAsync` (`paste`) and the rest.
 
 ## Exporting
 
+`apply` only edits the deck: operations that would write a file, export, print,
+change templates or the recent list, or touch a recovery journal are refused
+with a note saying which verb does that instead, so `--dry-run` really is dry.
+
 ```
 omashow export talk.omashow --kind pdf     --out talk.pdf [--layout notes] [--stages]
 omashow export talk.omashow --kind images  --out frames/slide.png --width 1920 [--format jpeg]

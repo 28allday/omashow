@@ -212,10 +212,14 @@ void Backend::recoverFrom(const QString &journalPath) {
       originalPath = journal.originalPath;
   }
 
+  if (!m_importedFrom.isEmpty()) { m_importedFrom.clear(); m_importWarnings.clear(); emit importReportChanged(); }
   resetMediaSession();
   m_document = result.document;
+  Review::prune(m_document);
+  m_activeShow.clear();
+  applyActiveShow();
   m_history.reset(m_document);
-  pause(); m_gestureActive = false; m_guides.clear(); emit guidesChanged();
+  pause(); m_gestureActive = false; m_gestureDepth = 0; m_guides.clear(); emit guidesChanged();
   m_currentSlide = 0;
   m_collapsedSections.clear();
   resetSlideSelection();
@@ -307,7 +311,9 @@ void Backend::acceptImported(const Document &document, const QString &sourcePath
   const auto name = QFileInfo(sourcePath).fileName();
   setStatus(warnings.isEmpty()
                 ? tr("Opened %1 from %2 — save it as an OmaShow deck").arg(name, kind)
-                : tr("Opened %1 from %2 with %n thing(s) to know — save it as an OmaShow deck", "", warnings.size()).arg(name, kind));
+                : warnings.size() == 1
+                ? tr("Opened %1 from %2 with one thing to know — save it as an OmaShow deck").arg(name, kind)
+                : tr("Opened %1 from %2 with %3 things to know — save it as an OmaShow deck").arg(name, kind).arg(warnings.size()));
 }
 
 QVariantMap Backend::importReport() const {
@@ -339,7 +345,7 @@ int Backend::substituteFonts(const QVariantMap &replacements) {
   m_history.commit();
   touch();
   emit importReportChanged();
-  setStatus(tr("Replaced %n typeface name(s)", "", changed));
+  setStatus(changed == 1 ? tr("Replaced one typeface name") : tr("Replaced %1 typeface names").arg(changed));
   return changed;
 }
 
@@ -352,6 +358,7 @@ void Backend::dismissImportReport() {
 
 void Backend::acceptOpen(const Document &document, const QUrl &url) {
   if (!m_importedFrom.isEmpty()) { m_importedFrom.clear(); m_importWarnings.clear(); emit importReportChanged(); }
+  m_gestureDepth = 0;
   resetMediaSession();
   m_document = document;
   Review::prune(m_document);
@@ -425,6 +432,14 @@ void Backend::saveAsDialog() {
 
 bool Backend::saveTo(const QString &path) {
   QString error;
+  // A .pptx or .key is never written to: a native deck goes under its own name.
+  if (Interchange::isForeign(Interchange::kindOf(path))) {
+    error = tr("%1 is a %2 file; save the deck as .omashow instead.")
+                .arg(QFileInfo(path).fileName(), Interchange::kindName(Interchange::kindOf(path)));
+    setStatus(error);
+    emit failed(error);
+    return false;
+  }
   if (!Bundle::save(m_document, path, &error)) {
     setStatus(tr("Could not save: %1").arg(error));
     emit failed(error);
@@ -523,6 +538,7 @@ void Backend::reloadFromDisk() {
 }
 
 void Backend::setDocument(const Document &document) {
+  if (!m_importedFrom.isEmpty()) { m_importedFrom.clear(); m_importWarnings.clear(); emit importReportChanged(); }
   activateDocument();
   pause();
   resetMediaSession();
@@ -797,6 +813,7 @@ void Backend::setSnapEnabled(bool enabled) {
 }
 
 void Backend::undo() {
+  if (m_gestureActive) return;   // a drag in progress owns the pending step
   const auto currentId=m_document.slides.value(m_currentSlide).id;
   if (!m_history.undo(m_document))
     return;
@@ -811,6 +828,7 @@ void Backend::undo() {
 }
 
 void Backend::redo() {
+  if (m_gestureActive) return;
   const auto currentId=m_document.slides.value(m_currentSlide).id;
   if (!m_history.redo(m_document))
     return;

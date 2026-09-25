@@ -953,7 +953,9 @@ ApplicationWindow {
                         wrapMode: Text.Wrap
                         text: parent.parent.parent.notes.length === 0
                               ? qsTr("%1 was opened from %2 as a new OmaShow deck. Save it to keep it; the original is untouched.").arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
-                              : qsTr("%1 was opened from %2 as a new OmaShow deck. %n thing(s) could not be brought across; the original is untouched.", "", parent.parent.parent.notes.length).arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
+                              : parent.parent.parent.notes.length === 1
+                              ? qsTr("%1 was opened from %2 as a new OmaShow deck. One thing could not be brought across; the original is untouched.").arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
+                              : qsTr("%1 was opened from %2 as a new OmaShow deck. %3 things could not be brought across; the original is untouched.").arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind).arg(parent.parent.parent.notes.length)
                     }
                     Button {
                         objectName: "importFonts"

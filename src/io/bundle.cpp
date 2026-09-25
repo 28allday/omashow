@@ -697,12 +697,17 @@ bool Bundle::save(const Document &document, const QString &path, QString *error)
     }
     // QSaveFile is the atomic write: a temporary beside the target, then a
     // rename on commit. An interrupted save leaves the old deck untouched.
+    // What is written must be readable again: the reader refuses more.
+    const QByteArray raw = toBytes(document);
+    if (raw.isEmpty() || raw.size() > Zip::kMaxArchiveBytes) {
+        if (error) *error = QStringLiteral("The deck is too large to save: it holds more than 512 MB of pictures and film. Link films instead of embedding them, or split the deck.");
+        return false;
+    }
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
         if (error) *error = file.errorString();
         return false;
     }
-    const QByteArray raw = toBytes(document);
     if (file.write(raw) != raw.size()) {
         if (error) *error = file.errorString();
         file.cancelWriting();

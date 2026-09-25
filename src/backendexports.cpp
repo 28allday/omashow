@@ -102,6 +102,7 @@ int Backend::queueExport(const QVariantMap &options) {
   }
   ExportEntry entry;
   entry.id = ++m_exportSerial;
+  entry.generation = m_documentGeneration;
   entry.request = request;
   entry.state = QStringLiteral("queued");
   // The deck is taken as it is now, so editing while it exports is safe.
@@ -194,6 +195,12 @@ bool Backend::retryExport(int id) {
     if (entry.id != id || entry.state == QLatin1String("running") ||
         entry.state == QLatin1String("queued"))
       continue;
+    if (entry.generation != m_documentGeneration) {
+      // Another deck is open now; its slides must not land in the old file.
+      setStatus(tr("That export was of a different deck; export this one afresh."));
+      emit failed(status());
+      return false;
+    }
     entry.state = QStringLiteral("queued");
     entry.message.clear();
     entry.log.clear();

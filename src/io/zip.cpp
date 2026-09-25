@@ -87,6 +87,14 @@ quint32 get32(const QByteArray &raw, int offset) {
 } // namespace
 
 QByteArray Zip::write(const QVector<Entry> &entries) {
+    // No zip64: sizes and offsets are 32-bit, so anything that would not fit
+    // is refused (an empty answer) rather than written corrupt.
+    qint64 total = 0;
+    for (const auto &entry : entries) {
+        if (entry.data.size() > 0xFFFFFFF0LL) return QByteArray();
+        total += entry.data.size() + 100 + entry.name.size();
+        if (total > 0xFFFFFFF0LL) return QByteArray();
+    }
     QByteArray out;
     struct Record {
         QString name;

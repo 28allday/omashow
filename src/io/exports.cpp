@@ -146,6 +146,8 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
         if (!packaged.ok) return fail(packaged.error);
         outcome.files.append(request.path);
         outcome.log = packaged.lines;
+        if (indices.size() != document.slides.size())
+            outcome.log.append(QStringLiteral("A package is always the whole deck; the slide range was not applied."));
         report(100);
         outcome.ok = true;
         return outcome;
@@ -153,7 +155,15 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
 
     if (request.kind == PowerPoint) {
         report(5);
-        const auto written = PptxWriter::write(document, request.path, job);
+        // The whole deck goes across, hidden slides as hidden slides, unless a
+        // range or a custom show asks for particular slides in an order.
+        Document chosen = document;
+        if (request.from >= 0 || request.to >= 0 || !document.activeShow.isEmpty()) {
+            chosen.slides.clear();
+            for (int i : indices) chosen.slides.append(document.slides.at(i));
+        }
+        chosen.activeShow.clear();
+        const auto written = PptxWriter::write(chosen, request.path, job);
         if (!written.ok) return fail(written.error);
         outcome.files.append(request.path);
         outcome.log = written.lines;
@@ -166,6 +176,7 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
         Pdf::Options options;
         options.from = *std::min_element(indices.cbegin(), indices.cend());
         options.to = *std::max_element(indices.cbegin(), indices.cend());
+        options.indices = indices;
         options.pagePerBuildStage = request.stages;
         options.includeSkipped = request.includeSkipped;
         options.layout = request.layout;

@@ -151,7 +151,7 @@ Sheet {
                                     Layout.fillWidth: true; wrapMode: Text.Wrap
                                     objectName: "importFont" + index
                                     color: modelData.resolved ? Theme.textSecondary : Theme.accent
-                                    text: modelData.family + " · " + qsTr("%n uses", "", modelData.uses)
+                                    text: modelData.family + " · " + (modelData.uses === 1 ? qsTr("1 use") : qsTr("%1 uses").arg(modelData.uses))
                                           + (modelData.detail ? " · " + modelData.detail : "")
                                 }
                                 ComboBox {

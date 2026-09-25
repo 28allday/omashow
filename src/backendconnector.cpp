@@ -82,7 +82,9 @@ bool Backend::putTextOnShape() {
 bool Backend::takeTextOffPath() {
   const auto ids = selectedIds();
   if (ids.size() != 1) return false;
-  const auto *shown = Design::resolve(m_document, m_currentSlide).find(ids.first());
+  // The resolved slide must outlive the pointer into it.
+  const Slide resolved = Design::resolve(m_document, m_currentSlide);
+  const auto *shown = resolved.find(ids.first());
   if (!shown || shown->textKind != 2) return false;
   m_history.begin(m_document, tr("Take the text off the path"));
   auto *target = m_document.slides[m_currentSlide].find(ids.first());

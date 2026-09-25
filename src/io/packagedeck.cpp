@@ -157,6 +157,7 @@ Package::Report Package::write(const Document &document, const QString &path,
 
     if (job && job->canceled) return fail(QStringLiteral("Packaging canceled."));
     const QByteArray archive = Zip::write(entries);
+    if (archive.isEmpty()) return fail(QStringLiteral("The package would be larger than 4 GB, which the zip format cannot hold. Leave the largest films out."));
     QString error;
     if (!Workers::write(path, archive, &error, job))
         return fail(error.isEmpty() ? QStringLiteral("The package could not be written.") : error);

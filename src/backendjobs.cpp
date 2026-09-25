@@ -101,6 +101,10 @@ void Backend::saveAsync(const QString &path) {
         if (generation != m_documentGeneration) { emit saveCanceled(); return; }
         setFileUrl(QUrl::fromLocalFile(path));
         if (revision != m_revision) {
+            // The file on disk is the version just written; keep watching it
+            // from there, or the save itself reads as an outside change.
+            watchFile();
+            emit fileStateChanged();
             setStatus(tr("Saved an earlier version; your newer edits still need saving."));
             emit saveCanceled(); // A pending close/open must not discard newer edits.
             return;

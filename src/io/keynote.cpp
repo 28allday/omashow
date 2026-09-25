@@ -2,6 +2,7 @@
 
 #include "core/edit.h"
 #include "core/imageasset.h"
+#include "core/link.h"
 #include "core/shape.h"
 #include "core/svgasset.h"
 #include "core/table.h"
@@ -273,7 +274,7 @@ public:
     }
 
     // Turns a buffer into a text object's properties.
-    void applyText(SceneObject &o, const TextBuffer &buffer) const {
+    void applyText(SceneObject &o, const TextBuffer &buffer) {
         o.type = ObjectType::Text;
         o.text = buffer.text;
         const auto &b = buffer.box;
@@ -315,6 +316,10 @@ public:
         if (!buffer.link.isEmpty()) {
             if (buffer.link.startsWith(QLatin1String("mailto:"), Qt::CaseInsensitive)) { o.linkKind = 2; o.linkTarget = buffer.link.mid(7); }
             else if (buffer.link.startsWith(QLatin1String("http"), Qt::CaseInsensitive)) { o.linkKind = 1; o.linkTarget = buffer.link; }
+            if (o.linkKind && !Links::validate(o.linkKind, o.linkTarget, doc, true).isEmpty()) {
+                o.linkKind = 0; o.linkTarget.clear();
+                warnings.add(QStringLiteral("A link OmaShow cannot follow was left off: %1").arg(buffer.link.left(80)), slideNumber);
+            }
         }
     }
 

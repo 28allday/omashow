@@ -174,6 +174,7 @@ void Backend::selectRegion(qreal x, qreal y, qreal w, qreal h, bool extend) {
   selectIds(ids);
 }
 void Backend::beginEdit(const QString &label) {
+  ++m_gestureDepth;
   if (!m_gestureActive) {
     m_gestureWasModified = m_modified;
     m_gestureBasis = Design::resolve(m_document, m_currentSlide);
@@ -183,8 +184,10 @@ void Backend::beginEdit(const QString &label) {
   m_history.begin(m_document, label);
 }
 void Backend::endEdit() {
-  if(!m_gestureActive) return;
+  if(!m_gestureActive || m_gestureDepth <= 0) return;
   m_history.commit();
+  // An inner gesture ends inside an outer one: the outer one carries on.
+  if (--m_gestureDepth > 0) return;
   m_gestureActive = false;
   m_guides.clear();
   emit guidesChanged();
@@ -194,6 +197,7 @@ void Backend::cancelEdit() {
   if (!m_history.cancel(m_document))
     return;
   m_gestureActive = false;
+  m_gestureDepth = 0;
   m_guides.clear();
   m_modified = m_gestureWasModified;
   ++m_revision;
@@ -267,6 +271,9 @@ void Backend::nudgeSelected(qreal dx, qreal dy) {
 }
 void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   if(key.startsWith("media")) return; // Media changes must keep the cue and source consistent.
+  // Assets are set by inserting a picture; links by setObjectLink, which checks them.
+  static const QStringList guarded{"imageId", "imageFormat", "imageOriginal", "linkKind", "linkTarget"};
+  if(guarded.contains(key)) return;
   const auto ids = selectedIds();
   if (ids.isEmpty())
     return;

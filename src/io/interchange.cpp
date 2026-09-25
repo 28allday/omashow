@@ -4,13 +4,15 @@
 #include "io/keynote.h"
 #include "io/pptx.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 
 namespace Interchange {
 
 Kind kindOf(const QString &path) {
-    const auto suffix = QFileInfo(path).suffix().toLower();
+    // A Keynote package is a folder; a shell may hand it over with a slash.
+    const auto suffix = QFileInfo(QDir::cleanPath(path)).suffix().toLower();
     if (suffix == QStringLiteral("omashow")) return Native;
     if (suffix == QStringLiteral("pptx")) return PowerPoint;
     if (suffix == QStringLiteral("key")) return Keynote;
@@ -91,7 +93,7 @@ QStringList openPatterns() {
 }
 
 QString suggestedName(const QString &path) {
-    const auto base = QFileInfo(path).completeBaseName();
+    const auto base = QFileInfo(QDir::cleanPath(path)).completeBaseName();
     return (base.isEmpty() ? QStringLiteral("Untitled") : base) + QStringLiteral(".omashow");
 }
 

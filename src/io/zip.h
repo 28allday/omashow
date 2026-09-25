@@ -23,7 +23,11 @@ struct Entry {
     bool compress = true;
 };
 
+// Empty when the archive would not fit the format (no zip64: 4 GB).
 QByteArray write(const QVector<Entry> &entries);
+
+// The most a deck may be, so that whatever is written can be read again.
+constexpr qint64 kMaxArchiveBytes = 512LL * 1024 * 1024;
 
 class Reader {
 public:

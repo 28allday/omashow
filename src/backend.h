@@ -690,6 +690,7 @@ private:
     // One export at a time, each against the deck as it was when it was queued.
     struct ExportEntry {
         int id = 0;
+        int generation = 0;   // which deck it was queued from
         Exports::Request request;
         QString state, message;
         QStringList log;
@@ -726,6 +727,7 @@ private:
     // body area if it has one, else the space under the title, else `fallback`.
     QRectF roomForContent(const QRectF &fallback) const;
     bool m_gestureActive = false;
+    int m_gestureDepth = 0;   // nested beginEdit/endEdit pairs
     bool m_gestureWasModified = false;
     int m_revision = 0;
     bool m_snapEnabled = true;

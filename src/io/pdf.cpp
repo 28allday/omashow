@@ -19,6 +19,11 @@ namespace {
 constexpr qreal kA4Width = 595.0, kA4Height = 842.0, kMargin = 48.0;
 
 QVector<int> eligibleSlides(const Document &document, const Pdf::Options &options) {
+    if (!options.indices.isEmpty()) {
+        QVector<int> chosen;
+        for (int i : options.indices) if (i >= 0 && i < document.slides.size()) chosen.append(i);
+        return chosen;
+    }
     const int from = qBound(0, options.from, int(document.slides.size()) - 1);
     const int to = options.to < 0 ? document.slides.size() - 1
                                   : qBound(from, options.to, int(document.slides.size()) - 1);

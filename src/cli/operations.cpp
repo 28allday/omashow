@@ -31,6 +31,26 @@ const QMap<QString, QString> &refusals() {
         {QStringLiteral("table.clipboardText"), QStringLiteral("there is no clipboard here")},
         {QStringLiteral("table.cancelDataFile"), QStringLiteral("nothing is read in the background here")},
         {QStringLiteral("table.refreshDataFile"), QStringLiteral("read the file yourself and use table.applyDataFile")},
+        // Writing happens once, when apply finishes; exporting is its own verb.
+        {QStringLiteral("saveTo"), QStringLiteral("the deck is written when apply finishes; --out names the file")},
+        {QStringLiteral("save"), QStringLiteral("the deck is written when apply finishes; --out names the file")},
+        {QStringLiteral("exportPdf"), QStringLiteral("use `omashow export --kind pdf`")},
+        {QStringLiteral("exportReview"), QStringLiteral("use `omashow review`")},
+        {QStringLiteral("renderFrame"), QStringLiteral("use `omashow export --kind images`")},
+        {QStringLiteral("queueExport"), QStringLiteral("use `omashow export`")},
+        {QStringLiteral("retryExport"), QStringLiteral("use `omashow export`")},
+        {QStringLiteral("cancelExport"), QStringLiteral("nothing exports in the background here")},
+        {QStringLiteral("clearFinishedExports"), QStringLiteral("nothing exports in the background here")},
+        // These change this computer, not the deck.
+        {QStringLiteral("saveAsTemplate"), QStringLiteral("templates are installed from the app")},
+        {QStringLiteral("installTemplate"), QStringLiteral("templates are installed from the app")},
+        {QStringLiteral("removeTemplate"), QStringLiteral("templates are removed from the app")},
+        {QStringLiteral("removeRecent"), QStringLiteral("the recent list belongs to the app")},
+        {QStringLiteral("pinRecent"), QStringLiteral("the recent list belongs to the app")},
+        {QStringLiteral("openRecent"), QStringLiteral("open the deck as the file argument instead")},
+        {QStringLiteral("discardRecovery"), QStringLiteral("recovery journals belong to the app that wrote them")},
+        {QStringLiteral("recoverFrom"), QStringLiteral("recovery journals belong to the app that wrote them")},
+        {QStringLiteral("importFromDeck"), QStringLiteral("finishes later on another thread; use the import dialog in the app")},
     };
     return table;
 }

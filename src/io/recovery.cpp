@@ -53,6 +53,10 @@ bool Recovery::write(const Document &document, const QString &originalPath, QStr
     meta[QStringLiteral("pid")] = QCoreApplication::applicationPid();
 
     const auto bytes = Bundle::toBytes(document, QJsonDocument(meta).toJson(QJsonDocument::Compact));
+    if (bytes.isEmpty() || bytes.size() > Zip::kMaxArchiveBytes) {
+        if (error) *error = QStringLiteral("The deck is too large for a recovery journal (over 512 MB).");
+        return false;
+    }
     return Workers::write(journalPathForPid(QCoreApplication::applicationPid()), bytes, error, job);
 }
 

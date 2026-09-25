@@ -11,6 +11,7 @@
 
 #include <QSizeF>
 #include <QString>
+#include <QVector>
 #include <functional>
 
 #include "core/scene.h"
@@ -27,6 +28,7 @@ enum Layout { Slides = 0, Notes = 1, Outline = 2, Handout = 3 };
 struct Options {
     int from = 0;              // slide index, inclusive
     int to = -1;               // -1 means to the end
+    QVector<int> indices;      // when given, exactly these slides in this order (a custom show)
     // A page per build stage instead of one per slide: the handout mode the
     // competing products do badly, and it is nearly free here because the
     // evaluator can be asked for any moment.
