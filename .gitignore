@@ -24,3 +24,4 @@ __pycache__/
 /demo/
 /build-demo/
 /tools/demo-video.sh
+build-asan/
