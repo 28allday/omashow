@@ -728,6 +728,7 @@ private:
     QRectF roomForContent(const QRectF &fallback) const;
     bool m_gestureActive = false;
     int m_gestureDepth = 0;   // nested beginEdit/endEdit pairs
+    QVariantList m_gestureBefore;   // the slide's objects when the gesture began
     bool m_gestureWasModified = false;
     int m_revision = 0;
     bool m_snapEnabled = true;

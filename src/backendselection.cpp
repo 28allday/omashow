@@ -173,10 +173,22 @@ void Backend::selectRegion(qreal x, qreal y, qreal w, qreal h, bool extend) {
       ids.append(o.id);
   selectIds(ids);
 }
+namespace {
+// What a slide's objects are, in a form that can be compared: a gesture that
+// ends where it began leaves no step to undo.
+QVariantList objectsOf(const Document &document, int slide) {
+  QVariantList out;
+  if (slide < 0 || slide >= document.slides.size()) return out;
+  for (const auto &o : document.slides.at(slide).objects) out.append(Design::properties(o));
+  return out;
+}
+} // namespace
+
 void Backend::beginEdit(const QString &label) {
   ++m_gestureDepth;
   if (!m_gestureActive) {
     m_gestureWasModified = m_modified;
+    m_gestureBefore = objectsOf(m_document, m_currentSlide);
     m_gestureBasis = Design::resolve(m_document, m_currentSlide);
     m_gestureBounds = Arrange::bounds(m_gestureBasis, selectedIds());
     m_gestureActive = true;
@@ -185,12 +197,23 @@ void Backend::beginEdit(const QString &label) {
 }
 void Backend::endEdit() {
   if(!m_gestureActive || m_gestureDepth <= 0) return;
-  m_history.commit();
   // An inner gesture ends inside an outer one: the outer one carries on.
-  if (--m_gestureDepth > 0) return;
+  if (m_gestureDepth > 1) { m_history.commit(); --m_gestureDepth; return; }
+  m_gestureDepth = 0;
   m_gestureActive = false;
   m_guides.clear();
   emit guidesChanged();
+  if (objectsOf(m_document, m_currentSlide) == m_gestureBefore) {
+    // A click, or a drag that came back to where it started: nothing to undo.
+    m_history.abandon();
+    m_gestureBefore.clear();
+    m_modified = m_gestureWasModified;
+    ++m_revision;
+    emit documentChanged();
+    return;
+  }
+  m_gestureBefore.clear();
+  m_history.commit();
   touch();
 }
 void Backend::cancelEdit() {
