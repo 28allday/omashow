@@ -45,6 +45,14 @@ has them. To hand a deck to someone with PowerPoint,
 `export --kind pptx --out talk.pptx`; the answer's `log` names anything that
 had to be approximated.
 
+## Names, not numbers
+
+Choices can be given by name: `{"op":"addShape","args":["star"]}`,
+`{"op":"setSlideTransition","args":["kind","zoom"]}`,
+`{"op":"addBuildForSelection","args":["in","fade"]}`,
+`{"op":"setBuildProperty","args":[0,"trigger","onClick"]}`. The names are the
+ones `omashow ops` lists under `vocabulary`.
+
 ## The loop that works
 
 1. **`new`** the deck, with as many slides as it needs.

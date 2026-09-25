@@ -1,4 +1,5 @@
 #include "cli/operations.h"
+#include "cli/describe.h"
 #include "backend.h"
 #include "core/delimited.h"
 #include "tablemodel.h"
@@ -102,6 +103,77 @@ QVector<QMetaMethod> methodsNamed(const QMetaObject *meta, const QString &name) 
         return a.parameterCount() < b.parameterCount();
     });
     return found;
+}
+
+// "Fade", "fade-through-black", "Stacked column", "onClick": a word matches a
+// choice whatever its case and whatever joins its parts.
+QString folded(const QString &word) {
+    QString out;
+    for (const QChar c : word) if (c.isLetterOrNumber()) out += c.toLower();
+    return out;
+}
+
+// Which numbered choice each argument of an operation is, as a path into the
+// published vocabulary. For key/value operations the list depends on the key.
+QVariantMap choicesFor(const QString &op, int argument, const QVariantList &arguments) {
+    const auto vocabulary = Cli::vocabulary();
+    const auto at = [&vocabulary](const QString &group, const QString &list) {
+        return vocabulary.value(group).toMap().value(list).toMap();
+    };
+    const auto key = [&arguments](int i) { return arguments.value(i).toString(); };
+    if (op == QLatin1String("addShape") && argument == 0) return at(QStringLiteral("shapes"), QStringLiteral("kinds"));
+    if (op == QLatin1String("addChart") && argument == 0) return at(QStringLiteral("charts"), QStringLiteral("kinds"));
+    if (op == QLatin1String("setChartProperty") && argument == 1 && key(0) == QLatin1String("kind"))
+        return at(QStringLiteral("charts"), QStringLiteral("kinds"));
+    if ((op == QLatin1String("addBuild") && argument == 1) || (op == QLatin1String("addBuildForSelection") && argument == 0))
+        return at(QStringLiteral("builds"), QStringLiteral("phases"));
+    if ((op == QLatin1String("addBuild") && argument == 2) || (op == QLatin1String("addBuildForSelection") && argument == 1))
+        return at(QStringLiteral("builds"), QStringLiteral("effects"));
+    if (op == QLatin1String("setBuildProperty") && argument == 2) {
+        const QMap<QString, QString> lists{{QStringLiteral("effect"), QStringLiteral("effects")},
+                                           {QStringLiteral("phase"), QStringLiteral("phases")},
+                                           {QStringLiteral("trigger"), QStringLiteral("triggers")},
+                                           {QStringLiteral("easing"), QStringLiteral("easing")},
+                                           {QStringLiteral("unit"), QStringLiteral("revealUnits")}};
+        if (lists.contains(key(1))) return at(QStringLiteral("builds"), lists.value(key(1)));
+    }
+    if (op == QLatin1String("setSlideTransition") && argument == 1) {
+        if (key(0) == QLatin1String("kind")) return at(QStringLiteral("transitions"), QStringLiteral("kinds"));
+        if (key(0) == QLatin1String("direction")) return at(QStringLiteral("transitions"), QStringLiteral("directions"));
+    }
+    return {};
+}
+
+// Turns names into the numbers the operation takes, where it takes a choice.
+// Numbers pass through untouched; an unknown name says what there is.
+bool resolveNames(const QString &op, QVariantList &arguments, QString *why) {
+    for (int i = 0; i < arguments.size(); ++i) {
+        if (arguments.at(i).metaType().id() != QMetaType::QString) continue;
+        const auto choices = choicesFor(op, i, arguments);
+        if (choices.isEmpty()) continue;
+        const QString word = arguments.at(i).toString();
+        bool numeric = false;
+        word.toInt(&numeric);
+        if (numeric) continue;
+        const auto wanted = folded(word);
+        bool found = false;
+        for (auto it = choices.cbegin(); it != choices.cend(); ++it) {
+            if (folded(it.value().toString()) != wanted) continue;
+            arguments[i] = it.key().toInt();
+            found = true;
+            break;
+        }
+        if (!found) {
+            QList<int> order;
+            for (auto it = choices.cbegin(); it != choices.cend(); ++it) order.append(it.key().toInt());
+            std::sort(order.begin(), order.end());
+            QStringList names;
+            for (int n : order) names.append(choices.value(QString::number(n)).toString());
+            *why = QStringLiteral("%1 is not one of %2").arg(word, names.join(QStringLiteral(", ")));
+            return false;
+        }
+    }
+    return true;
 }
 
 bool convert(const QVariant &given, QMetaType wanted, QVariant *out, QString *why) {
@@ -489,6 +561,10 @@ static Cli::OpResult runResolved(Backend &backend, const QVariantMap &op, const 
                           .arg(name, QString::fromLatin1(method.parameterNames().join(", ")));
                 continue;
             }
+        }
+        if (!resolveNames(name, positional, &why)) {
+            result.error = why;
+            return result;
         }
         if (positional.size() != method.parameterCount()) {
             why = QStringLiteral("%1 takes %2 argument(s), not %3")

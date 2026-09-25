@@ -138,6 +138,13 @@ $ omashow apply talk.omashow ops.json
   before anything runs. When the backend explains a refusal (a missing file, an
   unreadable picture) that explanation is the error.
 
+Wherever an operation takes a numbered choice — a shape or chart kind, a
+build's phase, effect, trigger, easing or reveal unit, a transition's kind or
+direction — its name from `omashow ops` works as well as its number, in any
+case and with any spacing: `["kind", "fade-through-black"]`,
+`addShape("star")`, `addChart("Stacked column")`. A name that is not a choice
+is refused with the list of those that are.
+
 ## Tables and chart data
 
 Cells belong to the table model, which follows the selection. Its operations
