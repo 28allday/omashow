@@ -11,6 +11,7 @@
 #include <QSet>
 #include <functional>
 #include "io/bundle.h"
+#include "anim/presentation.h"
 
 #include <QDebug>
 
@@ -197,7 +198,7 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
     slide.transitionDirection = json.value("transitionDirection").toInt(0);
     slide.transitionSeconds = json.value("transitionSeconds").toDouble(-1);
     slide.advanceAfter = json.value("advanceAfter").toDouble(-1);
-    if (slide.transition < -1 || slide.transition > 3 ||
+    if (slide.transition < -1 || slide.transition > Presentation::LastKind ||
         slide.transitionDirection < 0 || slide.transitionDirection > 3 ||
         !std::isfinite(slide.transitionSeconds) || slide.transitionSeconds < -1 ||
         slide.transitionSeconds > 10 || !std::isfinite(slide.advanceAfter) ||
@@ -401,7 +402,7 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
         document.knownWords.append(word);
     }
     if (!std::isfinite(document.transitionDuration) || document.transitionDuration < 0 ||
-        document.transitionDuration > 10 || document.transition < 0 || document.transition > 3) {
+        document.transitionDuration > 10 || document.transition < 0 || document.transition > Presentation::LastKind) {
         result.error = QStringLiteral("The deck has an invalid transition."); return result;
     }
 

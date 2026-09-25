@@ -1,4 +1,5 @@
 #include "anim/presentation.h"
+#include "core/deckresize.h"
 #include "core/design.h"
 
 #include "anim/evaluator.h"
@@ -6,6 +7,8 @@
 #include "core/scene.h"
 
 #include <QEasingCurve>
+#include <QtMath>
+#include <cmath>
 #include <algorithm>
 
 namespace {
@@ -21,13 +24,27 @@ SceneObject backdrop(const QSizeF &size, const QColor &color, const QString &id)
   return object;
 }
 
+// Everything on a slide, grown or shrunk and turned about the middle of it.
+void around(QVector<SceneObject> &objects, const QPointF &centre, qreal scale, qreal degrees) {
+  const qreal radians = qDegreesToRadians(degrees);
+  const qreal c = std::cos(radians), s = std::sin(radians);
+  for (auto &object : objects) {
+    if (!qFuzzyCompare(scale, 1.0)) DeckResize::scaleObject(object, qMax(0.001, scale), centre);
+    if (qFuzzyIsNull(degrees)) continue;
+    const QPointF offset = object.rect.center() - centre;
+    const QPointF turned(offset.x() * c - offset.y() * s, offset.x() * s + offset.y() * c);
+    object.rect.translate(turned - offset);
+    object.rotation += degrees;
+  }
+}
+
 } // namespace
 
 int Presentation::transitionKind(const Document &document, int index) {
   if (index < 0 || index >= document.slides.size()) return document.transition;
   const int own = document.slides.at(index).transition;
   const int kind = own < 0 ? document.transition : own;
-  return kind < Cut || kind > Morph ? Morph : kind;
+  return kind < Cut || kind > LastKind ? Morph : kind;
 }
 
 qreal Presentation::transitionSeconds(const Document &document, int index) {
@@ -131,8 +148,36 @@ QVector<SceneObject> Presentation::blend(const Document &document, const Slide &
     for (auto object : to.objects) { object.opacity *= eased; states.append(object); }
     return states;
   }
-  // Push: each slide carries its own background across the screen.
   const QSizeF size = document.size;
+  const QPointF centre(size.width() / 2, size.height() / 2);
+  if (kind == FadeThroughBlack) {
+    // Out to black over the first half, in from it over the second.
+    const qreal out = qBound(qreal(0), p * 2, qreal(1)), in = qBound(qreal(0), p * 2 - 1, qreal(1));
+    const QEasingCurve curve(QEasingCurve::InOutQuad);
+    for (auto object : from.objects) { object.opacity *= 1 - curve.valueForProgress(out); states.append(object); }
+    for (auto object : to.objects) { object.opacity *= curve.valueForProgress(in); states.append(object); }
+    return states;
+  }
+  if (kind == Zoom) {
+    // The next slide grows out of the middle as this one fades behind it.
+    for (auto object : from.objects) { object.opacity *= 1 - eased; states.append(object); }
+    QVector<SceneObject> arriving = to.objects;
+    around(arriving, centre, 0.25 + 0.75 * eased, 0);
+    for (auto &object : arriving) { object.opacity *= eased; states.append(object); }
+    return states;
+  }
+  if (kind == Whirl) {
+    // The next slide, background and all, spins in from nothing over this one.
+    states.append(backdrop(size, from.background, QStringLiteral("@transition/from")));
+    states += from.objects;
+    QVector<SceneObject> arriving{backdrop(size, to.background, QStringLiteral("@transition/to"))};
+    arriving += to.objects;
+    around(arriving, centre, qMax(0.001, eased), 360.0 * (1 - eased));
+    states += arriving;
+    return states;
+  }
+  // Push, Cover and Uncover: slides that travel, each carrying its own
+  // background across the screen.
   const bool horizontal = direction == 0 || direction == 1;
   const qreal travel = horizontal ? size.width() : size.height();
   const qreal sign = direction == 0 || direction == 2 ? -1 : 1;
@@ -140,22 +185,33 @@ QVector<SceneObject> Presentation::blend(const Document &document, const Slide &
                                      : QPointF(0, travel * eased * sign);
   const QPointF arriving = horizontal ? QPointF(travel * (eased - 1) * sign, 0)
                                       : QPointF(0, travel * (eased - 1) * sign);
-  states.append(backdrop(size, from.background, QStringLiteral("@transition/from")));
-  states += from.objects;
-  const int outgoing = states.size();
-  states.append(backdrop(size, to.background, QStringLiteral("@transition/to")));
-  states += to.objects;
-  for (int i = 0; i < states.size(); ++i)
-    states[i].rect.translate(i < outgoing ? leaving : arriving);
-  return states;
+  QVector<SceneObject> leavingSlide{backdrop(size, from.background, QStringLiteral("@transition/from"))};
+  leavingSlide += from.objects;
+  QVector<SceneObject> arrivingSlide{backdrop(size, to.background, QStringLiteral("@transition/to"))};
+  arrivingSlide += to.objects;
+  // Cover leaves this slide still and brings the next one over it; Uncover
+  // leaves the next one still beneath and takes this one away.
+  if (kind != Cover) for (auto &object : leavingSlide) object.rect.translate(leaving);
+  if (kind != Uncover) for (auto &object : arrivingSlide) object.rect.translate(arriving);
+  if (kind == Uncover) return arrivingSlide + leavingSlide;
+  return leavingSlide + arrivingSlide;
 }
 
 QColor Presentation::blendBackground(const QColor &from, const QColor &to, int kind,
                                      qreal progress) {
   // A push paints its own backgrounds, so what lies behind them is the slide
   // being arrived at from the first frame.
-  if (kind == Push) return to;
-  if (kind == Cut) return progress < 1 ? from : to;
+  if (kind == Push || kind == Cover || kind == Uncover) return to;
+  if (kind == Cut || kind == Whirl) return progress < 1 ? from : to;
+  if (kind == FadeThroughBlack) {
+    const qreal p = qBound(qreal(0), progress, qreal(1));
+    const QColor black(0, 0, 0);
+    const auto mix = [](const QColor &a, const QColor &b, qreal t) {
+      return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * t, a.greenF() + (b.greenF() - a.greenF()) * t,
+                              a.blueF() + (b.blueF() - a.blueF()) * t, a.alphaF() + (b.alphaF() - a.alphaF()) * t);
+    };
+    return p < 0.5 ? mix(from, black, p * 2) : mix(black, to, p * 2 - 1);
+  }
   const qreal p = QEasingCurve(QEasingCurve::InOutCubic)
                       .valueForProgress(qBound(qreal(0), progress, qreal(1)));
   return QColor::fromRgbF(from.redF() + (to.redF() - from.redF()) * p,

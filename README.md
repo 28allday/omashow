@@ -171,7 +171,8 @@ on the right:
   where you placed it. It can travel the other way, and turn as it goes. Individual or selected objects
   together, order, exact start/delay/duration/easing and click/with/after
   triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
-- **Transitions:** cut, fade, push (in any of four directions) or morph, chosen
+- **Transitions:** cut, fade, fade through black, push, cover and uncover (each
+  in any of four directions), zoom, whirl or morph, chosen
   per slide or handed to the whole deck, with their own duration. A slide can
   also move on by itself after a set number of seconds; blanking, freezing or
   pausing holds it where it is. Preview, present and export read the same clock,

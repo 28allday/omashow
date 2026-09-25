@@ -47,7 +47,8 @@ namespace Bundle {
 // Format 22 adds text that follows a path.
 // Format 23 adds the language a deck, a box or a stretch of text is written in,
 // the words the deck has been taught, and whether it smartens punctuation.
-constexpr int kFormatVersion = 23;
+// Format 24 adds the cover, uncover, fade-through-black, zoom and whirl transitions.
+constexpr int kFormatVersion = 24;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

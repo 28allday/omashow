@@ -274,7 +274,9 @@ QVariantMap Backend::slideTransition() const {
           {"first", m_currentSlide == 0},
           {"deckKind", m_document.transition},
           {"deckSeconds", m_document.transitionDuration},
-          {"names", QStringList{tr("Cut"), tr("Fade"), tr("Push"), tr("Morph")}},
+          {"names", QStringList{tr("Cut"), tr("Fade"), tr("Push"), tr("Morph"), tr("Cover"),
+                                tr("Uncover"), tr("Through black"), tr("Zoom"), tr("Whirl")}},
+          {"travels", Presentation::hasDirection(Presentation::transitionKind(m_document, m_currentSlide))},
           {"directions", QStringList{tr("Left"), tr("Right"), tr("Up"), tr("Down")}}};
 }
 
@@ -316,7 +318,7 @@ bool Backend::applyTransition(Slide &slide, const QString &key, const QVariant &
   const qreal number = value.toDouble(&ok);
   if (!ok || !std::isfinite(number)) return false;
   if (key == QLatin1String("kind")) {
-    if (number < -1 || number > Presentation::Morph || number != qRound(number)) return false;
+    if (number < -1 || number > Presentation::LastKind || number != qRound(number)) return false;
     slide.transition = int(number);
   } else if (key == QLatin1String("direction")) {
     if (number < 0 || number > 3 || number != qRound(number)) return false;

@@ -52,6 +52,11 @@ QString transitionName(int kind) {
     case 0: return QStringLiteral("cut");
     case 1: return QStringLiteral("fade");
     case 2: return QStringLiteral("push");
+    case 4: return QStringLiteral("cover");
+    case 5: return QStringLiteral("uncover");
+    case 6: return QStringLiteral("fade-through-black");
+    case 7: return QStringLiteral("zoom");
+    case 8: return QStringLiteral("whirl");
     default: return QStringLiteral("morph");
     }
 }
@@ -327,7 +332,9 @@ QVariantMap Cli::vocabulary() {
                       QStringLiteral("setSlideTransition(key, value[, everySlide]); -1 means follow the deck")},
                      {QStringLiteral("kinds"),
                       indexed({QStringLiteral("cut"), QStringLiteral("fade"), QStringLiteral("push"),
-                               QStringLiteral("morph")})},
+                               QStringLiteral("morph"), QStringLiteral("cover"), QStringLiteral("uncover"),
+                               QStringLiteral("fade-through-black"), QStringLiteral("zoom"),
+                               QStringLiteral("whirl")})},
                      {QStringLiteral("directions"),
                       indexed({QStringLiteral("left"), QStringLiteral("right"), QStringLiteral("up"),
                                QStringLiteral("down")})},

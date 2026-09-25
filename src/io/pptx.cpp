@@ -1786,12 +1786,19 @@ struct Reader {
         const Node *effectNode = nullptr;
         for (const auto &k : transition->kids) if (k.name == effect) effectNode = &k;
         if (effect.isEmpty() || effect == QLatin1String("cut")) slide.transition = 0;
-        else if (effect == QLatin1String("fade")) slide.transition = 1;
+        else if (effect == QLatin1String("fade"))
+            slide.transition = effectNode && (effectNode->attr(QStringLiteral("thruBlk")) == QLatin1String("1") ||
+                                              effectNode->attr(QStringLiteral("thruBlk")) == QLatin1String("true")) ? 6 : 1;
         else if (effect == QLatin1String("push") || effect == QLatin1String("cover") || effect == QLatin1String("pull") || effect == QLatin1String("wipe")) {
-            slide.transition = 2;
-            const auto dir = effectNode ? effectNode->attr(QStringLiteral("dir"), QStringLiteral("l")) : QStringLiteral("l");
+            slide.transition = effect == QLatin1String("cover") ? 4 : effect == QLatin1String("pull") ? 5 : 2;
+            // Diagonal covers ("lu", "rd") travel mostly the way their first letter says.
+            const auto dir = effectNode ? effectNode->attr(QStringLiteral("dir"), QStringLiteral("l")).left(1) : QStringLiteral("l");
             slide.transitionDirection = dir == QLatin1String("r") ? 1 : dir == QLatin1String("u") ? 2 : dir == QLatin1String("d") ? 3 : 0;
-            if (effect != QLatin1String("push")) warnings.add(QStringLiteral("The %1 transition was shown as a push").arg(effect), number);
+            if (effect == QLatin1String("wipe")) warnings.add(QStringLiteral("The wipe transition was shown as a push"), number);
+        } else if (effect == QLatin1String("zoom") || effect == QLatin1String("warp")) slide.transition = 7;
+        else if (effect == QLatin1String("newsflash") || effect == QLatin1String("vortex") || effect == QLatin1String("wheel")) {
+            slide.transition = 8;
+            if (effect != QLatin1String("newsflash")) warnings.add(QStringLiteral("The %1 transition was shown as a whirl").arg(effect), number);
         } else if (effect == QLatin1String("morph")) slide.transition = 3;
         else { slide.transition = 1; warnings.add(QStringLiteral("The %1 transition was shown as a fade").arg(effect), number); }
         const auto speed = transition->attr(QStringLiteral("spd"), QStringLiteral("fast"));

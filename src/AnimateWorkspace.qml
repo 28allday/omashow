@@ -464,7 +464,12 @@ RowLayout {
                         model: [{ kind: 0, icon: "scissors", detail: qsTr("No transition at all") },
                                 { kind: 1, icon: "sun", detail: qsTr("One slide fades into the next") },
                                 { kind: 2, icon: "arrow-left-right", detail: qsTr("The next slide pushes this one off") },
-                                { kind: 3, icon: "sparkles", detail: qsTr("Matching objects move into place") }]
+                                { kind: 3, icon: "sparkles", detail: qsTr("Matching objects move into place") },
+                                { kind: 4, icon: "layers", detail: qsTr("The next slide slides in over this one") },
+                                { kind: 5, icon: "eye", detail: qsTr("This slide slides away to show the next beneath") },
+                                { kind: 6, icon: "moon", detail: qsTr("Fades out to black, then the next slide fades in") },
+                                { kind: 7, icon: "zoom-in", detail: qsTr("The next slide grows out of the middle") },
+                                { kind: 8, icon: "rotate-cw", detail: qsTr("The next slide spins in from nothing") }]
                         Button {
                             required property var modelData
                             objectName: "transitionKind" + modelData.kind
@@ -481,7 +486,7 @@ RowLayout {
                 }
                 FieldRow {
                     label: qsTr("Towards")
-                    visible: root.transition.effective === 2
+                    visible: root.transition.travels ?? false
                     ComboBox {
                         objectName: "transitionDirection"
                         Layout.fillWidth: true

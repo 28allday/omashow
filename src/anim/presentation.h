@@ -33,8 +33,16 @@ constexpr qreal kHold = 0.8;
 
 // How a show gets from one slide to the next. Cut has no frames of its own;
 // Push carries each slide's background with it; Morph interpolates the objects
-// the two slides have in common.
-enum Kind { Cut = 0, Fade = 1, Push = 2, Morph = 3 };
+// the two slides have in common. Cover slides the next slide over this one,
+// Uncover slides this one away to show the next beneath; FadeThroughBlack
+// fades out to black and the next slide in from it; Zoom grows the next slide
+// out of the middle; Whirl spins it in from nothing. Each is one PowerPoint
+// also has, so a deck keeps its transitions both ways.
+enum Kind { Cut = 0, Fade = 1, Push = 2, Morph = 3, Cover = 4, Uncover = 5,
+            FadeThroughBlack = 6, Zoom = 7, Whirl = 8, LastKind = Whirl };
+
+// Whether a transition travels, and so has a direction to choose.
+inline bool hasDirection(int kind) { return kind == Push || kind == Cover || kind == Uncover; }
 
 // Always about the slide being arrived at, as Keynote and PowerPoint both read.
 int transitionKind(const Document &document, int index);

@@ -64,7 +64,8 @@ size and theme colours and fonts, text with its inherited typography and
 per-range formatting, lists, shapes and their fills, lines and shadows,
 pictures (with crops and masks), films, tables (with merged cells and cell
 fills), charts (with their data and series colours), notes, comments,
-transitions (fade, push, morph; others become a fade), entrance, exit and
+transitions (fade, fade through black, push, cover, uncover, zoom, newsflash
+as whirl and morph; others become the nearest of those), entrance, exit and
 emphasis builds, and links. What does not: embedded typefaces, SmartArt,
 embedded objects and pictures in EMF/WMF — each is named in `warnings`.
 A Keynote deck gives its slides, text, shapes, pictures, tables and notes;

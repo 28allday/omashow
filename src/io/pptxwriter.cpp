@@ -1098,9 +1098,15 @@ struct Writer {
         if (kind == 0 && !advance) return;
         x.start("p:transition").attr("spd", seconds < 0.6 ? "fast" : seconds < 0.9 ? "med" : "slow");
         if (advance) x.attr("advTm", qRound64(slide.advanceAfter * 1000));
-        if (kind == 1) x.empty("p:fade");
-        else if (kind == 2) x.start("p:push").attr("dir", slide.transitionDirection == 1 ? "r" : slide.transitionDirection == 2 ? "u" : slide.transitionDirection == 3 ? "d" : "l").end();
-        else if (kind == 3) { x.empty("p:fade"); warnings.add(QStringLiteral("The morph transition was written as a fade"), index + 1); }
+        const char *dir = slide.transitionDirection == 1 ? "r" : slide.transitionDirection == 2 ? "u" : slide.transitionDirection == 3 ? "d" : "l";
+        if (kind == Presentation::Fade) x.empty("p:fade");
+        else if (kind == Presentation::Push) x.start("p:push").attr("dir", dir).end();
+        else if (kind == Presentation::Cover) x.start("p:cover").attr("dir", dir).end();
+        else if (kind == Presentation::Uncover) x.start("p:pull").attr("dir", dir).end();
+        else if (kind == Presentation::FadeThroughBlack) x.start("p:fade").attr("thruBlk", "1").end();
+        else if (kind == Presentation::Zoom) x.empty("p:zoom");
+        else if (kind == Presentation::Whirl) x.empty("p:newsflash");
+        else if (kind == Presentation::Morph) { x.empty("p:fade"); warnings.add(QStringLiteral("The morph transition was written as a fade"), index + 1); }
         x.end();
     }
 
