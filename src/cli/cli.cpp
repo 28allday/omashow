@@ -222,7 +222,7 @@ void usage() {
   omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
   omashow inspect <file> [--slide N] [--full]
   omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
-  omashow export <file> --kind pdf|images|video|package|print --out <path>
+  omashow export <file> --kind pdf|images|video|package|print|pptx --out <path>
                         [--from N] [--to N] [--layout slides|notes|outline|handout]
                         [--per-page N] [--width N] [--format png|jpeg] [--fps N]
                         [--quality 0|1] [--transparent] [--stages] [--include-skipped]
@@ -489,7 +489,7 @@ int exportDeck(Backend &backend, const Flags &flags) {
     if (!readDeck(backend, flags.rest.value(0), &trouble, &source)) return refuse(trouble);
     const auto kinds = QStringList{QStringLiteral("pdf"), QStringLiteral("images"),
                                    QStringLiteral("video"), QStringLiteral("package"),
-                                   QStringLiteral("print")};
+                                   QStringLiteral("print"), QStringLiteral("pptx")};
     const auto kind = flags.value(QStringLiteral("kind")).toLower();
     if (!kinds.contains(kind))
         return refuse(QStringLiteral("--kind is one of %1.").arg(kinds.join(", ")));

@@ -66,11 +66,13 @@ void Backend::exportDialog(const QVariantMap &options) {
   m_pending = Pending::ExportFile;
   const auto request = Exports::Request::fromMap(options);
   const QString filter = request.kind == Exports::Video   ? tr("MP4 film")
+                         : request.kind == Exports::PowerPoint ? tr("PowerPoint decks")
                          : request.kind == Exports::Package ? tr("Deck packages")
                          : request.kind == Exports::Images
                              ? (request.format == 0 ? tr("PNG pictures") : tr("JPEG pictures"))
                              : tr("PDF documents");
   const QString pattern = request.kind == Exports::Video   ? QStringLiteral("*.mp4")
+                          : request.kind == Exports::PowerPoint ? QStringLiteral("*.pptx")
                           : request.kind == Exports::Package ? QStringLiteral("*.zip")
                           : request.kind == Exports::Images
                               ? (request.format == 0 ? QStringLiteral("*.png")

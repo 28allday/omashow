@@ -60,6 +60,9 @@ embedded objects and pictures in EMF/WMF — each is named in `warnings`.
 A Keynote deck gives its slides, text, shapes, pictures, tables and notes;
 libetonyek does not report its builds, transitions or charts.
 
+The other way round, `export --kind pptx` writes a PowerPoint deck (see
+Exporting), so a deck can make the round trip.
+
 ## Reading one
 
 `inspect` is how a script finds what to aim at. Every object has an `id`, and
@@ -166,7 +169,14 @@ omashow export talk.omashow --kind images  --out frames/slide.png --width 1920 [
 omashow export talk.omashow --kind video   --out talk.mp4 --fps 30 [--quality 1]
 omashow export talk.omashow --kind package --out talk.zip --approve-media
 omashow export talk.omashow --kind print   --printer "Office" --copies 2
+omashow export talk.omashow --kind pptx    --out talk.pptx
 ```
+
+`pptx` writes a PowerPoint deck: every slide as it would be drawn, with its
+design applied, plus notes, comments, sections, custom shows, transitions and
+builds. What PowerPoint has no form for — an equation, words on a path, a
+morph, a picture fill — is written in the nearest form, and the answer's `log`
+says so, slide by slide.
 
 `--from` and `--to` take a slide range, `--include-skipped` includes the slides
 the deck skips, `--per-page` sets handout sheets and `--layout` is `slides`,

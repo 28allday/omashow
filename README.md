@@ -264,7 +264,10 @@ on the right:
   tables, charts, notes, sections, transitions, builds and comments — and
   arrives as a new, unsaved OmaShow deck. The original is never written to,
   and a bar across the top says what could not be brought across.
-  `omashow import talk.pptx` does the same without a window.
+  `omashow import talk.pptx` does the same without a window. Export goes the
+  other way: a `.pptx` with the slides, text, shapes, pictures, films, tables,
+  charts, notes, comments, sections, transitions and builds, for anyone who
+  has PowerPoint, Keynote, Google Slides or LibreOffice instead.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
   rendering from the command line. A deck whose file is read-only, missing or
   changed by something else says so in a bar across the top, with the way out of
@@ -425,6 +428,7 @@ omashow inspect talk.omashow --slide 0
 omashow apply talk.omashow ops.json
 omashow review talk.omashow
 omashow export talk.omashow --kind pdf --out talk.pdf
+omashow export talk.omashow --kind pptx --out talk.pptx
 omashow ops --filter text
 ```
 

@@ -18,7 +18,7 @@
 
 namespace Exports {
 
-enum Kind { Pdf = 0, Images = 1, Video = 2, Package = 3, Print = 4 };
+enum Kind { Pdf = 0, Images = 1, Video = 2, Package = 3, Print = 4, PowerPoint = 5 };
 
 struct Request {
     int kind = Pdf;

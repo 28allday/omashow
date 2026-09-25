@@ -5,8 +5,8 @@ description: >
   line, with no window and no display — `omashow new`, `inspect`, `apply`,
   `export`, `review`, `ops`. Use when asked to build a deck, a slide show or a
   presentation on this machine, to change or check an existing `.omashow` file,
-  or to turn one into a PDF, pictures, film or a package, or to bring a
-  PowerPoint (.pptx) or Keynote (.key) deck into OmaShow. Triggers: omashow,
+  or to turn one into a PDF, pictures, film, a package or a PowerPoint deck,
+  or to bring a PowerPoint (.pptx) or Keynote (.key) deck into OmaShow. Triggers: omashow,
   make me a deck, build a presentation, slide deck, .omashow, presentation to
   PDF, export slides, presenter notes, slide transitions, check my slides,
   convert this pptx, open this keynote file.
@@ -25,7 +25,7 @@ omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slide
 omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
 omashow inspect <file> [--slide N] [--full]
 omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
-omashow export <file> --kind pdf|images|video|package|print --out <path>
+omashow export <file> --kind pdf|images|video|package|print|pptx --out <path>
 omashow review <file>
 omashow ops [--filter <text>]
 ```
@@ -37,7 +37,9 @@ omashow ops [--filter <text>]
 back to the person. `inspect`, `review` and `export` also take a `.pptx` or
 `.key` directly (the answer then carries `source`), but `apply` on one needs
 `--out`, because the foreign file is never written to. Work on the
-`.omashow` from then on.
+`.omashow` from then on. To hand a deck to someone with PowerPoint,
+`export --kind pptx --out talk.pptx`; the answer's `log` names anything that
+had to be approximated.
 
 ## The loop that works
 

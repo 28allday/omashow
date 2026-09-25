@@ -4,6 +4,7 @@
 #include "anim/presentationcache.h"
 #include "core/design.h"
 #include "io/packagedeck.h"
+#include "io/pptxwriter.h"
 #include "io/pdf.h"
 #include "io/printing.h"
 #include "render/scenerenderer.h"
@@ -58,7 +59,7 @@ QVariantMap Exports::Request::toMap() const {
 
 Exports::Request Exports::Request::fromMap(const QVariantMap &map) {
     Request request;
-    request.kind = qBound(int(Pdf), map.value("kind", Pdf).toInt(), int(Print));
+    request.kind = qBound(int(Pdf), map.value("kind", Pdf).toInt(), int(PowerPoint));
     request.path = map.value("path").toString();
     request.includeSkipped = map.value("includeSkipped").toBool();
     request.stages = map.value("stages").toBool();
@@ -92,6 +93,8 @@ QString Exports::Request::describe() const {
             .arg(width).arg(fps);
     case Package:
         return QStringLiteral("The deck with copies of everything it links to");
+    case PowerPoint:
+        return QStringLiteral("A PowerPoint deck, for people who have that");
     case Print:
         return QStringLiteral("Printed on %1 · %2%3")
             .arg(printer.isEmpty() ? QStringLiteral("the default printer") : printer, shape)
@@ -110,6 +113,7 @@ QString Exports::Request::suggestedName(const QString &deckName) const {
     case Images: return base + (format == 0 ? ".png" : ".jpg");
     case Video: return base + ".mp4";
     case Package: return base + "-package.zip";
+    case PowerPoint: return base + ".pptx";
     default: break;
     }
     return base + ".pdf";
@@ -142,6 +146,17 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
         if (!packaged.ok) return fail(packaged.error);
         outcome.files.append(request.path);
         outcome.log = packaged.lines;
+        report(100);
+        outcome.ok = true;
+        return outcome;
+    }
+
+    if (request.kind == PowerPoint) {
+        report(5);
+        const auto written = PptxWriter::write(document, request.path, job);
+        if (!written.ok) return fail(written.error);
+        outcome.files.append(request.path);
+        outcome.log = written.lines;
         report(100);
         outcome.ok = true;
         return outcome;

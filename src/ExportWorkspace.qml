@@ -277,6 +277,25 @@ Item {
                 }
             }
 
+            ExportCard {
+                CardHeader { title: qsTr("PowerPoint"); icon: "file-output"
+                             detail: qsTr("A .pptx that PowerPoint, Keynote, Google Slides and LibreOffice open.") }
+                Divider {}
+                Label {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsLabel
+                    text: qsTr("Slides, text, shapes, pictures, films, tables, charts, notes, comments, sections, transitions and builds go across. What has no equivalent there — an equation, words on a path, a morph — is written in the nearest form, and the export log says so.")
+                }
+                RowLayout {
+                    Layout.fillWidth: true
+                    Item { Layout.fillWidth: true }
+                    Button {
+                        objectName: "exportPowerPoint"
+                        icon.name: "save"; text: qsTr("Export PowerPoint…")
+                        onClicked: backend.exportDialog({ kind: 5 })
+                    }
+                }
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.s3
