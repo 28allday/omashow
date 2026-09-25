@@ -22,8 +22,9 @@ makedepends=('gcc' 'make' 'pkgconf')
 source=()
 sha256sums=()
 
-# Builds the working tree — this PKGBUILD exists for ./bin/install only. The
-# release PKGBUILD lives in omarchy-pkgs and builds a tagged tarball instead.
+# Builds the working tree. ./bin/install uses it, and so does the Oma package
+# repository, which versions it from the git history; its depends are the
+# release depends.
 build() {
   cd "$startdir/.."
   ./bin/build
