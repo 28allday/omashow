@@ -4,24 +4,43 @@ Make and present slide decks on Omarchy. OmaShow works offline, follows your
 Omarchy theme and can be driven entirely from the keyboard. It opens PowerPoint
 and Keynote decks and saves back to PowerPoint.
 
+![Editing a slide in OmaShow](docs/screenshots/editing.png)
+
 ## Install
 
-On Arch or Omarchy:
+OmaShow is made for Omarchy.
+
+1. Open a terminal with **Super + Enter**.
+2. Copy and paste these three lines, then press Enter:
+
+   ```sh
+   git clone https://github.com/28allday/omashow.git ~/omashow
+   cd ~/omashow
+   ./bin/install
+   ```
+
+3. Type your password when asked.
+4. If it asks which spelling dictionary to use, press Enter for British
+   English, or type another (`hunspell-en_us` for American English).
+5. When it lists the packages it needs and asks to proceed, press Enter.
+
+The first install takes a few minutes, because OmaShow is built on your
+computer. When it finishes, open OmaShow from the app launcher: press
+**Super + Space** and type **OmaShow**.
+
+### Updating
 
 ```sh
-git clone https://github.com/28allday/omashow.git
-cd omashow
+cd ~/omashow
+git pull
 ./bin/install
 ```
 
-This builds OmaShow and installs it as a package, along with everything it
-needs. If you have no spelling dictionary yet, it asks which one to add
-(press Enter for British English). OmaShow then appears in the app launcher.
-
-To remove it:
+### Removing
 
 ```sh
 sudo pacman -R omashow
+rm -rf ~/omashow
 ```
 
 ## Getting started
@@ -118,6 +137,8 @@ Press **Ctrl+K** to find any command by name.
 - A slide can move on by itself after a set time. **Rehearse** times each slide
   for you.
 
+![The light table, showing every slide in its sections](docs/screenshots/light-table.png)
+
 ### Review
 
 - An outline of the whole deck, editable in place.
@@ -139,6 +160,8 @@ Press **Ctrl+K** to find any command by name.
 - **Custom shows** present a chosen order of slides without copying them.
 - Notifications are silenced and the screen stays awake while you present.
 
+![The presenter console](docs/screenshots/presenter-console.png)
+
 ### Export and sharing
 
 - **PDF**: slides, slides with notes, an outline, handouts with several slides
@@ -152,6 +175,8 @@ Press **Ctrl+K** to find any command by name.
   to.
 
 Exports run in the background and can be cancelled.
+
+![The Export sheet](docs/screenshots/export.png)
 
 ### PowerPoint and Keynote decks
 

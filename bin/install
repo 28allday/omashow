@@ -5,11 +5,13 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 PKGBUILD_DIR="$ROOT/pkgbuild"
 
 if ! command -v makepkg >/dev/null 2>&1; then
-  echo "makepkg is required to build and install the Arch package." >&2
+  echo "OmaShow is built with makepkg. Install the build tools first:" >&2
+  echo "  sudo pacman -S --needed base-devel git" >&2
   exit 1
 fi
 
-"$ROOT/bin/build"
+# makepkg installs what OmaShow needs before building it, so nothing is
+# compiled here: on a new machine the compiler's libraries are not there yet.
 
 # The package needs a spelling dictionary, and pacman would offer every language
 # in alphabetical order. Offer British English first instead, and take any other
