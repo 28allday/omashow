@@ -1,491 +1,247 @@
 # OmaShow
 
-A native Qt 6 / QML presentation app for Omarchy: keyboard-first and offline.
-The app opens a Start centre with theme previews, slide-size presets and recent files.
+Make and present slide decks on Omarchy. OmaShow works offline, follows your
+Omarchy theme and can be driven entirely from the keyboard. It opens PowerPoint
+and Keynote decks and saves back to PowerPoint.
 
-## The window
+## Install
 
-One toolbar, the slide list on the left, the slide in the middle and a sidebar
-on the right:
-
-- **The toolbar** adds slides and things to put on them — text, shapes (and the
-  pen and freehand tools, under Shape), pictures, tables, charts, diagrams and
-  media — and has Arrange, Review, undo and Play.
-- **The sidebar** has three switches at the toolbar's right-hand end:
-  **Format** styles whatever is selected (or the slide, with nothing selected);
-  **Animate** shows builds and the slide's transition, with the build timeline
-  under the slide; **Document** holds the theme, slide size, language, and the
-  ways into the masters, presenter setup and review.
-- **Rooms you visit and leave:** editing masters and layouts, Review, presenter
-  setup and the light table replace the toolbar with a title and **Done**.
-  Escape does the same.
-- **Export** (File ▸ Export…) is a sheet over the deck. Play goes straight to
-  the show; presenter notes open from View ▸ Presenter notes.
-
-## What works
-
-- **Start:** Midnight, Paper and Grove previews; widescreen, standard, portrait,
-  square and custom sizes; title, body or blank first slide. Recent decks can be
-  pinned, revealed or removed, with missing files clearly marked.
-- **Templates:** a template is just a deck. The Start centre lists the built-in
-  themes, whatever you have kept (File ▸ Keep as template…), and the examples
-  that ship with OmaShow — searchable, filtered by shape, each showing its
-  first slide, its layouts and the typefaces it asks for, with any that are not
-  installed here called out. Installing one checks it opens first; using one
-  makes a new unsaved deck, so the template is never written over.
-- **Edit:** text, native shapes and pictures; on-slide text editing, snap guides,
-  resize, rotation handles (Shift snaps to 15°), numeric properties, undo/redo, multi-selection, nested groups,
-  alignment/distribution, layer order, lock and hide. Presenter notes are edited
-  under the slide (View → Presenter notes). Copy/cut/paste/duplicate
-  preserve appearance, groups, animation targets and embedded pictures.
-- **Canvas:** fit slide or selection, 100%, 10–800% zoom, pointer-centred Ctrl+wheel zoom, ordinary
-  wheel/trackpad pan and middle-button drag. Zoom does not change the deck.
-- **Text:** font family, size, weight, italic, underline and colour for a whole
-  box — or for any stretch of it: select words while editing on the slide and
-  the Text inspector formats just those, including strike-through and raised or
-  lowered baselines. It says when the selection is not all the same. Stretches
-  follow their letters when the words are rewritten, and survive saving,
-  reopening, export and text builds. Horizontal
-  and vertical alignment, line/paragraph spacing, indent, bullets and numbering.
-  Bullets can be discs, circles or squares, and numbering can be 1., a., A.,
-  i. or I., from any starting number. Leading tabs nest list items, stepping
-  disc → circle → square as they go; a tab stop distance can be set per box. Text can
-  run in up to six columns with its own gap, and reading direction can follow the
-  words or be forced left-to-right or right-to-left. Clip with an overflow
-  warning, shrink to fit, or resize the box to fit its text.
-- **Text styles:** keep the look of a text box as a named style and other boxes
-  can follow it — typeface, size, weight, colour, alignment, spacing, lists,
-  tabs, columns and direction, but never the words. Update the style and every
-  box following it changes, except where a box was given its own value, which
-  stays. Unlinking keeps the look the box had.
-- **Words on a path:** select a text box and a shape, and Arrange ▸ "Put the
-  text on this shape" hands the words the shape's outline. The text keeps its own
-  copy of the line, so it can be reshaped with the ordinary node tools, and the
-  shape stays where it is. Align decides where the words start along the line and
-  which side of it they sit on.
-- **Language and spelling:** a deck says what it is written in, and a box or a
-  stretch of text can say something else. Spelling is checked against the
-  Hunspell dictionaries on the computer. The package installs one (you choose
-  which; British English is offered first) and any other `hunspell-*` package
-  adds a language, chosen per deck in Document ▸ Language. A deck in a language
-  with no dictionary of its own is checked against the nearest one (US English
-  against British) and the finding names the dictionary that answered. A word the
-  dictionary does not know becomes a finding in Review with what it would suggest
-  instead. A word the deck should know is taught to the deck, so it travels with
-  the file rather than living on one computer. Straight quotes, double hyphens and
-  three full stops become the marks that were meant, and that can be turned off.
-- **Equations:** a text box can hold maths instead of words, written the way it
-  is written by hand — `^` and `_`, `\frac`, `\sqrt`, `\sum`, `\int`, `\lim`,
-  Greek letters, brackets that grow with what is inside them, accents and
-  `\text{...}`. It is drawn as glyphs and rules in the box's own typeface and
-  colour, so it is sharp in an exported PDF and editable as the letters that
-  made it. What cannot be read is named in the inspector and in review, and the
-  box falls back to showing what was typed.
-- **Shapes:** 24 basic shapes, arrows, callouts, flowchart shapes and symbols;
-  solid, linear/radial gradient, pattern and picture fills; stroke width, dash,
-  join and cap; opacity and offset shadows. Saved object styles copy appearance
-  without replacing content or geometry. Arrange → Combine shapes previews
-  union, intersection, subtraction and divided overlaps, with undo.
-- **Connectors and links:** select two objects and use Arrange → Connect objects.
-  Straight, elbow and curved connectors follow attached sides through moves and
-  animation. Detach into a path for free editing. Object links support web/email,
-  stable slide targets, next/previous, first/last and end-show actions. External
-  links pause the show and require a private presenter confirmation before opening.
-- **Drawing:** Shape ▸ Draw with the pen creates point paths; Draw freehand
-  creates smooth curves. Finish or
-  close a path, convert a shape to a path, drag anchors/control points, remove
-  nodes, and open/close paths. Esc cancels; a drag is one undo step.
-- **Pictures:** insert PNG/JPEG/WebP or static self-contained SVG using the toolbar,
-  drag-and-drop or clipboard; fit/fill/stretch, editable source crop with eight on-slide handles, focal point,
-  shape masks, reset and replace. Raster colour profiles convert to sRGB;
-  brightness, contrast, saturation and tint are reversible. Replacement retains
-  crop, frame, effects and builds. SVG remains vector content, including in PDF;
-  unsupported SVG scripts, animation and external resources are rejected. Pictures are embedded
-  in the deck and reach the canvas, slideshow, thumbnails, PNG and PDF exports.
-- **Audio and video:** Media → Insert embeds a clip or links its local file.
-  Codec, duration, poster and portability appear in the inspector. Trim, volume,
-  one to 100 plays and automatic/on-next-click cues share the presentation
-  timeline. Preview opens Animate; Stop returns to the cue start. Video frames
-  decode on workers during playback; exports decode the exact requested time.
-  Audio follows pause, seek and playback rate.
-  Presenter blank/freeze suppresses audio. Media preflight approves, locates,
-  relinks or embeds linked files. Opening a deck resets linked-file permission.
-  Import runs in the background with progress/cancel and one undo step.
-  Supported containers: MP4/MOV, MKV/WebM, WAV, MP3, FLAC and Ogg, with locally
-  available codecs. Clips need a known duration up to 24 hours; video is SDR up
-  to 4096 × 4096. Embedding is limited to 64 MiB per clip; linking supports local
-  files up to 2 GiB. HDR/wide-gamut video requires prior conversion to SDR.
-- **Optimise assets:** compare original and compressed pictures/video before
-  applying. JPEG/PNG picture presets preserve transparency when using PNG;
-  H.264/AAC media presets show size, codec and playback quality. Keep original
-  enables Restore after reload; discard it to reduce deck size. Jobs cancel,
-  and apply/restore/discard undo together. Crop, effects and timing are retained.
-- **Tables:** native editable cells, row/column insertion/deletion and sizing,
-  merge/split, header row/column, alternating rows, cell fills/borders/padding,
-  font/alignment and overflow/shrink controls. Double-click a table to edit.
-  Keyboard ranges, copy/cut/paste/clear and undo; CSV/TSV text/file import previews
-  before applying. Stable text/numeric sorting supports UK/German/French locales.
-  Formulas remain literal text. Tables stay on one slide, up to 100 × 50 cells.
-  Native accessibility exposes header relationships, positions and merged spans.
-- **Charts:** ten native chart types, embedded cell editor, missing-value gaps,
-  negative stacks, log scales, axis bounds/titles, locale-aware number formats
-  and theme or per-series colours. Charts remain editable after save/reopen,
-  keep their appearance when copied between themes, and export as vector PDF.
-- **Linked CSV/TSV:** opt in when importing table or chart data. The editor
-  shows its source path, previews whole-grid refresh, flags local data edits and
-  supports disconnect/undo. Saved values remain available offline; opening a
-  deck never reads linked data files automatically.
-- **Diagrams:** preview and insert native process or hierarchy diagrams in
-  either direction. Shapes, labels and attached connectors remain grouped and
-  editable; outline validation and text-fit checks catch unreadable layouts.
-- **Design:** Document ▸ theme switches Midnight, Paper and Grove; Edit masters
-  and layouts opens the room for previews, editable colour/font
-  tokens with contrast feedback; master management; text/shape placeholder layouts.
-  Apply layouts to the current, selected or all slides with placeholder mapping,
-  before/after previews and overflow/displacement warnings. Keep local position
-  edits, reapply layout positions or keep every current position. The whole batch
-  undoes together. Reset position and style separately.
-- **Master fields:** the masters room's Fields tab controls slide numbers, a saved date and
-  footer text, the starting number and first-slide visibility. Numbers follow
-  deck order, including skipped slides. Fields use the theme's body font and
-  muted colour in a footer strip that follows slide size. In Edit, deselect
-  objects to toggle master artwork or fields for that slide, independently of
-  its background colour. Fields stay as selectable text in PDF.
-- **Import from another deck:** File → Import from deck, or the masters room's Import from
-  deck, brings slides across with their masters, layouts, theme and content.
-  Choose the slides, then reuse matching masters and layouts, import copies of
-  them, or keep each slide's own appearance with no design at all. Missing
-  typefaces must be replaced or explicitly kept, and missing linked files left
-  out, before anything is inserted. A different slide size is scaled to this
-  deck, sections arrive by name, and the whole import is one undo step. The
-  preview on the right is the slide that will arrive.
-- **Unused design:** the masters room's Unused tab lists masters no layout points at, layouts
-  no slide uses, empty sections and originals kept from optimising a picture or
-  film, with what each would give back. Removing the ones you pick is one undo
-  step and never changes what a slide looks like.
-- **Animate:** builds in and out — fade, rise, move from an offset, scale, spin,
-  an emphasis that swells and settles in place, text that arrives a paragraph,
-  a word or a character at a time, and travel along a path. A path is any shape
-  or pen drawing on the same slide: draw the route, hide it, and the object
-  follows it — editing its nodes changes the motion, and the object still lands
-  where you placed it. It can travel the other way, and turn as it goes. Individual or selected objects
-  together, order, exact start/delay/duration/easing and click/with/after
-  triggers. Drag timing clips, trim their ends, scrub, zoom and preview.
-- **Transitions:** cut, fade, fade through black, push, cover and uncover (each
-  in any of four directions), zoom, whirl or morph, chosen
-  per slide or handed to the whole deck, with their own duration. A slide can
-  also move on by itself after a set number of seconds; blanking, freezing or
-  pausing holds it where it is. Preview, present and export read the same clock,
-  so a transition looks the same in all three.
-- **Slides:** range/toggle/select-all, batch duplicate/delete, multi-slide drag
-  and keyboard reorder. Thumbnail, compact and outline navigation share the
-  selection with the light table (the slide list's fourth view, or View ▸
-  Light table). Named sections travel with whole
-  section selections; notes, builds, pictures and skipped states have badges.
-  Duplicated objects retain the identities used by Morph.
-- **Sections:** create, rename, select, move up/down, collapse/expand and remove
-  while keeping slides. Use the arrow and **⋯** beside a section name; Actions
-  also offers collapse/expand all. Collapsed summaries show hidden selection
-  counts and share state between the navigator and sorter. Collapse is a session
-  preference: it does not dirty the deck or change the show/export sequence.
-- **Slide size:** Document ▸ Slide size (or Arrange → Slide size) previews proportional fit/centre or
-  unchanged content size/position. Applying resizes every slide, master and
-  layout in one undo step.
-- **Skip slides:** Slides → Actions → Skip in show keeps slides editable while
-  presentation, PNG and PDF exports omit them. PDF's Include skipped slides
-  checkbox and the CLI's `--include-skipped` explicitly include them.
-- **Review:** the deck as words rather than pictures. The outline edits each
-  slide's title and body in place; comments attach to a slide or to one object,
-  take replies, resolve and reopen, and travel inside the deck with who wrote
-  them and when. Find and replace covers slides, tables, chart data and notes,
-  with whole-word, case and scope options, and refuses a match whose words have
-  changed since it was found. Findings cover missing descriptions, text contrast
-  below WCAG 2.2, type that is too small, text that does not fit, slides with no
-  title, typefaces this computer has not got (with what is being drawn instead),
-  equations that cannot be read,
-  links that do not say where they go and a reading order that disagrees
-  with the layout; each can be gone to, or set aside as not a problem — a
-  decision the deck remembers. Reading order and alternative text are editable
-  per slide, and statistics count slides, words, pictures, film, typefaces and
-  how long the deck runs. The findings and open comments export as a plain-text
-  review.
-- **Drawing over the show:** a pointer the audience can follow, a spotlight that
-  dims everything else, or freehand ink — with undo, clear, and an explicit
-  "keep on the slide" that turns the drawing into an ordinary editable path.
-  Nothing drawn changes the deck unless you keep it, and ending the show forgets
-  it.
-- **Rehearsing:** rehearse in a window and each slide is timed. The times are
-  listed against what the slides do now, and can be applied in one undo step so
-  each slide moves on by itself after the time it took — or discarded.
-- **Custom shows:** named orders of the slides you already have. Choose one and
-  presenting, previewing and exporting all follow it; choose the whole deck
-  again and everything goes back. A show is an order, never a copy, and deleting
-  a slide simply takes it out of the show.
-- **Present:** separate audience and presenter windows, current/next previews,
-  speaker notes, slide navigator, click-group navigation, elapsed/countdown,
-  black/white and freeze. Named display routing, swapping and windowed rehearsal
-  are in Present ▸ Presenter setup… (also Document ▸ Displays, timings and shows).
-- **Export:** PDF with real text — the slides, slides with their notes, the deck
-  as an outline, or several slides a sheet — and build-stage handouts; pictures as PNG or
-  JPEG at any width, with or without the slide background; and film as H.264,
-  every build, transition and hold rendered frame by frame by the same
-  evaluator that drives the show. Each export takes the deck as it stands,
-  queues behind the last one, shows its progress and can be cancelled or tried
-  again. Sound is not in the film yet, and the export says so. The same pages
-  print on paper, and a deck can be packaged as a zip carrying copies of
-  everything it links to plus a manifest of what is inside, what was left out
-  and why — nothing on your computer is changed by packaging.
-- **Shell:** Ctrl+K finds any command by name or by the words you would use for
-  it. The slide list and the inspector can be dragged wider, collapsed with a
-  double-click on their edge and put back where they were next time. A deck
-  opened in another window is another copy of the app, with its own selection,
-  undo, playback and export queue.
-- **Paste special:** keep what was copied, match this deck's text style, take
-  the words only, or flatten it into a picture.
-- **Keyboard:** every sheet the app puts in front of you takes the keyboard and
-  keeps it: Tab stays inside, Escape dismisses it (except the two that must be
-  answered), Enter answers the ones that ask for a single thing, and the
-  shortcuts behind it stand down rather than reaching the deck underneath.
-- **Accessibility:** the interface names itself to assistive technology — the
-  canvas says which slide it is showing and what is selected, slide rows say
-  what is special about them, the Format / Animate / Document switches are tabs
-  and the status line is
-  readable text. "Less movement" takes the animation out of the interface and
-  makes a show arrive at each moment instead of travelling to it; "Stronger
-  contrast" firms up edges and quiet text. Both are yours, not the deck's: a
-  file saved with them on is the same file.
-- **A command line that is the whole app:** `omashow new`, `inspect`, `apply`,
-  `export`, `review` and `ops` run with no window and no display, answering in
-  JSON. `apply` takes a list of operations — the same ones the interface calls,
-  listed by `omashow ops` — so a script can build a deck, change it, read back
-  what it made and export it. Nothing is written until every operation has run.
-  See `docs/cli.md`.
-- **Decks from elsewhere:** a PowerPoint `.pptx` or a Keynote `.key` opens
-  like any other deck — slides, text with its formatting, shapes, pictures,
-  tables, charts, notes, sections, transitions, builds and comments — and
-  arrives as a new, unsaved OmaShow deck. The original is never written to,
-  and a bar across the top says what could not be brought across. When the
-  deck names typefaces this computer does not have, the same bar offers a
-  sheet with a replacement already chosen for each — the family without the
-  weight in its name when that is installed, else the nearest kind — and every
-  installed family to pick instead; the Review workspace offers the same for
-  any deck.
-  `omashow import talk.pptx` does the same without a window. Export goes the
-  other way: a `.pptx` with the slides, text, shapes, pictures, films, tables,
-  charts, notes, comments, sections, transitions and builds, for anyone who
-  has PowerPoint, Keynote, Google Slides or LibreOffice instead.
-- **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
-  rendering from the command line. A deck whose file is read-only, missing or
-  changed by something else says so in a bar across the top, with the way out of
-  it: reload, keep yours, or save somewhere else. Every save keeps the version
-  it replaced beside it as `.bak`, and a deck open in another copy of OmaShow
-  says so — advice, not a lock.
-
-Other writing systems are laid out by the same text engine: right to left, both
-directions in one box, combining marks and CJK are shaped by the system's own
-fonts, and a word composed through an input method reaches the deck only once it
-is settled.
-
-Screen recording is not here: capturing the screen on Wayland needs the
-desktop's own permission dialog, and it is not worth shipping a recorder whose
-permission, consent and recovery behaviour has not been through a real session.
-Interchange with other applications and other release features remain on the
-roadmap. Shapes from other applications' plug-ins cannot arrive, because nothing
-is imported from them. Embedding a typeface in a deck is not offered either: a
-licence to use a typeface on this computer is rarely a licence to send it to
-someone else, so a package says which typefaces a deck asks for instead of
-carrying them. Exported PDFs carry real text but not clickable link annotations. Notes are
-plain text, and reading order is not yet carried into exported PDF.
-
-## Shared design and time
-
-The document stores authored content, theme tokens, masters, layouts and local
-property overrides. One resolver supplies the editor, thumbnails, animation and
-export. Theme changes update linked properties; literal local colours stay put.
-Layout changes retain unmatched objects as editable content. Copied objects keep
-their resolved appearance and become independent of the original placeholders.
-New text and shapes follow the current theme's font and colour tokens.
-
-A visual state is a pure function of document time. Playback, scrubbing and PNG
-export use the same evaluator. Morph matches stable object identities, then
-similarity, and fades unmatched objects. Slide backgrounds blend too.
-
-On-click groups wait for the speaker in Present. Preview and export use their
-resolved timing. Ordinary PDF pages show authored content, including objects
-with build-outs; build-stage handouts show the animation states.
-
-## Rendering and responsiveness
-
-The live canvas uses vendor-neutral OpenGL through Qt's GPU-backed QPainter on
-Qt 6.9+: Intel, AMD and NVIDIA use the same rendering path. Explicit alternative
-Qt backends retain Qt's raster fallback. Live video probes available VA-API
-devices (including Intel and AMD), then optional CUDA devices, and falls back to
-software if the installed drivers or codec cannot accelerate it. A failed GPU
-does not prevent trying another GPU on a mixed system. No NVIDIA SDK or
-vendor-specific driver is required to build or run OmaShow. Exports keep the
-deterministic software decoder. GPU antialiasing can differ slightly from raster
-exports.
-
-Thumbnail rendering, picture adjustments, file image imports, batch layout previews,
-open/recovery, save/autosave, object/picture clipboard processing and PDF export
-run on workers. Playback caches resolved
-slides, timings and transition matches; text layouts and navigator summaries are
-cached too. Worker queues are bounded, and late file/preview results cannot discard
-newer edits. PDF and deck saves commit atomically.
-
-See [performance checks and limits](docs/performance.md) for reproduction commands,
-measurements and renderer fallback switches.
-
-## What ships
-
-`docs/release.md` is the release record: how it is built, what it is made of
-(`docs/sbom.md`), everything that has been tested and on what, and the limits
-that are deliberate. There is no telemetry: the application makes no network
-calls at all, and recovery journals never leave this computer.
-
-## Build and run
-
-Requirements: Qt 6 (`qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-multimedia`),
-FFmpeg development libraries (`libavformat`, `libavcodec`, `libavutil`,
-`libswscale`), zlib, Hunspell (`hunspell`), a C++17 compiler, make, pkg-config
-and `qmake6`. Spelling also wants a dictionary for the language you write in
-(`hunspell-en_gb` and the like); with none installed, OmaShow says so rather
-than guessing. Tests also
-use the `ffmpeg` executable and `pdftotext`, `pdfimages` and `pdftoppm` from Poppler. WebP
-requires its Qt image handler. Media optimisation also needs `ffmpeg` with
-H.264 (`libx264`) and AAC encoders.
-
-```sh
-./bin/build
-./build/omashow
-./build/omashow talk.omashow
-```
-
-### Install as a package
-
-On Arch / Omarchy, `./bin/install` builds the working tree and installs it
-with `makepkg -si`, pulling in the runtime dependencies. If no spelling
-dictionary is installed it asks which one first, with British English as the
-answer to Enter. OmaShow then appears
-in the app launcher, opens `.omashow` files, and uninstalls with
-`sudo pacman -R omashow`.
+On Arch or Omarchy:
 
 ```sh
 git clone https://github.com/28allday/omashow.git
 cd omashow
 ./bin/install
-omashow skill --link   # optional: the agent skill for the command line
 ```
+
+This builds OmaShow and installs it as a package, along with everything it
+needs. If you have no spelling dictionary yet, it asks which one to add
+(press Enter for British English). OmaShow then appears in the app launcher.
+
+To remove it:
+
+```sh
+sudo pacman -R omashow
+```
+
+## Getting started
+
+OmaShow opens on the **Start centre**. Pick a theme (Midnight, Paper or Grove),
+a slide size and a first slide, or open one of your recent decks, a template
+or one of the example decks that come with the app.
+
+The window has three parts:
+
+- **The toolbar** adds slides and things to put on them: text, shapes (the pen
+  and freehand tools are under Shape), pictures, tables, charts, diagrams,
+  audio and video. It also has Arrange, Review, Undo and Play.
+- **The slide list** on the left. Switch it between thumbnails, a compact
+  list, an outline and the light table, a full view of every slide for
+  reordering.
+- **The sidebar** on the right, with three switches:
+  - **Format** styles whatever is selected, or the slide when nothing is.
+  - **Animate** sets builds and the slide's transition, with a timeline under
+    the slide.
+  - **Document** holds the theme, slide size, language, masters and presenter
+    setup.
+
+Some tasks open in their own room: editing masters and layouts, Review,
+presenter setup and the light table. Press **Done** or Escape to go back to
+your slide.
+
+Press **Ctrl+K** to find any command by name.
+
+## What you can do
+
+### Slides and text
+
+- Type straight onto the slide. Format a whole box or just a few words: font,
+  size, weight, italic, underline, strike-through, colour, raised or lowered
+  text.
+- Bullets and numbering, nested with Tab; alignment, spacing and indents; up to
+  six columns; right-to-left text.
+- Keep a look as a named **text style**. Change the style and every box that
+  uses it follows.
+- Put words along the outline of a shape (Arrange ▸ Put the text on this shape).
+- Write **equations** the way you would by hand (`^`, `_`, `\frac`, `\sqrt`,
+  `\sum`, Greek letters and more). They stay sharp in PDFs.
+- **Spelling** is checked in the deck's language, set in Document ▸ Language.
+  Words you teach it are saved in the deck, so they travel with the file.
+  Straight quotes and double hyphens turn into proper typographic marks; you
+  can switch that off.
+- **Sections** group slides. You can collapse sections, move them and skip
+  slides in the show without deleting them.
+
+### Shapes, pictures and media
+
+- 24 basic shapes plus arrows, callouts, flowchart shapes and symbols. Fill
+  them with solid colours, gradients, patterns or pictures, and add outlines
+  and shadows. Arrange ▸ Combine shapes merges, cuts or splits overlapping
+  shapes.
+- **Connectors** join two objects and stay attached when they move.
+- Draw your own shapes with the pen or freehand tools and edit their points.
+- **Pictures** in PNG, JPEG, WebP or SVG: crop on the slide, set a focal point,
+  mask to a shape, and adjust brightness, contrast, saturation and tint.
+  Replacing a picture keeps its crop, effects and animation.
+- **Audio and video** (MP4, MOV, MKV, WebM, WAV, MP3, FLAC, Ogg): embed a clip or
+  link to the file, trim it, set the volume and loop, and start it with the
+  slide or on a click.
+- **Optimise** makes pictures and films smaller. Compare before and after, then
+  keep the original or throw it away.
+- **Tables** with merged cells, header rows, borders, sorting and CSV/TSV
+  import. **Charts** in ten types, with the data edited in place. Tables and
+  charts can stay linked to a CSV file and refresh when you ask.
+- **Diagrams** for processes and hierarchies, built from ordinary shapes you
+  can keep editing.
+- Links on any object: web pages, email, another slide, or ending the show.
+
+### Design
+
+- Switch themes at any time. Edit **masters and layouts** with their colours
+  and fonts, and apply a layout to one slide, a selection or the whole deck,
+  with a before-and-after preview.
+- Slide numbers, date and footer come from the masters.
+- **Import from deck** brings slides from another deck with their design.
+- Change the **slide size** and have everything scaled to fit.
+- Keep any deck as a **template** (File ▸ Keep as template…).
+
+### Animation
+
+- **Builds** bring objects in or take them out: fade, rise, move, scale, spin,
+  an emphasis that swells and settles, text that arrives a paragraph, word or
+  letter at a time, and travel along a path you draw.
+- Start builds on a click, with the previous build or after it, and set their
+  timing on the timeline.
+- **Transitions:** cut, fade, fade through black, push, cover and uncover (in
+  four directions), zoom, whirl and **morph**, which moves matching objects
+  from one slide to their places on the next.
+- A slide can move on by itself after a set time. **Rehearse** times each slide
+  for you.
+
+### Review
+
+- An outline of the whole deck, editable in place.
+- Comments on a slide or an object, with replies. They are saved in the deck.
+- Find and replace across slides, tables, chart data and notes.
+- Checks for missing picture descriptions, low-contrast or too-small text,
+  text that doesn't fit, slides without titles, missing typefaces and more.
+  Jump to each one, or mark it as not a problem.
+
+### Presenting
+
+- Press **F5** or Play. With two displays, the audience sees the slides and you
+  get the presenter console: current and next slide, notes, a timer and a
+  slide picker. Choose which display is which in Present ▸ Presenter setup….
+- On one display the show fills the screen. **Rehearse in windows** shows the
+  console alongside it.
+- Black or white out the screen, freeze it, point, spotlight or draw on the
+  slide. Drawings disappear when the show ends unless you choose to keep them.
+- **Custom shows** present a chosen order of slides without copying them.
+- Notifications are silenced and the screen stays awake while you present.
+
+### Export and sharing
+
+- **PDF**: slides, slides with notes, an outline, handouts with several slides
+  a page, or one page per build step.
+- **Pictures**: PNG or JPEG at any width, with or without the background.
+- **Film**: an H.264 video of the whole show with every build and transition.
+  Sound is not included yet.
+- **PowerPoint**: a `.pptx` anyone with PowerPoint, Keynote, Google Slides or
+  LibreOffice can open.
+- **Print**, or **package** a deck as a zip with copies of every file it links
+  to.
+
+Exports run in the background and can be cancelled.
+
+### PowerPoint and Keynote decks
+
+Open a `.pptx` or `.key` file like any other deck. It arrives as a new, unsaved
+OmaShow deck, and the original is never changed. A bar across the top lists
+anything that couldn't be brought across. If the deck uses typefaces you don't
+have, **Choose typefaces…** suggests a replacement for each one.
+
+### Accessibility
+
+Everything can be reached from the keyboard, and the interface works with
+screen readers. **Less movement** turns off interface animation and makes the
+show jump to each slide instead of animating. **Stronger contrast** firms up
+edges and faint text. Both are your settings and never change the deck.
 
 ## Keys
 
 | Key | Action |
 | --- | --- |
-| `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | Open / Save / Save As |
-| `Ctrl+Shift+N` | Start centre (also available through Home) |
+| `Ctrl+K` | Find a command |
+| `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | Open / Save / Save as |
+| `Ctrl+Shift+N` | Start centre |
 | `Ctrl+N` | Add slide |
-| `Ctrl+D` | Duplicate selected objects, or the current slide when no objects are selected |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut / paste; text fields retain their own clipboard actions |
-| `Ctrl++` / `Ctrl+-` | Zoom in / out |
-| `Ctrl+0` / `Ctrl+1` | Fit slide / 100% |
-| `Ctrl+Shift+0` | Fit selected objects |
-| Shift-click / Ctrl-click in Slides or the light table | Range / toggle selection |
-| `Ctrl+A` / `Ctrl+D` / Delete in Slides or the light table | Select all / duplicate / delete selected slides |
-| `Ctrl+wheel` / middle-button drag | Zoom around pointer / pan |
-| `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Reorder selected slides |
-| `Ctrl+←` / `Ctrl+→` in Slides or the light table | Collapse / expand current section |
-| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` in Slides or the light table | Move current section up / down |
-| `T` / `S` | Add text / shape in Edit |
-| `Shift-click` / drag empty canvas | Extend selection / box-select |
-| `Alt-click` | Select behind another object |
-| `Ctrl+A` | Select all editable objects |
-| `Ctrl+G` / `Ctrl+Shift+G` | Group / ungroup |
-| `Enter` / `Escape` | Enter / leave a group |
-| Arrow keys | Nudge in Edit, step time in Animate |
+| `Ctrl+D` | Duplicate the selection, or the slide when nothing is selected |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut / paste |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
-| `F5` | Start show |
-| `Space` / `→` / `PgDown` during show | Finish current build / advance cue |
-| `←` / `PgUp` during show | Previous cue / slide |
-| `B` / `W` / `F` on audience output | Black / white / freeze |
-| `Escape` during show | End show |
-| `Escape` in a room | Back to the slide (same as Done) |
+| `T` / `S` | Add text / shape |
+| `Ctrl+A` | Select everything on the slide |
+| `Shift`-click / drag on empty space | Add to selection / select an area |
+| `Alt`-click | Select the object behind |
+| `Ctrl+G` / `Ctrl+Shift+G` | Group / ungroup |
+| `Enter` / `Escape` | Go into / out of a group |
+| Arrow keys | Nudge the selection |
+| `Ctrl++` / `Ctrl+-` | Zoom in / out |
+| `Ctrl+0` / `Ctrl+1` / `Ctrl+Shift+0` | Fit slide / 100% / fit selection |
+| `Ctrl`+wheel / middle-button drag | Zoom at the pointer / pan |
+| `Ctrl+Shift+↑` / `Ctrl+Shift+↓` | Move the selected slides |
 | `Ctrl+E` | Export PDF |
+| `F5` | Start the show |
+| `Space` / `→` / `Page Down` | Next build or slide |
+| `←` / `Page Up` | Previous build or slide |
+| `B` / `W` / `F` | Black screen / white screen / freeze |
+| `Escape` | End the show, or leave a room |
 
-## Presenter displays
+## Your files
 
-Select the audience output in Present. With two displays, the console opens
-on the other output. On one display, full-screen mode shows slides only;
-**Rehearse in windows** also opens the console.
+- Decks are saved as `.omashow` files. Pictures and embedded media are stored
+  inside the deck, so moving or deleting the originals can't break it.
+- Each save keeps the previous version next to the deck as `.bak`.
+- If OmaShow closes unexpectedly, it offers to recover your unsaved work the
+  next time it opens.
+- If a deck is open in another OmaShow window, or the file changes on disk,
+  OmaShow tells you and lets you reload, keep your version or save elsewhere.
 
-Display routing and swapping pass a two-screen Qt simulation. Native rendering
-has been checked on one physical ASUS 4K display. Two physical outputs, mixed
-monitor scaling and unplug/reconnect still need hardware acceptance.
+OmaShow keeps its own data in these folders, and removing the package leaves
+them in place:
 
-## Without a window
+| Folder | What's in it |
+| --- | --- |
+| `~/.config/omashow/` | Recent decks, panel sizes, view and review settings |
+| `~/.config/omarchy/omashow.conf` | Your presenter display choice |
+| `~/.local/share/omashow/` | Recovery copies of unsaved work, and your templates |
 
-Six verbs run with no window and no display, each answering with JSON and
-exiting 0 or 1 — enough to make a deck, change it, read back what was made and
-export it, from a script or from something that cannot see the screen at all.
+OmaShow makes no network connections.
+
+## From the command line
+
+OmaShow can make, change and export decks without opening a window:
 
 ```sh
 omashow new talk.omashow --theme 1 --size 16:9 --slides 4
 omashow import talk.pptx --out talk.omashow
-omashow inspect talk.omashow --slide 0
-omashow apply talk.omashow ops.json
+omashow inspect talk.omashow
+omashow apply talk.omashow changes.json
 omashow review talk.omashow
 omashow export talk.omashow --kind pdf --out talk.pdf
 omashow export talk.omashow --kind pptx --out talk.pptx
-omashow ops --filter text
 ```
 
-`apply` takes a list of operations — the same ones the interface calls — and
-writes nothing unless every one of them ran. `omashow ops` lists them all, with
-their arguments, by asking the app what it can do. The full reference is
-[docs/cli.md](docs/cli.md).
+Each command answers in JSON. `omashow ops` lists every change `apply` can
+make. See [the command-line guide](docs/cli.md) for the full reference.
 
-An agent skill for driving all this ships with the app. Installing OmaShow does
-not put it in your home directory — a package has no business writing there —
-so ask for it when you want it:
+## Limits
 
-```sh
-omashow skill          # where it is, and which agents have it
-omashow skill --link   # put it where they look
-```
-
-`--link` follows the arrangement Omarchy uses for its own skills: one directory
-per agent (`~/.agents/skills`, `~/.claude/skills`, and Codex, Pi and Hermes when
-they are installed), each a link to the one copy that came with the app.
-
-The older render flags still work, and without a positional deck they use the
-built-in Morph fixture:
-
-```sh
-./build/omashow talk.omashow --shot build/frames --times "0,0.5,1.0" --width 1920
-./build/omashow talk.omashow --pdf build/handout.pdf --stages
-./build/omashow --at 3.05
-```
-
-The native format is version 23. Versions 1–22 still open; versions 1 and 2
-retain their original text appearance, and an older build of the app refuses a
-newer format rather than half-reading it.
-Identical image assets are stored once under `assets/`, named by a content hash;
-moving the original files cannot break a deck. PDF images use lossless encoding.
-
-## Verification
-
-```sh
-./bin/test-all
-```
-
-This builds the app and runs core, persistence, export, QML interaction and
-presentation tests, simulated two-display routing, and the 13-frame rendering
-harness. The suite includes large-deck responsiveness, background-job cancellation and stale-result checks. UI tests run offscreen and mock notification/idle changes. Captured
-screens are in `build/qa/`; 100% reference captures for tables and charts are in `build/qa/table-scale-100/` and `build/qa/chart-scale-100/`.
-To include the real Wayland/OpenGL canvas and hardware video check, run
-`OMASHOW_TEST_GPU=1 ./bin/test-all` on a graphical session. The default run uses
-software rendering and skips the hardware-dependent cases. Extended codec,
-scaling, sustained GPU load and isolated package checks are documented in
-[hardware validation](docs/hardware-validation.md).
+- Exported films have no sound yet.
+- Links in exported PDFs aren't clickable.
+- Typefaces aren't embedded in decks. A package lists the typefaces a deck
+  needs instead, because most font licences don't allow sending them on.
+- Video must be SDR, up to 4096 × 4096. Embedded clips can be up to 64 MB;
+  linked files up to 2 GB.
 
 ## Licence
 

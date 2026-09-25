@@ -25,3 +25,9 @@ __pycache__/
 /build-demo/
 /tools/demo-video.sh
 build-asan/
+
+# Developer records, kept locally
+docs/performance.md
+docs/hardware-validation.md
+docs/release.md
+docs/sbom.md
