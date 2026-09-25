@@ -263,7 +263,12 @@ on the right:
   like any other deck — slides, text with its formatting, shapes, pictures,
   tables, charts, notes, sections, transitions, builds and comments — and
   arrives as a new, unsaved OmaShow deck. The original is never written to,
-  and a bar across the top says what could not be brought across.
+  and a bar across the top says what could not be brought across. When the
+  deck names typefaces this computer does not have, the same bar offers a
+  sheet with a replacement already chosen for each — the family without the
+  weight in its name when that is installed, else the nearest kind — and every
+  installed family to pick instead; the Review workspace offers the same for
+  any deck.
   `omashow import talk.pptx` does the same without a window. Export goes the
   other way: a `.pptx` with the slides, text, shapes, pictures, films, tables,
   charts, notes, comments, sections, transitions and builds, for anyone who

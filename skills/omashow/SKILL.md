@@ -37,7 +37,11 @@ omashow ops [--filter <text>]
 back to the person. `inspect`, `review` and `export` also take a `.pptx` or
 `.key` directly (the answer then carries `source`), but `apply` on one needs
 `--out`, because the foreign file is never written to. Work on the
-`.omashow` from then on. To hand a deck to someone with PowerPoint,
+`.omashow` from then on. Check `statistics.missingFonts` in the answer: if the
+deck names typefaces this computer lacks, run `{"op":"missingFonts"}` for a
+suggested stand-in per family and `{"op":"substituteFonts","args":[{…}]}` to
+apply them, or leave the names if the deck is going back to a computer that
+has them. To hand a deck to someone with PowerPoint,
 `export --kind pptx --out talk.pptx`; the answer's `log` names anything that
 had to be approximated.
 

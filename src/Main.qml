@@ -310,6 +310,7 @@ ApplicationWindow {
     DiagramDialog { id: diagramDialog }
     Connections { target: backend; function onTableEditorRequested() { win.commitEditors(); tableEditor.show() } }
     LinkDialog { id: linkDialog }
+    FontsDialog { id: fontsDialog }
     MediaOptimisation { id: mediaOptimisation }
     Connections { target: backend; function onMediaOptimisationRequested() { win.commitEditors(); mediaOptimisation.show() } }
     MediaPreflight { id: mediaPreflight; onEditRequested: win.workspace=0 }
@@ -879,6 +880,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: win.workspace === 3
+                onFontsRequested: fontsDialog.show()
             }
 
             PresenterPanel {
@@ -952,6 +954,12 @@ ApplicationWindow {
                         text: parent.parent.parent.notes.length === 0
                               ? qsTr("%1 was opened from %2 as a new OmaShow deck. Save it to keep it; the original is untouched.").arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
                               : qsTr("%1 was opened from %2 as a new OmaShow deck. %n thing(s) could not be brought across; the original is untouched.", "", parent.parent.parent.notes.length).arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
+                    }
+                    Button {
+                        objectName: "importFonts"
+                        visible: (parent.parent.parent.report.missingFonts ?? []).length > 0
+                        text: qsTr("Choose typefaces…")
+                        onClicked: fontsDialog.show()
                     }
                     Button {
                         objectName: "importDetails"

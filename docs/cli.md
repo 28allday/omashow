@@ -49,6 +49,16 @@ carries `source`, with the same `warnings`: what was left out or approximated,
 one line each, with the slides it happened on. Nothing is ever written back to
 the foreign file — `apply` on one needs `--out`.
 
+A deck cannot bring its typefaces. `statistics.missingFonts` names the ones
+this computer lacks, `missingFonts` (an operation) suggests a stand-in for
+each, and `substituteFonts` rewrites the deck — every box, stretch, master,
+layout, style, table cell and the theme — in one step:
+
+```
+[ { "op": "missingFonts" },
+  { "op": "substituteFonts", "args": [ { "Gill Sans": "Inter", "Lora": "Noto Serif" } ] } ]
+```
+
 What comes across: slides and their order, hidden slides, sections, the slide
 size and theme colours and fonts, text with its inherited typography and
 per-range formatting, lists, shapes and their fills, lines and shadows,
@@ -176,7 +186,8 @@ omashow export talk.omashow --kind pptx    --out talk.pptx
 design applied, plus notes, comments, sections, custom shows, transitions and
 builds. What PowerPoint has no form for — an equation, words on a path, a
 morph, a picture fill — is written in the nearest form, and the answer's `log`
-says so, slide by slide.
+says so, slide by slide. The log also names the typefaces the deck asks for,
+since a `.pptx` carries their names and not the fonts themselves.
 
 `--from` and `--to` take a slide range, `--include-skipped` includes the slides
 the deck skips, `--per-page` sets handout sheets and `--layout` is `slides`,

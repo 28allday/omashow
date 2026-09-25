@@ -1,4 +1,6 @@
 #include "backend.h"
+
+#include <QFontDatabase>
 #include "mediaplayback.h"
 #include "core/design.h"
 #include "core/review.h"
@@ -21,6 +23,7 @@
 #include "fixture.h"
 #include "io/bundle.h"
 #include "io/interchange.h"
+#include "core/fonts.h"
 #include "io/pdf.h"
 #include "io/recovery.h"
 #include "render/scenerenderer.h"
@@ -312,7 +315,32 @@ QVariantMap Backend::importReport() const {
   return {{QStringLiteral("source"), m_importedFrom},
           {QStringLiteral("name"), QFileInfo(m_importedFrom).fileName()},
           {QStringLiteral("kind"), Interchange::kindName(Interchange::kindOf(m_importedFrom))},
-          {QStringLiteral("warnings"), m_importWarnings}};
+          {QStringLiteral("warnings"), m_importWarnings},
+          {QStringLiteral("missingFonts"), Fonts::missing(m_document)}};
+}
+
+QVariantList Backend::missingFonts() const { return Fonts::report(m_document); }
+
+int Backend::substituteFonts(const QVariantMap &replacements) {
+  QMap<QString, QString> map;
+  for (auto it = replacements.cbegin(); it != replacements.cend(); ++it) {
+    const auto family = it.key().trimmed(), replacement = it.value().toString().trimmed();
+    if (family.isEmpty() || replacement.isEmpty() || replacement.size() > 256) continue;
+    if (!QFontDatabase::hasFamily(replacement)) {
+      emit failed(tr("%1 is not installed here.").arg(replacement));
+      return 0;
+    }
+    map.insert(family, replacement);
+  }
+  if (map.isEmpty()) return 0;
+  m_history.begin(m_document, tr("Replace typefaces"));
+  const int changed = Fonts::substitute(m_document, map);
+  if (!changed) { m_history.abandon(); return 0; }
+  m_history.commit();
+  touch();
+  emit importReportChanged();
+  setStatus(tr("Replaced %n typeface name(s)", "", changed));
+  return changed;
 }
 
 void Backend::dismissImportReport() {

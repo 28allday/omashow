@@ -3,6 +3,7 @@
 #include "anim/presentation.h"
 #include "core/chart.h"
 #include "core/design.h"
+#include "core/fonts.h"
 #include "core/mediaasset.h"
 #include "core/shape.h"
 #include "core/table.h"
@@ -1422,6 +1423,10 @@ Report write(const Document &document, const QString &path, const std::shared_pt
     report.bytes = data.size();
     report.lines = warnings;
     report.lines.prepend(QStringLiteral("Wrote %1 slides as PowerPoint.").arg(document.slides.size()));
+    // The deck names its typefaces and cannot carry them: say which, so the
+    // person it goes to can be told.
+    const auto families = Fonts::families(document);
+    if (!families.isEmpty()) report.lines.append(QStringLiteral("It asks for the typefaces %1; anyone opening it needs them installed to see it as designed.").arg(families.keys().join(QStringLiteral(", "))));
     return report;
 }
 

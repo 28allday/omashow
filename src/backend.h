@@ -132,6 +132,10 @@ public:
     QVariantMap fileState() const;
     QVariantMap importReport() const;
     Q_INVOKABLE void dismissImportReport();
+    // Typefaces the deck names that are not installed here, each with a
+    // suggested stand-in; and the rewrite, as one undo step.
+    Q_INVOKABLE QVariantList missingFonts() const;
+    Q_INVOKABLE int substituteFonts(const QVariantMap &replacements);
     Q_INVOKABLE void keepMyVersion();
     Q_INVOKABLE void reloadFromDisk();
     QString status() const { return m_status; }

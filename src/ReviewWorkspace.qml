@@ -8,6 +8,7 @@ import Omashow 1.0
 // notes, reading order and descriptions — on the right.
 RowLayout {
     id: root
+    signal fontsRequested()
     objectName: "reviewWorkspace"
     spacing: 0
     readonly property var stats: backend.statistics
@@ -351,10 +352,18 @@ RowLayout {
                     Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                     text: (root.stats.fonts ?? []).join(", ")
                 }
-                Label {
-                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.accent
+                RowLayout {
+                    Layout.fillWidth: true
                     visible: (root.stats.missingFonts ?? []).length > 0
-                    text: qsTr("Not installed here: %1").arg((root.stats.missingFonts ?? []).join(", "))
+                    Label {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.accent
+                        text: qsTr("Not installed here: %1").arg((root.stats.missingFonts ?? []).join(", "))
+                    }
+                    Button {
+                        objectName: "reviewFonts"
+                        text: qsTr("Choose replacements…")
+                        onClicked: root.fontsRequested()
+                    }
                 }
             }
         }
