@@ -30,6 +30,36 @@ $ omashow new talk.omashow --theme 1 --size 16:9 --slides 3
 Themes are 0, 1 and 2; layouts are 0, 1 and 2; sizes are `16:9`, `4:3`, `16:10`,
 `portrait` or `<width>x<height>` in slide units.
 
+## Bringing one in
+
+A PowerPoint deck (`.pptx`) or a Keynote deck (`.key`) reads anywhere a deck is
+named — `inspect`, `review` and `export` take one directly — and `import`
+turns it into an OmaShow deck beside it:
+
+```
+$ omashow import quarterly.pptx
+{ "ok": true, "file": "/home/you/quarterly.omashow", "slides": 14,
+  "source": { "kind": "PowerPoint", "file": "…/quarterly.pptx", "warnings": [ … ] },
+  "warnings": [ "A SmartArt graphic was left out (slide 7)" ], … }
+```
+
+`--out` names another destination (it must end in `.omashow`); an existing
+file is only replaced with `--force`. Every answer that read a foreign deck
+carries `source`, with the same `warnings`: what was left out or approximated,
+one line each, with the slides it happened on. Nothing is ever written back to
+the foreign file — `apply` on one needs `--out`.
+
+What comes across: slides and their order, hidden slides, sections, the slide
+size and theme colours and fonts, text with its inherited typography and
+per-range formatting, lists, shapes and their fills, lines and shadows,
+pictures (with crops and masks), films, tables (with merged cells and cell
+fills), charts (with their data and series colours), notes, comments,
+transitions (fade, push, morph; others become a fade), entrance, exit and
+emphasis builds, and links. What does not: embedded typefaces, SmartArt,
+embedded objects and pictures in EMF/WMF — each is named in `warnings`.
+A Keynote deck gives its slides, text, shapes, pictures, tables and notes;
+libetonyek does not report its builds, transitions or charts.
+
 ## Reading one
 
 `inspect` is how a script finds what to aim at. Every object has an `id`, and

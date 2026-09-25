@@ -174,3 +174,8 @@ HEADERS += src/core/workers.h
 SOURCES += src/core/workers.cpp src/backendjobs.cpp
 HEADERS += src/core/hardwaredecode.h
 SOURCES += src/core/hardwaredecode.cpp
+
+# Decks from elsewhere: PowerPoint read in-house, Keynote through libetonyek.
+PKGCONFIG += libetonyek-0.1 librevenge-0.0 librevenge-stream-0.0
+HEADERS += src/io/interchange.h src/io/pptx.h src/io/keynote.h
+SOURCES += src/io/interchange.cpp src/io/pptx.cpp src/io/keynote.cpp

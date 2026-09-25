@@ -49,6 +49,8 @@ class Backend : public QObject {
     Q_PROPERTY(QUrl fileUrl READ fileUrl NOTIFY fileUrlChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY fileUrlChanged)
     Q_PROPERTY(QVariantMap fileState READ fileState NOTIFY fileStateChanged)
+    // What a deck opened from PowerPoint or Keynote could not bring across.
+    Q_PROPERTY(QVariantMap importReport READ importReport NOTIFY importReportChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString operation READ operation NOTIFY operationChanged)
@@ -128,6 +130,8 @@ public:
     QUrl fileUrl() const { return m_fileUrl; }
     QString fileName() const;
     QVariantMap fileState() const;
+    QVariantMap importReport() const;
+    Q_INVOKABLE void dismissImportReport();
     Q_INVOKABLE void keepMyVersion();
     Q_INVOKABLE void reloadFromDisk();
     QString status() const { return m_status; }
@@ -522,6 +526,7 @@ public:
 
 signals:
     void opened();
+    void importReportChanged();
     void importReady();
     void deckImportChanged();
     void findChanged();
@@ -636,6 +641,11 @@ private:
     Pending m_pending = Pending::None;
     bool m_pendingPdfStages = false;
     QUrl m_fileUrl;
+    // A deck converted from another application: where it came from, and
+    // what was said about the conversion. Cleared by the next open.
+    QString m_importedFrom;
+    QStringList m_importWarnings;
+    void acceptImported(const Document &document, const QString &sourcePath, const QString &kind, const QStringList &warnings);
     QFileSystemWatcher m_watcher;
     QDateTime m_fileStamp;
     qint64 m_fileBytes = -1;

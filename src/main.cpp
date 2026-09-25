@@ -12,6 +12,7 @@
 #include "backend.h"
 #include "anim/presentation.h"
 #include "io/bundle.h"
+#include "io/interchange.h"
 #include "io/pdf.h"
 #include "showguard.h"
 #include "presenter.h"
@@ -239,7 +240,7 @@ int main(int argc, char *argv[]) {
     // Headless commands must load their positional deck before exporting.
     const auto cliFiles = parser.positionalArguments();
     if (!cliFiles.isEmpty() && (parser.isSet(writeOption) || parser.isSet(pdfOption) || parser.isSet(shotOption))) {
-        const auto loaded = Bundle::load(cliFiles.first());
+        const auto loaded = Interchange::load(cliFiles.first());
         if (!loaded.ok) { qCritical().noquote() << loaded.error; return 1; }
         backend.setDocument(loaded.document);
     }

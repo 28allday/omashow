@@ -6,6 +6,7 @@
 #include "core/design.h"
 #include "io/bundle.h"
 #include "io/exports.h"
+#include "io/interchange.h"
 #include "core/review.h"
 
 #include <QCoreApplication>
@@ -90,16 +91,50 @@ struct Flags {
     }
 };
 
-bool readDeck(Backend &backend, const QString &path, QString *error) {
+// A deck from PowerPoint or Keynote reads like any other; `source` says so,
+// with what the conversion could not carry, so the answer can pass it on.
+bool readDeck(Backend &backend, const QString &path, QString *error, QVariantMap *source = nullptr) {
     if (path.isEmpty()) { *error = QStringLiteral("name the deck to work on."); return false; }
     if (!QFileInfo::exists(path)) {
         *error = QStringLiteral("there is no file at %1.").arg(path);
         return false;
     }
-    const auto read = Bundle::load(path);
+    const auto read = Interchange::load(path);
     if (!read.ok) { *error = read.error; return false; }
     backend.setDocument(read.document);
+    if (source && Interchange::isForeign(read.kind))
+        *source = {{QStringLiteral("kind"), Interchange::kindName(read.kind)},
+                   {QStringLiteral("file"), QFileInfo(path).absoluteFilePath()},
+                   {QStringLiteral("warnings"), read.warnings}};
     return true;
+}
+
+// Converts a deck from another application into an OmaShow one, beside it
+// unless --out says otherwise, and never over a file that is already there
+// unless --force says so.
+int importDeck(Backend &backend, const Flags &flags) {
+    const auto path = flags.rest.value(0);
+    if (path.isEmpty()) return refuse(QStringLiteral("name the .pptx or .key file to import."));
+    const auto kind = Interchange::kindOf(path);
+    if (!Interchange::isForeign(kind))
+        return refuse(QStringLiteral("import takes a .pptx or .key file; %1 is not one.").arg(QFileInfo(path).fileName()));
+    QString trouble;
+    QVariantMap source;
+    if (!readDeck(backend, path, &trouble, &source)) return refuse(trouble);
+    QString destination = flags.value(QStringLiteral("out"));
+    if (destination.isEmpty())
+        destination = QFileInfo(path).absoluteDir().filePath(Interchange::suggestedName(path));
+    if (Interchange::kindOf(destination) != Interchange::Native)
+        return refuse(QStringLiteral("--out names the OmaShow deck to write, so it ends in .omashow."));
+    if (QFileInfo::exists(destination) && !flags.has(QStringLiteral("force")))
+        return refuse(QStringLiteral("%1 already exists; --force replaces it, or --out names another file.").arg(destination));
+    if (!backend.saveTo(destination))
+        return refuse(QStringLiteral("%1 could not be written.").arg(destination));
+    return say({{QStringLiteral("file"), QFileInfo(destination).absoluteFilePath()},
+                {QStringLiteral("source"), source},
+                {QStringLiteral("slides"), backend.document().slides.size()},
+                {QStringLiteral("warnings"), source.value(QStringLiteral("warnings"))},
+                {QStringLiteral("statistics"), Review::statistics(backend.document())}});
 }
 
 QVariant readJson(const QString &path, QString *error) {
@@ -162,7 +197,8 @@ const QStringList &verbs() {
     static const QStringList list{QStringLiteral("new"),    QStringLiteral("inspect"),
                                   QStringLiteral("apply"),  QStringLiteral("export"),
                                   QStringLiteral("review"), QStringLiteral("ops"),
-                                  QStringLiteral("skill"),  QStringLiteral("help")};
+                                  QStringLiteral("import"), QStringLiteral("skill"),
+                                  QStringLiteral("help")};
     return list;
 }
 
@@ -183,6 +219,7 @@ void usage() {
     out() << QStringLiteral(R"(OmaShow — presentations for Omarchy, without a window.
 
   omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N]
+  omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
   omashow inspect <file> [--slide N] [--full]
   omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
   omashow export <file> --kind pdf|images|video|package|print --out <path>
@@ -332,7 +369,8 @@ int makeDeck(Backend &backend, const Flags &flags) {
 
 int inspectDeck(Backend &backend, const Flags &flags) {
     QString trouble;
-    if (!readDeck(backend, flags.rest.value(0), &trouble)) return refuse(trouble);
+    QVariantMap source;
+    if (!readDeck(backend, flags.rest.value(0), &trouble, &source)) return refuse(trouble);
     const bool full = flags.has(QStringLiteral("full"));
     const auto &document = backend.document();
     if (flags.values.contains(QStringLiteral("slide"))) {
@@ -340,30 +378,45 @@ int inspectDeck(Backend &backend, const Flags &flags) {
         if (index < 0 || index >= document.slides.size())
             return refuse(QStringLiteral("the deck has %1 slides, numbered from 0.")
                               .arg(document.slides.size()));
-        return say({{QStringLiteral("file"), flags.rest.value(0)},
-                    {QStringLiteral("slide"), Cli::describeSlide(document, index, full)}});
+        QVariantMap payload{{QStringLiteral("file"), flags.rest.value(0)},
+                            {QStringLiteral("slide"), Cli::describeSlide(document, index, full)}};
+        if (!source.isEmpty()) payload[QStringLiteral("source")] = source;
+        return say(payload);
     }
     auto payload = Cli::describeDeck(document, full);
     payload[QStringLiteral("file")] = flags.rest.value(0);
+    if (!source.isEmpty()) payload[QStringLiteral("source")] = source;
     return say(payload);
 }
 
 int reviewDeck(Backend &backend, const Flags &flags) {
     QString trouble;
-    if (!readDeck(backend, flags.rest.value(0), &trouble)) return refuse(trouble);
+    QVariantMap source;
+    if (!readDeck(backend, flags.rest.value(0), &trouble, &source)) return refuse(trouble);
     auto payload = Cli::describeReview(backend.document(),
                                        flags.has(QStringLiteral("include-dismissed")));
     payload[QStringLiteral("file")] = flags.rest.value(0);
+    if (!source.isEmpty()) payload[QStringLiteral("source")] = source;
     return say(payload);
 }
 
 int applyOps(Backend &backend, const Flags &flags) {
     QString trouble;
-    if (!readDeck(backend, flags.rest.value(0), &trouble)) return refuse(trouble);
-    const auto source = flags.values.contains(QStringLiteral("ops"))
+    QVariantMap source;
+    if (!readDeck(backend, flags.rest.value(0), &trouble, &source)) return refuse(trouble);
+    if (!source.isEmpty() && !flags.has(QStringLiteral("dry-run"))) {
+        const auto out = flags.value(QStringLiteral("out"));
+        if (out.isEmpty())
+            return refuse(QStringLiteral("%1 is a %2 deck, which OmaShow never writes back to; --out names "
+                                         "the .omashow file to write instead.")
+                              .arg(QFileInfo(flags.rest.value(0)).fileName(), source.value(QStringLiteral("kind")).toString()));
+        if (Interchange::kindOf(out) != Interchange::Native)
+            return refuse(QStringLiteral("--out names the OmaShow deck to write, so it ends in .omashow."));
+    }
+    const auto opsPath = flags.values.contains(QStringLiteral("ops"))
                             ? flags.value(QStringLiteral("ops"))
                             : flags.rest.value(1, QStringLiteral("-"));
-    const auto given = readJson(source, &trouble);
+    const auto given = readJson(opsPath, &trouble);
     if (!trouble.isEmpty()) return refuse(trouble);
     QVariantList operations;
     if (given.metaType().id() == QMetaType::QVariantList) operations = given.toList();
@@ -395,6 +448,7 @@ int applyOps(Backend &backend, const Flags &flags) {
     QVariantMap payload{{QStringLiteral("applied"), done},
                         {QStringLiteral("of"), operations.size()},
                         {QStringLiteral("results"), results}};
+    if (!source.isEmpty()) payload[QStringLiteral("source")] = source;
     // Warnings gathered where they cannot be missed.
     QVariantList warnings;
     for (const auto &row : results)
@@ -431,7 +485,8 @@ int applyOps(Backend &backend, const Flags &flags) {
 
 int exportDeck(Backend &backend, const Flags &flags) {
     QString trouble;
-    if (!readDeck(backend, flags.rest.value(0), &trouble)) return refuse(trouble);
+    QVariantMap source;
+    if (!readDeck(backend, flags.rest.value(0), &trouble, &source)) return refuse(trouble);
     const auto kinds = QStringList{QStringLiteral("pdf"), QStringLiteral("images"),
                                    QStringLiteral("video"), QStringLiteral("package"),
                                    QStringLiteral("print")};
@@ -534,6 +589,7 @@ int Cli::run(Backend &backend, const QStringList &arguments) {
     if (verb == QStringLiteral("skill")) return offerSkill(flags);
     if (verb == QStringLiteral("ops")) return describeOps(flags);
     if (verb == QStringLiteral("new")) return makeDeck(backend, flags);
+    if (verb == QStringLiteral("import")) return importDeck(backend, flags);
     if (verb == QStringLiteral("inspect")) return inspectDeck(backend, flags);
     if (verb == QStringLiteral("review")) return reviewDeck(backend, flags);
     if (verb == QStringLiteral("apply")) return applyOps(backend, flags);

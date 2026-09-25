@@ -5,9 +5,11 @@ description: >
   line, with no window and no display — `omashow new`, `inspect`, `apply`,
   `export`, `review`, `ops`. Use when asked to build a deck, a slide show or a
   presentation on this machine, to change or check an existing `.omashow` file,
-  or to turn one into a PDF, pictures, film or a package. Triggers: omashow,
+  or to turn one into a PDF, pictures, film or a package, or to bring a
+  PowerPoint (.pptx) or Keynote (.key) deck into OmaShow. Triggers: omashow,
   make me a deck, build a presentation, slide deck, .omashow, presentation to
-  PDF, export slides, presenter notes, slide transitions, check my slides.
+  PDF, export slides, presenter notes, slide transitions, check my slides,
+  convert this pptx, open this keynote file.
   NOT for writing the app itself — that is an ordinary Qt project with its own
   notes beside the source.
 ---
@@ -20,12 +22,22 @@ reference; this is how to use it well.
 
 ```
 omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N]
+omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
 omashow inspect <file> [--slide N] [--full]
 omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
 omashow export <file> --kind pdf|images|video|package|print --out <path>
 omashow review <file>
 omashow ops [--filter <text>]
 ```
+
+## A deck from PowerPoint or Keynote
+
+`omashow import talk.pptx` writes `talk.omashow` beside it and answers with
+`warnings`: what could not be brought across, with slide numbers. Read them
+back to the person. `inspect`, `review` and `export` also take a `.pptx` or
+`.key` directly (the answer then carries `source`), but `apply` on one needs
+`--out`, because the foreign file is never written to. Work on the
+`.omashow` from then on.
 
 ## The loop that works
 

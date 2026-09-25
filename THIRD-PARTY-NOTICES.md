@@ -18,9 +18,17 @@ work, each under its own licence.
 | [FFmpeg](https://ffmpeg.org) — libavformat, libavcodec, libavutil, libswscale | LGPL-2.1-or-later; GPL-3.0 as built with `--enable-gpl --enable-version3` by Arch Linux |
 | [zlib](https://zlib.net) | zlib licence |
 | [Hunspell](https://hunspell.github.io) | GPL-2.0-or-later / LGPL-2.1-or-later / MPL-1.1 |
+| [libetonyek](https://wiki.documentfoundation.org/DLP/Libraries/libetonyek) — reads Keynote decks | MPL-2.0 |
+| [librevenge](https://sourceforge.net/p/libwpd/wiki/librevenge/) — the interface libetonyek speaks | MPL-2.0 / LGPL-2.1-or-later |
 
 Because the FFmpeg build OmaShow links against is GPL-3.0, OmaShow as a whole
 is distributed under GPL-3.0-or-later terms. No "nonfree" component is used.
+
+## Test fixtures
+
+`tests/fixtures/keynote5.key` is `keynote5-file.key` from libetonyek's own test
+data (MPL-2.0), a two-slide Keynote '09 deck; it is read by the tests and
+never shipped in the package.
 
 ## Spelling dictionaries
 

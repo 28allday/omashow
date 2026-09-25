@@ -4,6 +4,7 @@
 #include "core/design.h"
 #include "filepicker.h"
 #include "io/bundle.h"
+#include "io/interchange.h"
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QFutureWatcher>
@@ -11,8 +12,7 @@
 
 void Backend::importDeckDialog() {
   m_pending = Pending::ImportDeck;
-  m_chooser->openFile(tr("Import slides and design"), tr("OmaShow decks"),
-                      {QStringLiteral("*.omashow")});
+  m_chooser->openFile(tr("Import slides and design"), tr("Decks"), Interchange::openPatterns());
 }
 
 void Backend::importFromDeck(const QUrl &url) {
@@ -58,8 +58,10 @@ void Backend::importFromDeck(const QUrl &url) {
           });
   watcher->setFuture(QtConcurrent::run(Workers::io(), [url, job] {
     Bundle::ReadResult read;
-    if (!job->canceled)
-      read = Bundle::load(url.toLocalFile());
+    if (!job->canceled) {
+      const auto loaded = Interchange::load(url.toLocalFile());
+      read.ok = loaded.ok; read.error = loaded.error; read.document = loaded.document;
+    }
     return read;
   }));
 }

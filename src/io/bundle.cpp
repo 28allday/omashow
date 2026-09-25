@@ -12,6 +12,8 @@
 #include <functional>
 #include "io/bundle.h"
 
+#include <QDebug>
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -46,7 +48,12 @@ SceneObject objectFromJson(const QJsonObject &json) {
     // (language is an ordinary property: it goes through setProperty.)
     for (auto it = json.begin(); it != json.end(); ++it) {
         if(structural.contains(it.key())) continue;
-        if(!known.contains(it.key()) || !Design::setProperty(object,it.key(),it.value().toVariant(),false)) object.type=ObjectType(-1);
+        if(!known.contains(it.key()) || !Design::setProperty(object,it.key(),it.value().toVariant(),false)) {
+            // Which property a damaged deck fell over on, for whoever wrote it.
+            if (qEnvironmentVariableIsSet("OMASHOW_DEBUG_BUNDLE"))
+                qWarning().noquote() << "bundle: object" << object.id << "refused" << it.key() << "=" << it.value().toVariant();
+            object.type=ObjectType(-1);
+        }
     }
     // Parsing preserves authored geometry exactly; editing clamps new boxes.
     object.rect = QRectF(json.value("x").toDouble(), json.value("y").toDouble(),
@@ -57,7 +64,10 @@ SceneObject objectFromJson(const QJsonObject &json) {
     for (const auto &key : json.value("overrides").toArray()) object.overrides.append(key.toString());
     if (json.contains("runs")) {
         QVector<TextRun> runs;
-        if (!TextRuns::decode(json.value("runs").toVariant(), runs)) object.type = ObjectType(-1);
+        if (!TextRuns::decode(json.value("runs").toVariant(), runs)) {
+            if (qEnvironmentVariableIsSet("OMASHOW_DEBUG_BUNDLE")) qWarning().noquote() << "bundle: object" << object.id << "has damaged runs";
+            object.type = ObjectType(-1);
+        }
         else object.runs = TextRuns::tidy(runs, object.text.size());
     }
     return object;
@@ -588,6 +598,7 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
                 o.mediaOriginal=std::make_shared<const SceneObject>(originals.first());
             }
             if (o.type!=ObjectType::Rect && o.type!=ObjectType::Text && o.type!=ObjectType::Image && o.type!=ObjectType::Media && o.type!=ObjectType::Table && o.type!=ObjectType::Chart) {
+                if (qEnvironmentVariableIsSet("OMASHOW_DEBUG_BUNDLE")) qWarning().noquote() << "bundle: object" << o.id << "is of no known type";
                 result.error=QStringLiteral("The deck contains an unsupported object type."); return false;
             }
             if(!LinkedData::validate(o.dataSource) || (!o.dataSource.path.isEmpty() && o.type!=ObjectType::Table && o.type!=ObjectType::Chart)) { result.error="Invalid linked data source."; return false; }

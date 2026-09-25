@@ -7,5 +7,6 @@ Exec=omashow %f
 Icon=omashow
 Terminal=false
 Categories=Office;Presentation;
-Keywords=slides;presentation;deck;omarchy;
+Keywords=slides;presentation;deck;omarchy;powerpoint;keynote;pptx;
+MimeType=application/vnd.openxmlformats-officedocument.presentationml.presentation;application/x-iwork-keynote-sffkey;
 StartupWMClass=omashow

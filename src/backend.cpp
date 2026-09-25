@@ -20,6 +20,7 @@
 #include "filepicker.h"
 #include "fixture.h"
 #include "io/bundle.h"
+#include "io/interchange.h"
 #include "io/pdf.h"
 #include "io/recovery.h"
 #include "render/scenerenderer.h"
@@ -258,8 +259,7 @@ QString Backend::fileName() const { return displayNameFor(m_fileUrl); }
 
 void Backend::openDialog() {
   m_pending = Pending::None;
-  m_chooser->openFile(tr("Open deck"), tr("OmaShow decks"),
-                      {QStringLiteral("*.omashow")});
+  m_chooser->openFile(tr("Open deck"), tr("Decks"), Interchange::openPatterns());
 }
 
 void Backend::open(const QUrl &url) {
@@ -274,7 +274,7 @@ void Backend::open(const QUrl &url) {
     return;
   }
 
-  const Bundle::ReadResult result = Bundle::load(path);
+  const auto result = Interchange::load(path);
   if (!result.ok) {
     // Opening a deck never damages it, and a failure never replaces what is
     // already on screen.
@@ -283,10 +283,47 @@ void Backend::open(const QUrl &url) {
     return;
   }
 
-  acceptOpen(result.document, url);
+  if (Interchange::isForeign(result.kind))
+    acceptImported(result.document, path, Interchange::kindName(result.kind), result.warnings);
+  else
+    acceptOpen(result.document, url);
+}
+
+// A deck from another application arrives as a new, unsaved OmaShow deck:
+// nothing is ever written back to the file it came from.
+void Backend::acceptImported(const Document &document, const QString &sourcePath, const QString &kind,
+                             const QStringList &warnings) {
+  acceptOpen(document, QUrl());
+  m_importedFrom = sourcePath;
+  m_importWarnings = warnings;
+  m_modified = true;
+  rememberRecent(sourcePath);
+  emit fileStateChanged();
+  emit documentChanged();
+  emit importReportChanged();
+  const auto name = QFileInfo(sourcePath).fileName();
+  setStatus(warnings.isEmpty()
+                ? tr("Opened %1 from %2 — save it as an OmaShow deck").arg(name, kind)
+                : tr("Opened %1 from %2 with %n thing(s) to know — save it as an OmaShow deck", "", warnings.size()).arg(name, kind));
+}
+
+QVariantMap Backend::importReport() const {
+  if (m_importedFrom.isEmpty()) return {};
+  return {{QStringLiteral("source"), m_importedFrom},
+          {QStringLiteral("name"), QFileInfo(m_importedFrom).fileName()},
+          {QStringLiteral("kind"), Interchange::kindName(Interchange::kindOf(m_importedFrom))},
+          {QStringLiteral("warnings"), m_importWarnings}};
+}
+
+void Backend::dismissImportReport() {
+  if (m_importedFrom.isEmpty()) return;
+  m_importedFrom.clear();
+  m_importWarnings.clear();
+  emit importReportChanged();
 }
 
 void Backend::acceptOpen(const Document &document, const QUrl &url) {
+  if (!m_importedFrom.isEmpty()) { m_importedFrom.clear(); m_importWarnings.clear(); emit importReportChanged(); }
   resetMediaSession();
   m_document = document;
   Review::prune(m_document);
@@ -351,8 +388,9 @@ void Backend::save() {
 
 void Backend::saveAsDialog() {
   m_pending = Pending::SaveDeck;
-  const QString suggested =
-      m_fileUrl.isLocalFile() ? fileName() : QStringLiteral("Untitled.omashow");
+  const QString suggested = m_fileUrl.isLocalFile() ? fileName()
+                            : !m_importedFrom.isEmpty() ? Interchange::suggestedName(m_importedFrom)
+                            : QStringLiteral("Untitled.omashow");
   m_chooser->saveFile(tr("Save deck"), suggested, tr("OmaShow decks"),
                       {QStringLiteral("*.omashow")});
 }

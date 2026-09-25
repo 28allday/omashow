@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "io/interchange.h"
 #include "core/imageasset.h"
 #include "io/bundle.h"
 #include "io/pdf.h"
@@ -53,7 +54,7 @@ void Backend::openAsync(const QUrl &url, bool recovery) {
     if (!beginOperation(recovery ? tr("Recovering deck…") : tr("Opening deck…"))) return;
     const auto job = m_operationJob;
     const int generation = m_documentGeneration, revision = m_revision;
-    struct Result { Bundle::ReadResult read; QString original; };
+    struct Result { Interchange::Result read; QString original; };
     auto *watcher = new QFutureWatcher<Result>(this);
     connect(watcher, &QFutureWatcherBase::finished, this, [this, watcher, job, url, recovery, generation, revision] {
         const auto result = watcher->result(); watcher->deleteLater(); endOperation();
@@ -62,6 +63,10 @@ void Backend::openAsync(const QUrl &url, bool recovery) {
             emit failed(tr("The deck changed while opening. Your current edits have been kept.")); return;
         }
         if (!result.read.ok) { setStatus(result.read.error); emit failed(result.read.error); return; }
+        if (Interchange::isForeign(result.read.kind)) {
+            acceptImported(result.read.document, url.toLocalFile(), Interchange::kindName(result.read.kind), result.read.warnings);
+            return;
+        }
         acceptOpen(result.read.document, recovery ? QUrl() : url);
         if (recovery) {
             m_modified = true;
@@ -74,7 +79,7 @@ void Backend::openAsync(const QUrl &url, bool recovery) {
     watcher->setFuture(QtConcurrent::run(Workers::io(), [url, recovery, job] {
         Result result;
         if (job->canceled) return result;
-        result.read = Bundle::load(url.toLocalFile());
+        result.read = Interchange::load(url.toLocalFile());
         if (recovery && result.read.ok)
             for (const auto &journal : Recovery::orphans())
                 if (journal.journalPath == url.toLocalFile()) result.original = journal.originalPath;

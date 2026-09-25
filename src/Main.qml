@@ -921,6 +921,63 @@ ApplicationWindow {
             }
         }
 
+        // ── A deck that came from another application ───────────────────────
+        Rectangle {
+            objectName: "importBar"
+            property var report: backend.importReport
+            property var notes: report.warnings ?? []
+            property bool open: false
+            Layout.fillWidth: true
+            visible: (report.name ?? "") !== ""
+            implicitHeight: importColumn.implicitHeight + Theme.s2
+            color: Theme.withAlpha(Theme.accent, 0.12)
+            Hairline { anchors.bottom: parent.bottom; width: parent.width }
+            ColumnLayout {
+                id: importColumn
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Theme.s4
+                anchors.rightMargin: Theme.s4
+                spacing: Theme.s1
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.minimumHeight: Theme.hRow
+                    spacing: Theme.s3
+                    Icon { name: "info"; color: Theme.accent }
+                    Label {
+                        objectName: "importMessage"
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: parent.parent.parent.notes.length === 0
+                              ? qsTr("%1 was opened from %2 as a new OmaShow deck. Save it to keep it; the original is untouched.").arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
+                              : qsTr("%1 was opened from %2 as a new OmaShow deck. %n thing(s) could not be brought across; the original is untouched.", "", parent.parent.parent.notes.length).arg(parent.parent.parent.report.name).arg(parent.parent.parent.report.kind)
+                    }
+                    Button {
+                        objectName: "importDetails"
+                        visible: parent.parent.parent.notes.length > 0
+                        text: parent.parent.parent.open ? qsTr("Hide") : qsTr("What was left out")
+                        onClicked: parent.parent.parent.open = !parent.parent.parent.open
+                    }
+                    Button {
+                        objectName: "importDismiss"
+                        text: qsTr("OK")
+                        onClicked: backend.dismissImportReport()
+                    }
+                }
+                Repeater {
+                    model: parent.parent.open ? parent.parent.notes : []
+                    delegate: Label {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Theme.s5
+                        wrapMode: Text.Wrap
+                        color: Theme.textMuted
+                        text: "• " + modelData
+                    }
+                }
+            }
+        }
+
         // ── What happened to the file while you were working ────────────────
         Rectangle {
             objectName: "fileStateBar"

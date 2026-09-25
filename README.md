@@ -259,6 +259,12 @@ on the right:
   listed by `omashow ops` — so a script can build a deck, change it, read back
   what it made and export it. Nothing is written until every operation has run.
   See `docs/cli.md`.
+- **Decks from elsewhere:** a PowerPoint `.pptx` or a Keynote `.key` opens
+  like any other deck — slides, text with its formatting, shapes, pictures,
+  tables, charts, notes, sections, transitions, builds and comments — and
+  arrives as a new, unsaved OmaShow deck. The original is never written to,
+  and a bar across the top says what could not be brought across.
+  `omashow import talk.pptx` does the same without a window.
 - **Files:** atomic `.omashow` saves, autosave recovery, and headless PNG frame
   rendering from the command line. A deck whose file is read-only, missing or
   changed by something else says so in a bar across the top, with the way out of
@@ -414,6 +420,7 @@ export it, from a script or from something that cannot see the screen at all.
 
 ```sh
 omashow new talk.omashow --theme 1 --size 16:9 --slides 4
+omashow import talk.pptx --out talk.omashow
 omashow inspect talk.omashow --slide 0
 omashow apply talk.omashow ops.json
 omashow review talk.omashow
