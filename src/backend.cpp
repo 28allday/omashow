@@ -636,7 +636,19 @@ void Backend::step(qreal seconds) {
   setTime(m_time + seconds);
 }
 
+void Backend::frameTick() {
+  if (!m_playing)
+    return;
+  m_frameTicked.restart();
+  tick();
+}
+
 void Backend::tick() {
+  // The ticker only keeps time when no window is drawing the show, e.g.
+  // behind a minimised window; otherwise its ticks land between frames and
+  // make motion uneven.
+  if (sender() == &m_ticker && m_frameTicked.isValid() && m_frameTicked.elapsed() < 50)
+    return;
   const qreal end = m_playTo >= 0 ? m_playTo : duration();
   setTime(qMin(end, m_playFrom + m_clock.elapsed() / 1000.0 * m_playbackRate));
   if (m_time >= end)

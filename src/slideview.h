@@ -69,6 +69,7 @@ public:
     void paint(QPainter *painter) override;
 protected:
     void updatePolish() override;
+    void itemChange(ItemChange change, const ItemChangeData &value) override;
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 signals:
@@ -90,6 +91,7 @@ private:
     qreal m_zoom = 0;
     QPointF m_pan;
     Backend *m_deck = nullptr;
+    QMetaObject::Connection m_frameClock;
     qreal m_time = 0.0;
     int m_editSlide = -1;
     qreal m_scale = 1.0;

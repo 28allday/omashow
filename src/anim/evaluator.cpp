@@ -3,12 +3,12 @@
 #include "core/scene.h"
 #include "core/mediaasset.h"
 #include "core/connector.h"
-#include "core/deckresize.h"
 #include "core/shape.h"
 #include "core/textruns.h"
 
 #include <QTransform>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -39,6 +39,24 @@ QVector<int> unitEnds(const QString &text, int unit) {
     return ends;
 }
 
+// Draws [from, to) of the text at `alpha` of its own colour, run by run, so a
+// word already coloured keeps its colour while it fades.
+void fadeText(SceneObject &object, int from, int to, qreal alpha) {
+    QVector<int> cuts{from, to};
+    for (const auto &run : object.runs)
+        for (int edge : {run.start, run.start + run.length})
+            if (edge > from && edge < to) cuts.append(edge);
+    std::sort(cuts.begin(), cuts.end());
+    cuts.erase(std::unique(cuts.begin(), cuts.end()), cuts.end());
+    for (int i = 0; i + 1 < cuts.size(); ++i) {
+        const auto *run = TextRuns::at(object.runs, cuts.at(i));
+        QColor colour = run && run->color.isValid() ? run->color : object.textColor;
+        colour.setAlphaF(colour.alphaF() * alpha);
+        TextRuns::apply(object, cuts.at(i), cuts.at(i + 1), QStringLiteral("color"),
+                        colour.name(QColor::HexArgb));
+    }
+}
+
 void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide &slide) {
     const qreal progress = step.progressAt(t);
     const qreal p = step.phase == BuildPhase::Out ? 1.0 - progress : progress;
@@ -60,7 +78,7 @@ void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide
         break;
     case Effect::Scale: {
         const qreal from = step.amount > 0 ? step.amount : 0.5;
-        DeckResize::scaleObject(object, from + (1.0 - from) * p, object.rect.center());
+        object.paintScale *= from + (1.0 - from) * p;
         break;
     }
     case Effect::Spin:
@@ -70,7 +88,7 @@ void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide
         // An emphasis is not an entrance: it swells and settles where it is.
         const qreal swell = step.amount != 0 ? step.amount : 0.15;
         const qreal q = std::sin(M_PI * qBound(0.0, progress, 1.0));
-        DeckResize::scaleObject(object, 1.0 + swell * q, object.rect.center());
+        object.paintScale *= 1.0 + swell * q;
         break;
     }
     case Effect::Path: {
@@ -90,10 +108,22 @@ void applyBuild(SceneObject &object, const BuildStep &step, qreal t, const Slide
     case Effect::Reveal: {
         if (object.type != ObjectType::Text) break;
         const auto ends = unitEnds(object.text, qBound(0, step.unit, 2));
-        const int shown = int(std::ceil(p * ends.size() - 1e-9));
-        object.text = shown <= 0 ? QString()
-                                 : object.text.left(ends.at(qMin(shown, int(ends.size())) - 1));
-        object.runs = TextRuns::tidy(object.runs, object.text.size());
+        if (object.textKind != 0) {
+            // Equations and words on a path cannot be coloured by the letter.
+            const int shown = int(std::ceil(p * ends.size() - 1e-9));
+            object.text = shown <= 0 ? QString()
+                                     : object.text.left(ends.at(qMin(shown, int(ends.size())) - 1));
+            object.runs = TextRuns::tidy(object.runs, object.text.size());
+            break;
+        }
+        // The whole text keeps its place from the first frame, so lines already
+        // shown never move; each unit fades in over its share of the build.
+        const qreal along = qBound(0.0, p, 1.0) * ends.size();
+        const int whole = int(std::floor(along + 1e-9));
+        if (whole >= ends.size()) break;
+        const int shownEnd = whole > 0 ? ends.at(whole - 1) : 0;
+        fadeText(object, shownEnd, ends.at(whole), along - whole);
+        fadeText(object, ends.at(whole), object.text.size(), 0.0);
         break;
     }
     }

@@ -53,6 +53,11 @@ struct SceneObject {
     QRectF rect;                      // in document coordinates
     qreal rotation = 0.0;             // degrees
     qreal opacity = 1.0;
+    // Drawn this much bigger or smaller about the middle of rect. Only ever
+    // set by an animation in flight and never saved: scaling the picture
+    // rather than the font keeps text from growing in whole-pixel steps and
+    // from re-wrapping half-way through.
+    qreal paintScale = 1.0;
     QColor fill = QColor(255, 255, 255);
     qreal cornerRadius = 0.0;
 

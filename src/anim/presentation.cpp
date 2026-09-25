@@ -1,5 +1,4 @@
 #include "anim/presentation.h"
-#include "core/deckresize.h"
 #include "core/design.h"
 
 #include "anim/evaluator.h"
@@ -24,12 +23,23 @@ SceneObject backdrop(const QSizeF &size, const QColor &color, const QString &id)
   return object;
 }
 
+} // namespace
+
+void Presentation::scaleAbout(SceneObject &object, qreal scale, const QPointF &origin) {
+  const QPointF offset = origin + (object.rect.center() - origin) * scale - object.rect.center();
+  object.rect.translate(offset);
+  object.connectorStart += offset;
+  object.connectorEnd += offset;
+  object.paintScale *= scale;
+}
+
+namespace {
 // Everything on a slide, grown or shrunk and turned about the middle of it.
 void around(QVector<SceneObject> &objects, const QPointF &centre, qreal scale, qreal degrees) {
   const qreal radians = qDegreesToRadians(degrees);
   const qreal c = std::cos(radians), s = std::sin(radians);
   for (auto &object : objects) {
-    if (!qFuzzyCompare(scale, 1.0)) DeckResize::scaleObject(object, qMax(0.001, scale), centre);
+    if (!qFuzzyCompare(scale, 1.0)) Presentation::scaleAbout(object, qMax(0.001, scale), centre);
     if (qFuzzyIsNull(degrees)) continue;
     const QPointF offset = object.rect.center() - centre;
     const QPointF turned(offset.x() * c - offset.y() * s, offset.x() * s + offset.y() * c);

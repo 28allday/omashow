@@ -8,6 +8,7 @@
 // question and gets the same answer.
 
 #include <QColor>
+#include <QPointF>
 #include <QVector>
 
 #include "anim/morph.h"
@@ -46,6 +47,9 @@ inline bool hasDirection(int kind) { return kind == Push || kind == Cover || kin
 
 // Always about the slide being arrived at, as Keynote and PowerPoint both read.
 int transitionKind(const Document &document, int index);
+// Moves the object as if it were scaled about origin and draws it that much
+// bigger, leaving its size and type as they are (see SceneObject::paintScale).
+void scaleAbout(SceneObject &object, qreal scale, const QPointF &origin);
 qreal transitionSeconds(const Document &document, int index);
 qreal hold(const Document &document, int index);
 

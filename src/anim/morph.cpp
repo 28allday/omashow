@@ -72,6 +72,25 @@ SceneObject interpolate(const SceneObject &from, const SceneObject &to, qreal u)
     // the box, which is the same motion without the per-glyph work.
     state.fontSize = lerp(from.fontSize, to.fontSize, u);
     state.letterSpacing = lerp(from.letterSpacing, to.letterSpacing, u);
+    if (to.type == ObjectType::Text && from.fontSize > 0 && to.fontSize > 0) {
+        // Words are laid out once, as they arrive, and the drawing is scaled:
+        // a type size that changes every frame steps a whole pixel at a time
+        // and re-wraps. The point the text is aligned to travels between the
+        // two boxes, so left-set words do not slide sideways as they grow.
+        const qreal scale = lerp(from.fontSize, to.fontSize, u) / to.fontSize;
+        const qreal fx = to.textAlign == 1 ? 0.5 : to.textAlign == 2 ? 1.0 : 0.0;
+        const qreal fy = to.verticalAlign == 1 ? 0.5 : to.verticalAlign == 2 ? 1.0 : 0.0;
+        const auto anchor = [fx, fy](const QRectF &r) {
+            return QPointF(r.left() + fx * r.width(), r.top() + fy * r.height());
+        };
+        const QPointF at = anchor(from.rect) + (anchor(to.rect) - anchor(from.rect)) * u;
+        const QSizeF drawn = to.rect.size() * scale;
+        state.rect = QRectF(QPointF(), to.rect.size());
+        state.rect.moveCenter(at + QPointF((0.5 - fx) * drawn.width(), (0.5 - fy) * drawn.height()));
+        state.fontSize = to.fontSize;
+        state.letterSpacing = to.letterSpacing;
+        state.paintScale *= scale;
+    }
     return state;
 }
 

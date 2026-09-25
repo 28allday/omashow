@@ -8,6 +8,7 @@
 #include "render/scenerenderer.h"
 
 #include <QPainter>
+#include <QQuickWindow>
 #include <QPaintEngine>
 #include <cmath>
 
@@ -97,6 +98,19 @@ void SlideView::paint(QPainter *painter) {
         SceneRenderer::paint(*painter, {o});
     }
     painter->restore();
+}
+
+void SlideView::itemChange(ItemChange change, const ItemChangeData &value) {
+    QQuickPaintedItem::itemChange(change, value);
+    if (change != ItemSceneChange) return;
+    disconnect(m_frameClock);
+    // While the deck plays, read the clock as each frame begins and ask for
+    // the next one, so every frame advances by exactly one refresh.
+    if (value.window) m_frameClock = connect(value.window, &QQuickWindow::afterAnimating, this, [this] {
+        if (!m_deck || !m_deck->playing() || m_editSlide >= 0 || !isVisible()) return;
+        m_deck->frameTick();
+        update();
+    });
 }
 
 void SlideView::geometryChange(const QRectF &next, const QRectF &previous) {

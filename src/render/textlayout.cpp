@@ -260,6 +260,13 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
             if (run.baseline == 1) format.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
             if (run.baseline == 2) format.setVerticalAlignment(QTextCharFormat::AlignSubScript);
             scope.mergeCharFormat(format);
+            // A list marker is drawn in its paragraph's colour: let it follow
+            // a colour that starts the paragraph, so a hidden line hides its bullet.
+            if (run.color.isValid() && from == bodyStart) {
+                QTextCharFormat marker;
+                marker.setForeground(run.color);
+                scope.mergeBlockCharFormat(marker);
+            }
         }
     }
     cache.insert(key, new std::shared_ptr<QTextDocument>(doc), qMax(1, int((o.text.size()*10+4096)/1024)));

@@ -417,6 +417,7 @@ bool Presenter::activateAt(qreal x, qreal y) {
     const auto c = o.rect.center();
     transform.translate(c.x(), c.y());
     transform.rotate(o.rotation);
+    transform.scale(o.paintScale, o.paintScale);
     transform.translate(-c.x(), -c.y());
     if (!Shape::contains(o, transform.inverted().map(QPointF(x, y))))
       continue;

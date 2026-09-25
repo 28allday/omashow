@@ -20,10 +20,11 @@ void paintObject(QPainter &painter, const SceneObject &object) {
     painter.save();
     painter.setOpacity(object.opacity);
 
-    if (!qFuzzyIsNull(object.rotation)) {
+    if (!qFuzzyIsNull(object.rotation) || !qFuzzyCompare(object.paintScale, 1.0)) {
         const QPointF centre = object.rect.center();
         painter.translate(centre);
         painter.rotate(object.rotation);
+        painter.scale(object.paintScale, object.paintScale);
         painter.translate(-centre);
     }
 

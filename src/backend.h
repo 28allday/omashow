@@ -159,6 +159,10 @@ public:
     qreal time() const { return m_time; }
     qreal duration() const;
     bool playing() const { return m_playing; }
+    // Called by a SlideView as its window starts each frame, so the time a
+    // frame shows is read at the display's own pace rather than whenever the
+    // ticker last fired.
+    void frameTick();
     int slideCount() const { return m_document.slides.size(); }
     int slideIndex() const;
     bool inTransition() const;
@@ -738,6 +742,7 @@ private:
     bool m_playing = false;
     QTimer m_ticker;
     QTimer m_autosave;
+    QElapsedTimer m_frameTicked; // the last frame-paced tick; the ticker stands down while fresh
     QElapsedTimer m_clock;   // monotonic: playback never drifts with timer jitter
     qreal m_playbackRate = 1.0;
     qreal m_playTo = -1.0;
