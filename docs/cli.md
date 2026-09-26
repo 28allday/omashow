@@ -143,8 +143,12 @@ Wherever an operation takes a numbered choice — a shape or chart kind, a
 build's phase, effect, trigger, easing or reveal unit, a transition's kind or
 direction — its name from `omashow ops` works as well as its number, in any
 case and with any spacing: `["kind", "fade-through-black"]`,
-`addShape("star")`, `addChart("Stacked column")`. A name that is not a choice
-is refused with the list of those that are.
+`addShape("star")`, `addChart("Stacked column")`. The same goes for a text box's
+or picture's numbered settings through `setSelectedProperty` — `listStyle`,
+`textAlign`, `verticalAlign`, `textFit`, `direction` and `imageMode` — listed
+under `vocabulary.objectChoices`: `["listStyle", "bullets"]`,
+`["textAlign", "centre"]`. A name that is not a choice is refused with the list
+of those that are.
 
 ## Tables and chart data
 

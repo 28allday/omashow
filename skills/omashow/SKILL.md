@@ -50,8 +50,11 @@ had to be approximated.
 Choices can be given by name: `{"op":"addShape","args":["star"]}`,
 `{"op":"setSlideTransition","args":["kind","zoom"]}`,
 `{"op":"addBuildForSelection","args":["in","fade"]}`,
-`{"op":"setBuildProperty","args":[0,"trigger","onClick"]}`. The names are the
-ones `omashow ops` lists under `vocabulary`.
+`{"op":"setBuildProperty","args":[0,"trigger","onClick"]}`, and a text box's
+numbered settings too: `{"op":"setSelectedProperty","args":["listStyle","bullets"]}`,
+`["textAlign","centre"]`, `["verticalAlign","top"]`, `["textFit","shrink"]`.
+The names are the ones `omashow ops` lists under `vocabulary` (`objectChoices`
+for those).
 
 ## The loop that works
 

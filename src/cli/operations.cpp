@@ -113,6 +113,8 @@ QVector<QMetaMethod> methodsNamed(const QMetaObject *meta, const QString &name) 
 QString folded(const QString &word) {
     QString out;
     for (const QChar c : word) if (c.isLetterOrNumber()) out += c.toLower();
+    // Both spellings of the middle.
+    out.replace(QStringLiteral("center"), QStringLiteral("centre"));
     return out;
 }
 
@@ -140,6 +142,10 @@ QVariantMap choicesFor(const QString &op, int argument, const QVariantList &argu
                                            {QStringLiteral("unit"), QStringLiteral("revealUnits")}};
         if (lists.contains(key(1))) return at(QStringLiteral("builds"), lists.value(key(1)));
     }
+    if (op == QLatin1String("setSelectedProperty") && argument == 1) {
+        const auto list = vocabulary.value(QStringLiteral("objectChoices")).toMap().value(key(0)).toMap();
+        if (!list.isEmpty()) return list;
+    }
     if (op == QLatin1String("setSlideTransition") && argument == 1) {
         if (key(0) == QLatin1String("kind")) return at(QStringLiteral("transitions"), QStringLiteral("kinds"));
         if (key(0) == QLatin1String("direction")) return at(QStringLiteral("transitions"), QStringLiteral("directions"));
@@ -161,7 +167,9 @@ bool resolveNames(const QString &op, QVariantList &arguments, QString *why) {
         const auto wanted = folded(word);
         bool found = false;
         for (auto it = choices.cbegin(); it != choices.cend(); ++it) {
-            if (folded(it.value().toString()) != wanted) continue;
+            // "bullet" finds "bullets": a singular is what people type.
+            const auto name = folded(it.value().toString());
+            if (name != wanted && name != wanted + QLatin1Char('s')) continue;
             arguments[i] = it.key().toInt();
             found = true;
             break;
