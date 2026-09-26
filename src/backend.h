@@ -244,8 +244,7 @@ public:
     Q_INVOKABLE void step(qreal seconds);
 
     // The export path, and what bin/shot drives. Same evaluator, same renderer
-    // as the live view — that identity is the whole architectural bet, and
-    // tst_omashow::exportMatchesTheLiveView holds it to it.
+    // as the live view — that identity is the whole architectural bet.
     Q_INVOKABLE bool renderFrame(qreal time, const QString &path, int width = 1920, bool includeSkipped = false) const;
 
     // --- editing -----------------------------------------------------------

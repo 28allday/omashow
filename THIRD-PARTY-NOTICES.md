@@ -24,18 +24,11 @@ work, each under its own licence.
 Because the FFmpeg build OmaShow links against is GPL-3.0, OmaShow as a whole
 is distributed under GPL-3.0-or-later terms. No "nonfree" component is used.
 
-## Test fixtures
-
-`tests/fixtures/keynote5.key` is `keynote5-file.key` from libetonyek's own test
-data (MPL-2.0), a two-slide Keynote '09 deck; it is read by the tests and
-never shipped in the package.
-
 ## Spelling dictionaries
 
 OmaShow bundles no dictionaries. It reads the Hunspell dictionaries installed on
 the system, each under its own licence, and says so when there are none for the
-language a deck is written in. `tests/fixtures/dictionaries` holds a ten-word
-dictionary written for the tests; it is not a language.
+language a deck is written in.
 
 ## Fonts
 
