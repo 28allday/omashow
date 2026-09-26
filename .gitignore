@@ -11,20 +11,9 @@ moc_*.cpp
 qrc_*.cpp
 .qmake.stash
 Makefile
-
-# Working notes, design sources and local snapshots — never tracked
-*.local.md
-/design-package/
-/.checkpoints/
-*.zip
-*-dev.desktop
-__pycache__/
-
-# The demo film recorder is a private tool, never tracked
-/demo/
-/build-demo/
-/tools/demo-video.sh
 build-asan/
+*.zip
+__pycache__/
 
 # The lock and backup OmaShow keeps beside an open deck
 *.omashow.lock
