@@ -13,8 +13,10 @@ bool Backend::addChart(int kind) {
   o.id = Edit::newId("chart");
   o.chart.kind = kind;
   o.groups = m_groupScope;
+  // A chart needs more height than a table to draw its plot and legend; where
+  // a slide has less free, it takes the middle of the slide to be moved.
   o.rect = roomForContent({m_document.size.width() * .12, m_document.size.height() * .14,
-                           m_document.size.width() * .76, m_document.size.height() * .72});
+                           m_document.size.width() * .76, m_document.size.height() * .72}, .4);
   o.fontSize = m_document.size.height() * .027;
   o.fillToken = "background";
   o.textColorToken = "foreground";

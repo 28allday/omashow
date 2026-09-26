@@ -729,7 +729,8 @@ private:
     QRectF m_gestureBounds;
     // Where a new chart or table belongs on the current slide: the layout's
     // body area if it has one, else the space under the title, else `fallback`.
-    QRectF roomForContent(const QRectF &fallback) const;
+    // Where new content goes; `share` is the least part of the slide height it needs.
+    QRectF roomForContent(const QRectF &fallback, qreal share = .25) const;
     bool m_gestureActive = false;
     int m_gestureDepth = 0;   // nested beginEdit/endEdit pairs
     QVariantList m_gestureBefore;   // the slide's objects when the gesture began

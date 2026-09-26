@@ -9,25 +9,33 @@ TableModel *Backend::tableModel() {
     m_tableModel = new TableModel(this);
   return m_tableModel;
 }
-QRectF Backend::roomForContent(const QRectF &fallback) const {
+QRectF Backend::roomForContent(const QRectF &fallback, qreal share) const {
   if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size())
     return fallback;
   const auto &slide = m_document.slides.at(m_currentSlide);
+  const qreal enough = m_document.size.height() * share;
   // A layout with a body says where content goes, whether or not the body
-  // placeholder is still on the slide.
+  // placeholder is still on the slide — when the body has room for it. A
+  // title slide's "body" is a one-line subtitle: go below it instead.
+  QRectF shortBody;
   if (const auto *layout = Design::layout(m_document, slide.layoutId))
     for (const auto &placeholder : layout->placeholders)
-      if (placeholder.id == QLatin1String("body") && placeholder.rect.isValid())
-        return placeholder.rect;
-  // Otherwise keep clear of the title: the space from under it to the
-  // bottom margin, as wide as the fallback.
+      if (placeholder.id == QLatin1String("body") && placeholder.rect.isValid()) {
+        if (placeholder.rect.height() >= enough)
+          return placeholder.rect;
+        shortBody = placeholder.rect;
+      }
+  // Otherwise keep clear of the title (and a short body under it): the space
+  // from under them to the bottom margin, as wide as the fallback.
   const auto shown = Design::resolve(m_document, m_currentSlide);
   for (const auto &object : shown.objects)
     if (object.placeholderId == QLatin1String("title") && !object.hidden) {
       const qreal margin = m_document.size.height() * .06;
-      const qreal top = object.rect.bottom() + margin * .5;
+      const qreal above = shortBody.isValid() ? qMax(object.rect.bottom(), shortBody.bottom())
+                                              : object.rect.bottom();
+      const qreal top = above + margin * .5;
       const qreal bottom = m_document.size.height() - margin;
-      if (bottom - top > m_document.size.height() * .25)
+      if (bottom - top > enough)
         return QRectF(fallback.left(), top, fallback.width(), bottom - top);
     }
   return fallback;
