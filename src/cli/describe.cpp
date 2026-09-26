@@ -164,8 +164,8 @@ QVariantMap Cli::describeSlide(const Document &d, int index, bool full) {
         objects.append(describeObject(d, *own, object, full));
     }
     QVariantList builds;
-    for (const auto &step : authored.timeline.steps)
-        builds.append(QVariantMap{{QStringLiteral("targetId"), step.targetId},
+    for (const auto &step : authored.timeline.steps) {
+        QVariantMap build{{QStringLiteral("targetId"), step.targetId},
                                   {QStringLiteral("effect"), effectName(step.effect)},
                                   {QStringLiteral("phase"),
                                    step.phase == BuildPhase::In ? QStringLiteral("in")
@@ -174,7 +174,13 @@ QVariantMap Cli::describeSlide(const Document &d, int index, bool full) {
                                   {QStringLiteral("start"), step.start},
                                   {QStringLiteral("duration"), step.duration},
                                   {QStringLiteral("delay"), step.delay},
-                                  {QStringLiteral("pathId"), step.pathId}});
+                                  {QStringLiteral("pathId"), step.pathId}};
+        // What a Reveal counts as one step, always: it is the whole point.
+        if (step.effect == Effect::Reveal)
+            build[QStringLiteral("unit")] = QStringList{QStringLiteral("paragraphs"), QStringLiteral("words"),
+                                                        QStringLiteral("characters")}.value(qBound(0, step.unit, 2));
+        builds.append(build);
+    }
     QString title;
     for (const auto &object : shown.objects)
         if (object.type == ObjectType::Text && !object.text.trimmed().isEmpty() &&

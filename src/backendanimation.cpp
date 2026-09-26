@@ -185,8 +185,16 @@ void Backend::setBuildProperty(int index, const QString &key,
     changed.amountY = number;
   else if (key == "amount" && std::abs(number) <= 100000)
     changed.amount = number;
-  else if (key == "unit" && number >= 0 && number <= 2)
+  else if (key == "unit" && number >= 0 && number <= 2) {
+    // Only Reveal brings text in by paragraph, word or character; on any
+    // other effect the unit would be kept and quietly do nothing.
+    if (changed.effect != Effect::Reveal) {
+      emit failed(tr("Only the Reveal effect brings text in by paragraph, word or character. "
+                     "Set the build's effect to reveal first."));
+      return;
+    }
     changed.unit = value.toInt();
+  }
   else if (key == "easing" && (number == QEasingCurve::Linear ||
                                number == QEasingCurve::OutCubic ||
                                number == QEasingCurve::InOutCubic))

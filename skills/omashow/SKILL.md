@@ -116,6 +116,7 @@ effect number.
 | Words on a shape | `putTextOnShape` with a text box and a shape selected |
 | Design | `applyTheme`, `applyLayout`, `setThemeToken` (a colour or font of the theme) |
 | Movement | `addBuild`, `setBuildProperty`, `setSlideTransition` |
+| Bullets one at a time | `addBuild(id, "in", "reveal")` then `setBuildProperty(i, "unit", "paragraphs")` — only `reveal` takes a unit |
 | Speaker | `setSlideNotes` |
 | Language | `setDeckLanguage`, `teachWord`, `setSmartPunctuation` |
 
