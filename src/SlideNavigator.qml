@@ -104,15 +104,11 @@ FocusScope {
                 objectName: "navigatorMode"; visible: !root.sorter; flat: true
                 // As wide as the longest view it can show, so "Thumbnails" is never
                 // clipped, whatever the language or the desktop's text size.
-                implicitWidth: Math.ceil(Math.max(thumbnailsWidth.advanceWidth, compactWidth.advanceWidth,
-                                                  outlineWidth.advanceWidth, lightTableWidth.advanceWidth))
+                implicitWidth: Math.ceil(model.reduce((widest, label) => Math.max(widest, modeFont.advanceWidth(label)), 0))
                                + leftPadding + rightPadding
                                + (contentItem ? (contentItem.leftPadding ?? 0) + (contentItem.rightPadding ?? 0) : 0)
                 implicitHeight: Theme.hControl
-                TextMetrics { id: thumbnailsWidth; font: modeBox.font; text: qsTr("Thumbnails") }
-                TextMetrics { id: compactWidth; font: modeBox.font; text: qsTr("Compact") }
-                TextMetrics { id: outlineWidth; font: modeBox.font; text: qsTr("Outline") }
-                TextMetrics { id: lightTableWidth; font: modeBox.font; text: qsTr("Light table") }
+                FontMetrics { id: modeFont; font: modeBox.font }
                 // The fourth choice is the light table: every slide at once,
                 // across the whole window, as Keynote's View menu offers it.
                 model: [qsTr("Thumbnails"),qsTr("Compact"),qsTr("Outline"),qsTr("Light table")]; currentIndex: root.mode

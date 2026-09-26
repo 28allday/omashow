@@ -137,8 +137,9 @@ effect number.
   committed. That is deliberate; `setSmartPunctuation false` turns it off.
 - **Dialog operations are refused** (`insertImageDialog` and friends) — use the
   one that takes a path.
-- **Film needs ffmpeg**, packaging needs `--approve-media` before it will read
-  the films a deck links to, and spelling needs a Hunspell dictionary installed
+- **Film needs ffmpeg**, and exports need `--approve-media` before they read
+  the films a deck links to (without it a package leaves them out and pictures
+  show their poster), and spelling needs a Hunspell dictionary installed
   for the deck's language (`omashow review` says which ones exist).
 - **Only approve media for a deck you trust.** `--approve-media` includes a
   linked film only when the file on disk is media and matches what the deck

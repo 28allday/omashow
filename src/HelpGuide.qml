@@ -23,7 +23,12 @@ Sheet {
     property var canVisit: function(key) { return true }
     signal visit(string key)
     property string pendingVisit: ""
-    onClosed: if (pendingVisit !== "") { const key = pendingVisit; pendingVisit = ""; visit(key) }
+    onAboutToShow: pendingVisit = ""
+    onClosed: {
+        const key = pendingVisit
+        pendingVisit = ""
+        if (key !== "" && canVisit(key)) visit(key)
+    }
     signal keysRequested()
 
     function showTopic(key) {

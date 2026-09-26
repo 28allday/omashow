@@ -31,21 +31,26 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
   // dozen lines can ask the renderer for billions of shapes. Record every
   // reference, and the references inside each element that has an id, so the
   // expanded size can be counted before anything is drawn.
-  QStringList openIds, references;
+  // Drawn references are those outside any id'd element (inside one, they are
+  // counted when that element is copied). A reference in a <style> block
+  // can apply to every element, so it is counted once for each of them.
+  QStringList openIds, references, styleReferences;
   QHash<QString, QStringList> inside;
   // How many elements each id'd element holds: a copy of it draws them all.
   QHash<QString, qint64> held;
-  const auto refer = [&](const QString &target) {
+  const auto refer = [&](const QString &target, bool fromStyle) {
     if (target.isEmpty()) return;
-    references.append(target);
+    bool nested = false;
     for (const auto &id : openIds)
-      if (!id.isEmpty()) inside[id].append(target);
+      if (!id.isEmpty()) { inside[id].append(target); nested = true; }
+    if (fromStyle) styleReferences.append(target);
+    else if (!nested) references.append(target);
   };
-  const auto referencesIn = [&](const QString &value) {
+  const auto referencesIn = [&](const QString &value, bool fromStyle) {
     static const QRegularExpression local(
         "url\\s*\\(\\s*['\"]?#([^)'\"\\s]*)", QRegularExpression::CaseInsensitiveOption);
     auto matches = local.globalMatch(value);
-    while (matches.hasNext()) refer(matches.next().captured(1));
+    while (matches.hasNext()) refer(matches.next().captured(1), fromStyle);
   };
   const auto safeCss = [](const QString &value) {
     if (value.contains('\\') || value.contains('@') ||
@@ -99,14 +104,14 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
           return fail("SVG external resources, scripts and animations are "
                       "unsupported.");
         if (name == "href")
-          refer(value.trimmed().mid(1));
-        referencesIn(value);
+          refer(value.trimmed().mid(1), false);
+        referencesIn(value, false);
       }
       if (tag == "style") {
         const auto css = xml.readElementText();
         if (!safeCss(css))
           return fail("SVG styles must be static and self-contained.");
-        referencesIn(css);
+        referencesIn(css, true);
         --depth;
         openIds.removeLast();
       }
@@ -119,35 +124,42 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
     return fail("The SVG XML could not be read.");
   {
     // Everything a reference draws, counted: the element, all it holds, and
-    // whatever its own references draw in turn. Loops and chains deeper than
-    // any real drawing needs are refused outright.
+    // whatever its own references draw in turn — and how deep those
+    // references go. Both are properties of the element alone, so neither
+    // depends on the order the file declares things in. Loops and chains
+    // deeper than any real drawing needs are refused outright.
     constexpr qint64 limit = 100000;
     constexpr int deepest = 256;
-    QHash<QString, qint64> copies;
+    struct Size { qint64 copies; int depth; };
+    QHash<QString, Size> sizes;
     QSet<QString> visiting;
     bool refused = false;
-    std::function<qint64(const QString &, int)> expand = [&](const QString &id, int level) -> qint64 {
-      if (const auto known = copies.constFind(id); known != copies.constEnd())
+    std::function<Size(const QString &, int)> expand = [&](const QString &id, int level) -> Size {
+      if (const auto known = sizes.constFind(id); known != sizes.constEnd())
         return *known;
-      if (level > deepest || visiting.contains(id)) { refused = true; return limit + 1; }
+      if (level > deepest || visiting.contains(id)) { refused = true; return {limit + 1, deepest + 1}; }
       visiting.insert(id);
-      qint64 total = 1 + held.value(id);
+      Size size{1 + held.value(id), 1};
       for (const auto &target : inside.value(id)) {
-        if (total > limit) break;
-        total += expand(target, level + 1);
-        if (refused) break;
+        const Size part = expand(target, level + 1);
+        size.copies = qMin(size.copies + part.copies, limit + 1);
+        size.depth = qMax(size.depth, part.depth + 1);
+        if (refused || size.copies > limit || size.depth > deepest) break;
       }
       visiting.remove(id);
-      total = qMin(total, limit + 1);
-      copies.insert(id, total);
-      return total;
+      sizes.insert(id, size);
+      return size;
     };
     qint64 total = 0;
-    for (const auto &target : references) {
-      total += expand(target, 0);
-      if (refused || total > limit)
-        return fail("This SVG repeats its own parts too many times to draw.");
-    }
+    const auto add = [&](const QString &target, qint64 times) {
+      const Size size = expand(target, 0);
+      if (size.depth > deepest) refused = true;
+      total = qMin(total + size.copies * times, limit + 1);
+    };
+    for (const auto &target : references) add(target, 1);
+    for (const auto &target : styleReferences) add(target, qMax(1, nodes));
+    if (refused || total > limit)
+      return fail("This SVG repeats its own parts too many times to draw.");
   }
   QSvgRenderer renderer;
   renderer.setOptions(QtSvg::DisableAnimations);

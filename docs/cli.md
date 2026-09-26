@@ -214,8 +214,8 @@ not there.
 An existing `--out` file is only replaced with `--force`.
 
 Reading a file the deck links to is the author's decision here as it is in the
-app: packaging leaves linked media out and says so unless `--approve-media` is
-given. Even then a film is included only when the file on disk opens as media
+app: packaging leaves linked media out and says so, and pictures, film and PDF
+show a linked film's poster, unless `--approve-media` is given. Even then a film is included only when the file on disk opens as media
 and matches the one the deck recorded; the answer's `log` names every path it
 approved or refused. A linked table or chart file travels only when its bytes
 still match the ones the table was linked to — refresh the table first if the

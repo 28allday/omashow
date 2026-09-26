@@ -25,14 +25,18 @@ QRectF Backend::roomForContent(const QRectF &fallback, qreal share) const {
           return placeholder.rect;
         shortBody = placeholder.rect;
       }
-  // Otherwise keep clear of the title and of a short body (a subtitle): the
-  // space from under whichever is lower to the bottom margin, as wide as the
-  // fallback. A subtitle counts even when the title has been removed.
-  qreal above = shortBody.isValid() ? shortBody.bottom() : -1;
+  // Otherwise keep clear of the title and of a short body (a subtitle) as they
+  // are on the slide — moved, or gone — : the space from under whichever is
+  // lower to the bottom margin, as wide as the fallback.
+  qreal above = -1;
   const auto shown = Design::resolve(m_document, m_currentSlide);
-  for (const auto &object : shown.objects)
-    if (object.placeholderId == QLatin1String("title") && !object.hidden)
+  for (const auto &object : shown.objects) {
+    if (object.hidden) continue;
+    const bool title = object.placeholderId == QLatin1String("title");
+    const bool subtitle = shortBody.isValid() && object.placeholderId == QLatin1String("body");
+    if (title || subtitle)
       above = qMax(above, object.rect.bottom());
+  }
   if (above >= 0) {
     const qreal margin = m_document.size.height() * .06;
     const qreal top = above + margin * .5;

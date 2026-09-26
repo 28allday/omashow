@@ -50,10 +50,15 @@ QString numbered(const QString &path, int n, int of, const QString &suffix) {
            QString::number(n).rightJustified(width, QLatin1Char('0')) + '.' + suffix;
 }
 
+// The one place a picture export's format becomes a file suffix.
+QString pictureSuffix(const Exports::Request &request) {
+    return request.format == 0 ? QStringLiteral("png") : QStringLiteral("jpg");
+}
+
 // The file one slide's picture goes to: numbered when there are several, and
 // always with the suffix of the format actually written.
 QString pictureFile(const Exports::Request &request, int index, int count, int total) {
-    const QString suffix = request.format == 0 ? QStringLiteral("png") : QStringLiteral("jpg");
+    const QString suffix = pictureSuffix(request);
     const QFileInfo chosen(request.path);
     if (count > 1) return numbered(request.path, index + 1, total, suffix);
     return chosen.suffix().compare(suffix, Qt::CaseInsensitive) == 0
@@ -235,7 +240,7 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
     const QSize size = pixels(document.size, request.width);
 
     if (request.kind == Images) {
-        const QString suffix = request.format == 0 ? QStringLiteral("png") : QStringLiteral("jpg");
+        const QString suffix = pictureSuffix(request);
         for (int n = 0; n < indices.size(); ++n) {
             if (canceled()) return fail(QStringLiteral("Export canceled."));
             const int index = indices.at(n);

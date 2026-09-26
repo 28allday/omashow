@@ -566,14 +566,17 @@ int exportDeck(Backend &backend, const Flags &flags) {
         request.format = format.startsWith(QStringLiteral("png")) ? 0 : 1;
     }
     request.printer = flags.value(QStringLiteral("printer"));
-    // The interface is given a folder that exists because somebody chose it;
-    // here the path is typed, so make the folder it names.
+    // --out names a file; a folder there would give pictures without a name.
+    if (!request.path.isEmpty() && (request.path.endsWith(QLatin1Char('/')) || QFileInfo(request.path).isDir()))
+        return refuse(QStringLiteral("--out names a file, and %1 is a folder; give a file name inside it.").arg(request.path));
     // Every file the export would write, not just the name given: pictures
     // of several slides are numbered, and the suffix follows the format.
     if (!flags.has(QStringLiteral("force")))
         for (const auto &file : Exports::targets(backend.document(), request))
             if (QFileInfo::exists(file))
                 return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(file));
+    // The interface is given a folder that exists because somebody chose it;
+    // here the path is typed, so make the folder it names.
     if (!request.path.isEmpty()) {
         const auto folder = QFileInfo(request.path).absolutePath();
         if (!folder.isEmpty() && !QDir().mkpath(folder))
@@ -584,14 +587,21 @@ int exportDeck(Backend &backend, const Flags &flags) {
 
     // Reading a file the deck links to is the author's decision, here as in the
     // interface — say so on the command line and it is taken.
+    // Pictures, film and PDF draw a linked film's frames once it may be read;
+    // a package copies its bytes. Approval marks each approved film as readable on the
+    // copy being exported, as the window does for its export queue.
     QStringList approvals;
-    // Only a package reads a linked film's bytes; nothing else needs approval.
-    const auto approved = flags.has(QStringLiteral("approve-media")) && request.kind == Exports::Package
+    const auto approved = flags.has(QStringLiteral("approve-media"))
                               ? everythingLinked(backend.document(), &approvals)
                               : QHash<QString, QString>();
+    Document exported = backend.document();
+    for (auto &slide : exported.slides)
+        for (auto &object : slide.objects)
+            if (object.type == ObjectType::Media)
+                object.mediaReadAllowed = approved.value(object.mediaPath) == object.mediaId;
     QElapsedTimer timer;
     timer.start();
-    const auto outcome = Exports::run(backend.document(), request,
+    const auto outcome = Exports::run(exported, request,
                                       std::make_shared<Workers::Job>(),
                                       [](int) {}, approved);
     QVariantMap payload{{QStringLiteral("kind"), kind},
