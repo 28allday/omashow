@@ -2,7 +2,7 @@ pragma Singleton
 
 import QtQuick
 
-// How many sheets are in front of the deck.
+// How many sheets (and menus) are in front of the deck.
 //
 // The shell's own shortcuts stand down while one is open: a sheet that has the
 // keyboard has to keep it, or Escape, Delete and the single letters that insert
