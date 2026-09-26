@@ -63,6 +63,12 @@ Outcome run(const Document &document, const Request &request,
 // so a caller can refuse to replace any that already exist.
 QStringList targets(const Document &document, const Request &request);
 
+// Where a picture export of several slides can go without replacing an
+// earlier one: the path as given, or "name (2).png", "name (3).png"… — the
+// first whose numbered pictures are all new. Other kinds keep their path (the
+// save dialog already asked about that one file).
+QString freePath(const Document &document, const Request &request);
+
 // Whether ffmpeg is here at all, so film can be offered honestly.
 bool encoderAvailable();
 } // namespace Exports

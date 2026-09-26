@@ -96,6 +96,13 @@ int Backend::queueExport(const QVariantMap &options) {
     emit failed(status());
     return -1;
   }
+  // Pictures of several slides are numbered files the save dialog never asked
+  // about: rather than replace an earlier export's, take the next free name.
+  const QString free = Exports::freePath(m_document, request);
+  if (free != request.path) {
+    setStatus(tr("Earlier pictures kept; these are named %1").arg(QFileInfo(free).completeBaseName()));
+    request.path = free;
+  }
   if (m_exports.size() >= 32) {
     setStatus(tr("The export queue is full. Clear what has finished."));
     return -1;

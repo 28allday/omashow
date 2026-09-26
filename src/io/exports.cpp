@@ -77,6 +77,25 @@ QStringList Exports::targets(const Document &document, const Request &request) {
     return files;
 }
 
+QString Exports::freePath(const Document &document, const Request &request) {
+    const auto anyExist = [&document](const Request &r) {
+        const auto files = targets(document, r);
+        if (files.size() < 2) return false;
+        for (const auto &file : files) if (QFileInfo::exists(file)) return true;
+        return false;
+    };
+    if (request.kind != Images || !anyExist(request)) return request.path;
+    const QFileInfo chosen(request.path);
+    const QString suffix = chosen.suffix().isEmpty() ? QString() : QLatin1Char('.') + chosen.suffix();
+    Request next = request;
+    for (int n = 2; n < 1000; ++n) {
+        next.path = chosen.absolutePath() + QLatin1Char('/') + chosen.completeBaseName() +
+                    QStringLiteral(" (%1)").arg(n) + suffix;
+        if (!anyExist(next)) return next.path;
+    }
+    return request.path;
+}
+
 QVariantMap Exports::Request::toMap() const {
     return {{"kind", kind}, {"path", path}, {"includeSkipped", includeSkipped},
             {"stages", stages}, {"layout", layout}, {"perPage", perPage},
