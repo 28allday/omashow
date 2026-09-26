@@ -225,6 +225,8 @@ edges and faint text. Both are your settings and never change the deck.
 
 - Decks are saved as `.omashow` files. Pictures and embedded media are stored
   inside the deck, so moving or deleting the originals can't break it.
+- Double-click a `.omashow`, `.pptx` or `.key` file in the file manager to
+  open it in OmaShow.
 - Each save keeps the previous version next to the deck as `.bak`.
 - If OmaShow closes unexpectedly, it offers to recover your unsaved work the
   next time it opens.
