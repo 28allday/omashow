@@ -25,3 +25,7 @@ __pycache__/
 /build-demo/
 /tools/demo-video.sh
 build-asan/
+
+# The lock and backup OmaShow keeps beside an open deck
+*.omashow.lock
+*.omashow.bak
