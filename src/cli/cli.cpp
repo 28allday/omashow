@@ -296,8 +296,8 @@ QVector<QPair<QString, bool>> skillPlaces() {
     return places;
 }
 
-// The skill is a file in the app; putting it where the agents look is a link the
-// person asks for, never something an install does to their home directory.
+// The skill is a file in the app; putting it where the agents look is a link,
+// made as the person (installing does it for them), never as root.
 int offerSkill(const Flags &flags) {
     const auto folder = skillFolder();
     if (folder.isEmpty())
@@ -319,8 +319,11 @@ int offerSkill(const Flags &flags) {
             rows.append(row);
             continue;
         }
+        // A link to nothing — left by an old copy, or carried over from another
+        // computer — is nobody's work, so it is replaced without asking.
+        const bool dangling = already.isSymLink() && !already.exists();
         if (already.exists() || already.isSymLink()) {
-            if (!flags.has(QStringLiteral("force"))) {
+            if (!dangling && !flags.has(QStringLiteral("force"))) {
                 row[QStringLiteral("note")] =
                     QStringLiteral("something else is there; --force replaces it");
                 trouble.append(QStringLiteral("%1 is already something else").arg(target));
