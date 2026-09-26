@@ -2,8 +2,8 @@
 # Build twice, from scratch, in two different directories, and compare.
 #
 # Same machine, same toolchain, same sources: the binaries should be identical.
-# This is the check behind the claim in docs/release.md — run it before a
-# release and paste what it prints.
+# Run it before a release: identical binaries mean the build is
+# reproducible here.
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
