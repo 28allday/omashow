@@ -22,6 +22,8 @@ Sheet {
     // Whether a part can be opened right now (there is a deck, say).
     property var canVisit: function(key) { return true }
     signal visit(string key)
+    property string pendingVisit: ""
+    onClosed: if (pendingVisit !== "") { const key = pendingVisit; pendingVisit = ""; visit(key) }
     signal keysRequested()
 
     function showTopic(key) {
@@ -245,7 +247,10 @@ Sheet {
                         // Parts that are everywhere, or outside the window, have nowhere to go.
                         visible: ["canvas", "toolbar", "status", "show", "cli"].indexOf(root.topic.key) < 0
                         enabled: root.canVisit(root.topic.key)
-                        onClicked: { const key = root.topic.key; root.close(); root.visit(key) }
+                        // Go once the guide has finished closing: a popup hands the
+                        // keyboard back as it closes, and would take it from the part
+                        // just opened.
+                        onClicked: { root.pendingVisit = root.topic.key; root.close() }
                     }
                     Button {
                         objectName: "helpAllKeys"

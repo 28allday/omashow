@@ -50,7 +50,27 @@ QString numbered(const QString &path, int n, int of, const QString &suffix) {
            QString::number(n).rightJustified(width, QLatin1Char('0')) + '.' + suffix;
 }
 
+// The file one slide's picture goes to: numbered when there are several, and
+// always with the suffix of the format actually written.
+QString pictureFile(const Exports::Request &request, int index, int count, int total) {
+    const QString suffix = request.format == 0 ? QStringLiteral("png") : QStringLiteral("jpg");
+    const QFileInfo chosen(request.path);
+    if (count > 1) return numbered(request.path, index + 1, total, suffix);
+    return chosen.suffix().compare(suffix, Qt::CaseInsensitive) == 0
+               ? request.path
+               : chosen.absolutePath() + '/' + chosen.completeBaseName() + '.' + suffix;
+}
+
 } // namespace
+
+QStringList Exports::targets(const Document &document, const Request &request) {
+    if (request.path.isEmpty()) return {};
+    if (request.kind != Images) return {request.path};
+    const auto indices = slidesIn(document, request);
+    QStringList files;
+    for (int index : indices) files << pictureFile(request, index, indices.size(), document.slides.size());
+    return files;
+}
 
 QVariantMap Exports::Request::toMap() const {
     return {{"kind", kind}, {"path", path}, {"includeSkipped", includeSkipped},
@@ -224,13 +244,7 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
             const QColor background = request.transparent && request.format == 0
                                           ? QColor(Qt::transparent) : resolved.background;
             auto image = SceneRenderer::render(states, document.size, size, background);
-            const QFileInfo chosen(request.path);
-            const QString file =
-                indices.size() > 1
-                    ? numbered(request.path, index + 1, document.slides.size(), suffix)
-                    : chosen.suffix().compare(suffix, Qt::CaseInsensitive) == 0
-                          ? request.path
-                          : chosen.absolutePath() + '/' + chosen.completeBaseName() + '.' + suffix;
+            const QString file = pictureFile(request, index, indices.size(), document.slides.size());
             QImageWriter writer(file, suffix.toUtf8());
             if (request.format == 1) writer.setQuality(92);
             if (!writer.write(image))

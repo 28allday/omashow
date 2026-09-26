@@ -59,6 +59,10 @@ Outcome run(const Document &document, const Request &request,
             const std::function<void(int)> &progress = {},
             const QHash<QString, QString> &approved = {});
 
+// Every file `run` would write for this request (pictures are one per slide),
+// so a caller can refuse to replace any that already exist.
+QStringList targets(const Document &document, const Request &request);
+
 // Whether ffmpeg is here at all, so film can be offered honestly.
 bool encoderAvailable();
 } // namespace Exports

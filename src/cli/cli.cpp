@@ -196,15 +196,22 @@ QHash<QString, QString> everythingLinked(const Document &document, QStringList *
             if (object.type != ObjectType::Media || object.mediaPath.isEmpty() ||
                 approved.contains(object.mediaPath))
                 continue;
+            // The same test as Media preflight in the window (Backend's
+            // approveOnly): the bytes hash to the deck's id, and the size and
+            // time the deck recorded still hold.
             const auto probed = MediaAsset::fromFile(object.mediaPath, false);
-            if (probed.ok() && probed.object.mediaId == object.mediaId) {
+            if (probed.ok() && probed.object.mediaId == object.mediaId &&
+                probed.object.mediaBytes == object.mediaBytes &&
+                probed.object.mediaModified == object.mediaModified) {
                 approved.insert(object.mediaPath, object.mediaId);
                 log->append(QStringLiteral("Approved linked media %1").arg(object.mediaPath));
             } else {
                 log->append(QStringLiteral("Not approved: %1 — %2")
                                 .arg(object.mediaPath,
-                                     probed.ok() ? QStringLiteral("the file is not the one the deck linked")
-                                                 : probed.error));
+                                     !probed.ok() ? probed.error
+                                     : probed.object.mediaId != object.mediaId
+                                         ? QStringLiteral("the file is not the one the deck linked")
+                                         : QStringLiteral("the file's size or date changed; relink it in the app")));
             }
         }
     return approved;
@@ -561,9 +568,12 @@ int exportDeck(Backend &backend, const Flags &flags) {
     request.printer = flags.value(QStringLiteral("printer"));
     // The interface is given a folder that exists because somebody chose it;
     // here the path is typed, so make the folder it names.
-    if (!request.path.isEmpty() && QFileInfo::exists(request.path) &&
-        !flags.has(QStringLiteral("force")))
-        return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(request.path));
+    // Every file the export would write, not just the name given: pictures
+    // of several slides are numbered, and the suffix follows the format.
+    if (!flags.has(QStringLiteral("force")))
+        for (const auto &file : Exports::targets(backend.document(), request))
+            if (QFileInfo::exists(file))
+                return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(file));
     if (!request.path.isEmpty()) {
         const auto folder = QFileInfo(request.path).absolutePath();
         if (!folder.isEmpty() && !QDir().mkpath(folder))
@@ -575,7 +585,8 @@ int exportDeck(Backend &backend, const Flags &flags) {
     // Reading a file the deck links to is the author's decision, here as in the
     // interface — say so on the command line and it is taken.
     QStringList approvals;
-    const auto approved = flags.has(QStringLiteral("approve-media"))
+    // Only a package reads a linked film's bytes; nothing else needs approval.
+    const auto approved = flags.has(QStringLiteral("approve-media")) && request.kind == Exports::Package
                               ? everythingLinked(backend.document(), &approvals)
                               : QHash<QString, QString>();
     QElapsedTimer timer;

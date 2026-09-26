@@ -291,11 +291,6 @@ public:
         sws_setColorspaceDetails(scaler, coefficients,
                                  pixels->color_range == AVCOL_RANGE_JPEG,
                                  coefficients, 1, 0, 1 << 16, 1 << 16);
-        // 8K is the largest film a deck plays; a file claiming more is refused
-        // rather than handed a gigabyte of pixels.
-        if (pixels->width <= 0 || pixels->height <= 0 ||
-            qint64(pixels->width) * pixels->height > 8192LL * 8192)
-          return false;
         image = QImage(pixels->width, pixels->height, QImage::Format_RGBA8888);
         if (image.isNull())
           return false;

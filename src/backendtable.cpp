@@ -25,19 +25,21 @@ QRectF Backend::roomForContent(const QRectF &fallback, qreal share) const {
           return placeholder.rect;
         shortBody = placeholder.rect;
       }
-  // Otherwise keep clear of the title (and a short body under it): the space
-  // from under them to the bottom margin, as wide as the fallback.
+  // Otherwise keep clear of the title and of a short body (a subtitle): the
+  // space from under whichever is lower to the bottom margin, as wide as the
+  // fallback. A subtitle counts even when the title has been removed.
+  qreal above = shortBody.isValid() ? shortBody.bottom() : -1;
   const auto shown = Design::resolve(m_document, m_currentSlide);
   for (const auto &object : shown.objects)
-    if (object.placeholderId == QLatin1String("title") && !object.hidden) {
-      const qreal margin = m_document.size.height() * .06;
-      const qreal above = shortBody.isValid() ? qMax(object.rect.bottom(), shortBody.bottom())
-                                              : object.rect.bottom();
-      const qreal top = above + margin * .5;
-      const qreal bottom = m_document.size.height() - margin;
-      if (bottom - top > enough)
-        return QRectF(fallback.left(), top, fallback.width(), bottom - top);
-    }
+    if (object.placeholderId == QLatin1String("title") && !object.hidden)
+      above = qMax(above, object.rect.bottom());
+  if (above >= 0) {
+    const qreal margin = m_document.size.height() * .06;
+    const qreal top = above + margin * .5;
+    const qreal bottom = m_document.size.height() - margin;
+    if (bottom - top > enough)
+      return QRectF(fallback.left(), top, fallback.width(), bottom - top);
+  }
   return fallback;
 }
 bool Backend::addTable(int rows, int columns) {

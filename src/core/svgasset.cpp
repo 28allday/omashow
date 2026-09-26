@@ -33,6 +33,8 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
   // expanded size can be counted before anything is drawn.
   QStringList openIds, references;
   QHash<QString, QStringList> inside;
+  // How many elements each id'd element holds: a copy of it draws them all.
+  QHash<QString, qint64> held;
   const auto refer = [&](const QString &target) {
     if (target.isEmpty()) return;
     references.append(target);
@@ -85,6 +87,8 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
                         .arg(tag));
       if (++depth > 128 || ++nodes > 10000)
         return fail("This SVG contains too many nested elements.");
+      for (const auto &id : openIds)
+        if (!id.isEmpty()) ++held[id];
       openIds.append(xml.attributes().value("id").toString());
       for (const auto &attribute : xml.attributes()) {
         const auto name = attribute.name().toString().toLower(),
@@ -114,28 +118,34 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
   if (xml.hasError() || !root)
     return fail("The SVG XML could not be read.");
   {
+    // Everything a reference draws, counted: the element, all it holds, and
+    // whatever its own references draw in turn. Loops and chains deeper than
+    // any real drawing needs are refused outright.
     constexpr qint64 limit = 100000;
+    constexpr int deepest = 256;
     QHash<QString, qint64> copies;
     QSet<QString> visiting;
-    bool loop = false;
-    std::function<qint64(const QString &)> expand = [&](const QString &id) -> qint64 {
+    bool refused = false;
+    std::function<qint64(const QString &, int)> expand = [&](const QString &id, int level) -> qint64 {
       if (const auto known = copies.constFind(id); known != copies.constEnd())
         return *known;
-      if (visiting.contains(id)) { loop = true; return limit + 1; }
+      if (level > deepest || visiting.contains(id)) { refused = true; return limit + 1; }
       visiting.insert(id);
-      qint64 total = 1;
+      qint64 total = 1 + held.value(id);
       for (const auto &target : inside.value(id)) {
-        total += expand(target);
-        if (loop || total > limit) { total = limit + 1; break; }
+        if (total > limit) break;
+        total += expand(target, level + 1);
+        if (refused) break;
       }
       visiting.remove(id);
+      total = qMin(total, limit + 1);
       copies.insert(id, total);
       return total;
     };
     qint64 total = 0;
     for (const auto &target : references) {
-      total += expand(target);
-      if (loop || total > limit)
+      total += expand(target, 0);
+      if (refused || total > limit)
         return fail("This SVG repeats its own parts too many times to draw.");
     }
   }
