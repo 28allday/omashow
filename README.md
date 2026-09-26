@@ -68,8 +68,18 @@ Some tasks open in their own room: editing masters and layouts, Review,
 presenter setup and the light table. Press **Done** or Escape to go back to
 your slide.
 
-Press **F1** for the built-in guide to every part of the window, and
-**Ctrl+K** to find any command by name.
+### Getting help
+
+Help is built in, so you don't need this page open while you work:
+
+- **The OmaShow guide** (**F1**, or Help ▸ OmaShow guide) lists every part of
+  the window. Pick one to see what it's for, where to find it and what you can
+  do there. **Take me there** opens that part for you.
+- **Keyboard shortcuts** (**?**, or Help ▸ Keyboard shortcuts) lists every key,
+  including the ones for presenting.
+- **Find a command** (**Ctrl+K**) finds any command by what you want to do:
+  type "graph" and it offers a chart.
+- Hover over any button to see what it does and its key.
 
 ## What you can do
 
