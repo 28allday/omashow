@@ -43,8 +43,8 @@ package() {
     [ -e "$example" ] || continue
     /usr/bin/install -Dm644 "$example" "$pkgdir/usr/share/omashow/examples/$(basename "$example")"
   done
-  # The skill file travels with the app, but a package must not write into
-  # anybody's home: `omashow skill --link` is what puts it in place.
+  # The skill file travels with the app. Installing links it for the person who
+  # ran sudo (see omashow.install); the copy here is what those links point at.
   /usr/bin/install -Dm644 skills/omashow/SKILL.md \
     "$pkgdir/usr/share/omashow/skills/omashow/SKILL.md"
 }

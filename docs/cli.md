@@ -238,8 +238,10 @@ installed; `dictionaries` says which ones this computer has.
 
 `skills/omashow/SKILL.md` is an agent skill for this command line — the working
 loop, the operations worth knowing and the things that bite. It ships with the
-app, packaged to `/usr/share/omashow/skills/`, but installing OmaShow does not
-put anything in your home directory. Ask for it:
+app, packaged to `/usr/share/omashow/skills/`, and linking it is part of
+installing OmaShow: a skill nobody links is a skill nobody uses. `./bin/install`
+does it as you, and a package install does it for whoever ran sudo, never as
+root. It is this command either way, and it is worth knowing:
 
 ```sh
 $ omashow skill          # where it is, and which agents have it

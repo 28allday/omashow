@@ -28,6 +28,10 @@ The first install takes a few minutes, because OmaShow is built on your
 computer. When it finishes, open OmaShow from the app launcher: press
 **Super + Space** and type **OmaShow**.
 
+Installing also links OmaShow's skill for the coding agents on this computer, so
+Claude and the others can build, check and export decks for you from the command
+line. They pick it up in a new session. `omashow skill` says where it went.
+
 ### Updating
 
 ```sh

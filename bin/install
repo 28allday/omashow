@@ -32,4 +32,18 @@ if ! pacman -T hunspell-dictionary >/dev/null 2>&1; then
 fi
 
 cd "$PKGBUILD_DIR"
-exec makepkg -fsi "$@"
+makepkg -fsi "$@"
+
+# Linking the agent skill is part of installing OmaShow: the skill is how a
+# coding agent knows the command line exists, and one left in /usr/share is one
+# nobody uses. The package cannot do it, because pacman runs as root and must
+# not write into a home directory; this script runs as the person, so it does.
+if command -v omashow >/dev/null 2>&1; then
+  echo
+  if omashow skill --link; then
+    echo "Your coding agents will find OmaShow's skill in a new session."
+  else
+    echo "OmaShow is installed, but its skill was not linked." >&2
+    echo "Put it in place with: omashow skill --link" >&2
+  fi
+fi

@@ -1,7 +1,54 @@
-post_install() {
+caches() {
   gtk-update-icon-cache -q -t -f usr/share/icons/hicolor >/dev/null 2>&1 || true
   update-mime-database usr/share/mime >/dev/null 2>&1 || true
   update-desktop-database -q >/dev/null 2>&1 || true
+}
+
+# A scriptlet runs as root, so the person being installed for comes from sudo,
+# which is how an Omarchy machine installs anything. Nothing is linked when that
+# is not known: a package guessing at a home directory would be worse than
+# saying the command.
+person() {
+  [ -n "${SUDO_USER-}" ] && [ "$SUDO_USER" != root ] || return 1
+  printf '%s\n' "$SUDO_USER"
+}
+
+# The skill is how a coding agent knows OmaShow's command line exists, so it is
+# linked as part of installing, not left for somebody to ask for. The link is
+# made as the person, never as root, so it belongs to them.
+link_skill() {
+  who="$(person)" || {
+    echo "OmaShow ships a skill for coding agents: omashow skill --link"
+    return 0
+  }
+  if command -v runuser >/dev/null 2>&1 &&
+     runuser -u "$who" -- omashow skill --link >/dev/null 2>&1; then
+    echo "OmaShow's skill is linked for $who's coding agents; they see it in a new session."
+  else
+    echo "OmaShow ships a skill for coding agents: omashow skill --link"
+  fi
+}
+
+# Those links are not in the package's file list, so removing OmaShow has to
+# take them away itself — and only the ones pointing at what was just removed.
+unlink_skill() {
+  who="$(person)" || return 0
+  home="$(getent passwd "$who" | cut -d: -f6)"
+  [ -n "$home" ] || return 0
+  for place in "$home/.agents/skills" "$home/.claude/skills" "$home/.codex/skills" \
+               "$home/.pi/agent/skills" "$home/.hermes/skills" \
+               "$home"/.hermes/profiles/*/skills; do
+    link="$place/omashow"
+    if [ -L "$link" ] &&
+       [ "$(readlink "$link")" = /usr/share/omashow/skills/omashow ]; then
+      rm -f "$link"
+    fi
+  done
+}
+
+post_install() {
+  caches
+  link_skill
 }
 
 post_upgrade() {
@@ -9,5 +56,6 @@ post_upgrade() {
 }
 
 post_remove() {
-  post_install
+  caches
+  unlink_skill
 }
