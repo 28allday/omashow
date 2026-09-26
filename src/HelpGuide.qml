@@ -139,6 +139,15 @@ Sheet {
           reach: qsTr("Ctrl+K · View ▸ Find a command…"),
           points: [qsTr("Search by name or by what it is for: \"graph\" finds Chart."),
                    qsTr("↑ and ↓ choose, Enter runs it.")] },
+        { key: "cli", icon: "square-terminal", name: qsTr("Command line"),
+          summary: qsTr("Make, change and export decks from a terminal, without opening a window."),
+          reach: qsTr("Any terminal · omashow help lists every command"),
+          points: [qsTr("omashow new talk.omashow makes a deck; omashow import brings in PowerPoint or Keynote."),
+                   qsTr("inspect lists every slide and the id of each object on it."),
+                   qsTr("apply runs a JSON list of changes: the operations the window uses, by the same names."),
+                   qsTr("export writes a PDF, pictures, a film, a package or a PowerPoint deck."),
+                   qsTr("review reports what Review finds; ops lists every change apply can make."),
+                   qsTr("Every command answers in JSON, and never replaces a file without --force.")] },
         { key: "status", icon: "info", name: qsTr("Status and messages"),
           summary: qsTr("What the deck is doing, along the bottom and above the slide."),
           reach: qsTr("Bottom of the window, and a bar above the slide when needed"),
@@ -233,8 +242,8 @@ Sheet {
                         objectName: "helpTakeMeThere"
                         text: qsTr("Take me there")
                         icon.name: "arrow-right"
-                        visible: root.topic.key !== "canvas" && root.topic.key !== "toolbar" &&
-                                 root.topic.key !== "status" && root.topic.key !== "show"
+                        // Parts that are everywhere, or outside the window, have nowhere to go.
+                        visible: ["canvas", "toolbar", "status", "show", "cli"].indexOf(root.topic.key) < 0
                         enabled: root.canVisit(root.topic.key)
                         onClicked: { const key = root.topic.key; root.close(); root.visit(key) }
                     }

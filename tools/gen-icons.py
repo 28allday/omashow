@@ -25,6 +25,8 @@ attribute = re.compile(r'"?([\w-]+)"?\s*:\s*"([^"]*)"')
 shapes = {}
 for name in sorted(set(names)):
     f = icons / f"{name}.js"
+    if not f.is_file():  # newer lucide releases ship .mjs
+        f = icons / f"{name}.mjs"
     if not f.is_file():
         sys.exit(f"{name}: not in {icons}")
     body = f.read_text()

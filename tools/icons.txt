@@ -31,3 +31,5 @@ file-text file-image file-play file-output diamond
 
 # maths
 sigma
+# the guide's command-line topic
+square-terminal

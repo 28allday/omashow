@@ -12,9 +12,10 @@ here, under the same name.
 
 ```
 omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N] [--force]
+omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
 omashow inspect <file> [--slide N] [--full]
 omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going] [--force]
-omashow export <file> --kind pdf|images|video|package|print --out <path> [...]
+omashow export <file> --kind pdf|images|video|package|print|pptx --out <path> [...]
 omashow review <file> [--include-dismissed]
 omashow ops [--filter <text>]
 omashow help
