@@ -345,7 +345,7 @@ Rectangle {
                                        ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Black the audience screen  B") }
                             ToolTile { icon.name: "sun"; text: qsTr("White"); checkable: true; checked: presenter.blankMode === 2; enabled: presenter.running
                                        onClicked: presenter.blankMode = checked ? 2 : 0
-                                       ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("White the audience screen") }
+                                       ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("White the audience screen  W") }
                             ToolTile { icon.name: "snowflake"; text: presenter.frozen ? qsTr("Frozen") : qsTr("Freeze"); checkable: true; checked: presenter.frozen; enabled: presenter.running
                                        onClicked: presenter.frozen = checked
                                        ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Hold the audience view while you move on  F") }
@@ -371,7 +371,8 @@ Rectangle {
                             visible: presenter.ink.length > 0
                             spacing: Theme.s2
                             Button { objectName: "inkUndo"; Layout.fillWidth: true; text: qsTr("Undo the last line"); onClicked: presenter.undoInk() }
-                            Button { objectName: "inkClear"; Layout.fillWidth: true; text: qsTr("Clear"); onClicked: presenter.clearInk() }
+                            Button { objectName: "inkClear"; Layout.fillWidth: true; text: qsTr("Clear"); onClicked: presenter.clearInk()
+                                     ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Clear the drawing  E") }
                             Button { objectName: "inkKeep"; Layout.fillWidth: true; text: qsTr("Keep on the slide"); onClicked: presenter.keepInkOnSlide() }
                         }
                         Label {

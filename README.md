@@ -68,7 +68,8 @@ Some tasks open in their own room: editing masters and layouts, Review,
 presenter setup and the light table. Press **Done** or Escape to go back to
 your slide.
 
-Press **Ctrl+K** to find any command by name.
+Press **F1** for the built-in guide to every part of the window, and
+**Ctrl+K** to find any command by name.
 
 ## What you can do
 
@@ -196,6 +197,7 @@ edges and faint text. Both are your settings and never change the deck.
 
 | Key | Action |
 | --- | --- |
+| `F1` | The OmaShow guide |
 | `Ctrl+K` | Find a command |
 | `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` | Open / Save / Save as |
 | `Ctrl+Shift+N` | Start centre |
@@ -219,6 +221,7 @@ edges and faint text. Both are your settings and never change the deck.
 | `Space` / `→` / `Page Down` | Next build or slide |
 | `←` / `Page Up` | Previous build or slide |
 | `B` / `W` / `F` | Black screen / white screen / freeze |
+| `P` / `S` / `D` / `E` | Pointer / spotlight / draw / clear the drawing |
 | `Escape` | End the show, or leave a room |
 
 ## Your files

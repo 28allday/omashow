@@ -41,5 +41,11 @@ ApplicationWindow {
     Shortcut { sequences: ["Left", "PgUp"]; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.previous() }
     Shortcut { sequence: "B"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.blankMode = presenter.blankMode === 1 ? 0 : 1 }
     Shortcut { sequence: "F"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.frozen = !presenter.frozen }
+    // The same keys as the audience window: the presenter's keyboard is usually here.
+    Shortcut { sequence: "W"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.blankMode = presenter.blankMode === 2 ? 0 : 2 }
+    Shortcut { sequence: "P"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.annotation = presenter.annotation === 1 ? 0 : 1 }
+    Shortcut { sequence: "S"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.annotation = presenter.annotation === 2 ? 0 : 2 }
+    Shortcut { sequence: "D"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.annotation = presenter.annotation === 3 ? 0 : 3 }
+    Shortcut { sequence: "E"; context: Qt.WindowShortcut; enabled: !externalLink.visible; onActivated: presenter.clearInk() }
     onClosing: event => { if (presenter.running) { event.accepted = false; presenter.stop() } }
 }

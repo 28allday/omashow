@@ -185,6 +185,7 @@ ApplicationWindow {
                onActivated: backend.togglePlay() }
     Shortcut { sequence: "F5"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible; onActivated: win.startShow() }
     Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: helpSheet.open() }
+    Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running; onActivated: { win.commitEditors(); helpGuide.open() } }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; enabled: !presenter.running; onActivated: win.close() }
 
     Shortcut { sequences: ["Ctrl++", "Ctrl+="]; enabled: !win.dialogOpen && win.editing && !presenter.running && !win.textEntryFocused; onActivated: editCanvas.zoomBy(1.25) }
@@ -298,8 +299,37 @@ ApplicationWindow {
             { group: qsTr("View"), name: qsTr("Snap to guides"), also: "align magnet", run: () => backend.snapEnabled = !backend.snapEnabled },
             { group: qsTr("View"), name: backend.reducedMotion ? qsTr("Allow movement again") : qsTr("Less movement"), also: "reduced motion animation accessibility vestibular", run: () => backend.reducedMotion = !backend.reducedMotion },
             { group: qsTr("View"), name: backend.highContrast ? qsTr("Ordinary contrast") : qsTr("Stronger contrast"), also: "high contrast accessibility legible", run: () => backend.highContrast = !backend.highContrast },
+            { group: qsTr("Help"), name: qsTr("OmaShow guide"), also: "help manual explain how what does sections parts", shortcut: "F1", run: () => helpGuide.open() },
             { group: qsTr("Help"), name: qsTr("Keyboard shortcuts"), also: "keys help", shortcut: "?", run: () => helpSheet.open() }
         ]
+    }
+    // Where the guide's "Take me there" goes. Most parts need a deck open.
+    function canVisitHelp(key) {
+        return key === "start" || key === "commands" || !backend.startVisible
+    }
+    function visitHelp(key) {
+        win.commitEditors()
+        switch (key) {
+        case "start": backend.showStart(); break
+        case "slides": win.workspace = 0; win.navigatorCollapsed = false; slideNavigator.forceActiveFocus(); break
+        case "format": win.chooseSidebar(0); break
+        case "animate": win.chooseSidebar(1); break
+        case "document": win.chooseSidebar(2); break
+        case "notes": win.workspace = 0; win.notesOpen = true; break
+        case "masters": win.workspace = 1; break
+        case "lighttable": win.workspace = 6; slideSorter.focusBrowser(); break
+        case "review": win.workspace = 3; break
+        case "setup": win.workspace = 4; break
+        case "export": win.showExport(); break
+        case "media": mediaPreflight.open(); break
+        case "commands": commandPalette.show(); break
+        }
+    }
+    HelpGuide {
+        id: helpGuide
+        canVisit: win.canVisitHelp
+        onVisit: (key) => win.visitHelp(key)
+        onKeysRequested: helpSheet.open()
     }
     Shortcut { sequence: "Ctrl+K"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running
                onActivated: { win.commitEditors(); commandPalette.show() } }
@@ -592,6 +622,7 @@ ApplicationWindow {
                     }
                     Menu {
                         title: qsTr("Help")
+                        MenuItem { objectName: "helpGuideMenuItem"; text: qsTr("OmaShow guide"); icon.name: "info"; onTriggered: { win.commitEditors(); helpGuide.open() } }
                         MenuItem { text: qsTr("Keyboard shortcuts"); icon.name: "keyboard"; onTriggered: helpSheet.open() }
                     }
                 }
@@ -1258,36 +1289,49 @@ ApplicationWindow {
         anchors.centerIn: parent
         standardButtons: Dialog.Close
 
-        ColumnLayout {
-            spacing: Theme.s1
+        GridLayout {
+            columns: 2
+            columnSpacing: Theme.s5
+            rowSpacing: Theme.s1
             Repeater {
                 model: [
+                    qsTr("F1 — the OmaShow guide"),
+                    qsTr("Ctrl+K — find a command"),
                     qsTr("Ctrl+O / Ctrl+S — open / save"),
                     qsTr("Ctrl+Shift+S — save as"),
                     qsTr("Ctrl+Shift+N — Start centre"),
                     qsTr("Ctrl+E — export PDF"),
+                    qsTr("Ctrl+Z / Ctrl+Shift+Z — undo / redo"),
+                    qsTr("Ctrl+Q — quit"),
                     qsTr("Double-click text — edit it on the slide"),
                     qsTr("T / S — add text / shape"),
                     qsTr("Delete — remove the selected object"),
                     qsTr("Arrows — nudge (step time in Animate)"),
-                    qsTr("Ctrl+N — new slide"),
+                    qsTr("Shift+click — add to the selection"),
+                    qsTr("Alt+click — select the object behind"),
+                    qsTr("Ctrl+A — select everything on the slide"),
+                    qsTr("Ctrl+G / Ctrl+Shift+G — group / ungroup"),
+                    qsTr("Enter — step inside a group, Escape leaves"),
                     qsTr("Ctrl+D — duplicate selected objects or slide"),
                     qsTr("Ctrl+C / Ctrl+X / Ctrl+V — copy / cut / paste"),
+                    qsTr("Rotation handle · Shift snaps to 15°"),
                     qsTr("Ctrl++ / Ctrl+- — zoom in / out"),
                     qsTr("Ctrl+0 / Ctrl+1 — fit slide / 100%"),
                     qsTr("Ctrl+Shift+0 — fit selection"),
-                    qsTr("Rotation handle · Shift snaps to 15°"),
+                    qsTr("Ctrl+wheel — zoom; middle drag or wheel — pan"),
+                    qsTr("Ctrl+N — new slide"),
+                    qsTr("PgUp / PgDn — previous / next slide"),
+                    qsTr("Ctrl+Shift+↑ / ↓ — move the selected slides"),
                     qsTr("Slides: Shift range, Ctrl toggle, Ctrl+A all"),
-                    qsTr("Slides: Ctrl+D duplicate, Delete remove"),
+                    qsTr("Slides: Ctrl+D duplicate, Delete remove, Enter edit"),
                     qsTr("Sections: Ctrl+← / Ctrl+→ collapse / expand"),
                     qsTr("Sections: Ctrl+Alt+↑ / ↓ move section"),
-                    qsTr("Ctrl+wheel — zoom; middle drag or wheel — pan"),
-                    qsTr("PgUp / PgDn — previous / next slide"),
-                    qsTr("Ctrl+Z / Ctrl+Shift+Z — undo / redo"),
-                    qsTr("F5 — start the show, Escape leaves"),
-                    qsTr("Space — play / pause in Animate"),
-                    qsTr("Escape — leave masters, review, presenter setup or the light table"),
-                    qsTr("Ctrl+Q — quit")
+                    qsTr("Space — play / pause in Animate and Presenter setup"),
+                    qsTr("Escape — cancel a crop or the pen, or leave a room"),
+                    qsTr("F5 — start the show"),
+                    qsTr("Show: Space, → or PgDn — next; ←, PgUp — back"),
+                    qsTr("Show: B black, W white, F freeze, Escape ends"),
+                    qsTr("Show: P pointer, S spotlight, D draw, E clear ink")
                 ]
                 Label {
                     required property string modelData
