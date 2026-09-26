@@ -2,10 +2,12 @@
 #include "core/imageasset.h"
 #include <QPainter>
 #include <QRegularExpression>
+#include <QHash>
 #include <QSet>
 #include <QSvgRenderer>
 #include <QXmlStreamReader>
 #include <cmath>
+#include <functional>
 
 bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
                       QString *error) {
@@ -25,6 +27,24 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
   QXmlStreamReader xml(bytes);
   int depth = 0, nodes = 0;
   bool root = false;
+  // <use> and url(#…) copy other elements, and a copy can hold copies: a few
+  // dozen lines can ask the renderer for billions of shapes. Record every
+  // reference, and the references inside each element that has an id, so the
+  // expanded size can be counted before anything is drawn.
+  QStringList openIds, references;
+  QHash<QString, QStringList> inside;
+  const auto refer = [&](const QString &target) {
+    if (target.isEmpty()) return;
+    references.append(target);
+    for (const auto &id : openIds)
+      if (!id.isEmpty()) inside[id].append(target);
+  };
+  const auto referencesIn = [&](const QString &value) {
+    static const QRegularExpression local(
+        "url\\s*\\(\\s*['\"]?#([^)'\"\\s]*)", QRegularExpression::CaseInsensitiveOption);
+    auto matches = local.globalMatch(value);
+    while (matches.hasNext()) refer(matches.next().captured(1));
+  };
   const auto safeCss = [](const QString &value) {
     if (value.contains('\\') || value.contains('@') ||
         value.contains("animation", Qt::CaseInsensitive))
@@ -65,6 +85,7 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
                         .arg(tag));
       if (++depth > 128 || ++nodes > 10000)
         return fail("This SVG contains too many nested elements.");
+      openIds.append(xml.attributes().value("id").toString());
       for (const auto &attribute : xml.attributes()) {
         const auto name = attribute.name().toString().toLower(),
                    value = attribute.value().toString();
@@ -73,17 +94,51 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
             !safeCss(value))
           return fail("SVG external resources, scripts and animations are "
                       "unsupported.");
+        if (name == "href")
+          refer(value.trimmed().mid(1));
+        referencesIn(value);
       }
       if (tag == "style") {
-        if (!safeCss(xml.readElementText()))
+        const auto css = xml.readElementText();
+        if (!safeCss(css))
           return fail("SVG styles must be static and self-contained.");
+        referencesIn(css);
         --depth;
+        openIds.removeLast();
       }
-    } else if (token == QXmlStreamReader::EndElement)
+    } else if (token == QXmlStreamReader::EndElement) {
       --depth;
+      if (!openIds.isEmpty()) openIds.removeLast();
+    }
   }
   if (xml.hasError() || !root)
     return fail("The SVG XML could not be read.");
+  {
+    constexpr qint64 limit = 100000;
+    QHash<QString, qint64> copies;
+    QSet<QString> visiting;
+    bool loop = false;
+    std::function<qint64(const QString &)> expand = [&](const QString &id) -> qint64 {
+      if (const auto known = copies.constFind(id); known != copies.constEnd())
+        return *known;
+      if (visiting.contains(id)) { loop = true; return limit + 1; }
+      visiting.insert(id);
+      qint64 total = 1;
+      for (const auto &target : inside.value(id)) {
+        total += expand(target);
+        if (loop || total > limit) { total = limit + 1; break; }
+      }
+      visiting.remove(id);
+      copies.insert(id, total);
+      return total;
+    };
+    qint64 total = 0;
+    for (const auto &target : references) {
+      total += expand(target);
+      if (loop || total > limit)
+        return fail("This SVG repeats its own parts too many times to draw.");
+    }
+  }
   QSvgRenderer renderer;
   renderer.setOptions(QtSvg::DisableAnimations);
   if (!renderer.load(bytes) || !renderer.isValid() || renderer.animated())

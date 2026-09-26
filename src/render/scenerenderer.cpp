@@ -60,6 +60,10 @@ void SceneRenderer::paint(QPainter &painter, const QVector<SceneObject> &states)
 
 QImage SceneRenderer::render(const QVector<SceneObject> &states, const QSizeF &documentSize,
                              const QSize &pixelSize, const QColor &background) {
+    // A deck's shape decides the pixel size; never let one ask for more
+    // memory than a 16K picture. Callers treat a null image as a failure.
+    if (pixelSize.isEmpty() || qint64(pixelSize.width()) * pixelSize.height() > kMaxPixels)
+        return QImage();
     QImage image(pixelSize, QImage::Format_RGBA8888);
     image.fill(background);
 

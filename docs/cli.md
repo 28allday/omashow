@@ -11,9 +11,9 @@ backend what it can do. Anything a person can do in the app, a script can do
 here, under the same name.
 
 ```
-omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N]
+omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N] [--force]
 omashow inspect <file> [--slide N] [--full]
-omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
+omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going] [--force]
 omashow export <file> --kind pdf|images|video|package|print --out <path> [...]
 omashow review <file> [--include-dismissed]
 omashow ops [--filter <text>]
@@ -206,9 +206,15 @@ the deck skips, `--per-page` sets handout sheets and `--layout` is `slides`,
 `notes`, `outline` or `handout`. The folder named by `--out` is created if it is
 not there.
 
+An existing `--out` file is only replaced with `--force`.
+
 Reading a file the deck links to is the author's decision here as it is in the
 app: packaging leaves linked media out and says so unless `--approve-media` is
-given.
+given. Even then a film is included only when the file on disk opens as media
+and matches the one the deck recorded; the answer's `log` names every path it
+approved or refused. A linked table or chart file travels only when its bytes
+still match the ones the table was linked to — refresh the table first if the
+file has changed.
 
 ## Reviewing
 

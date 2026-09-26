@@ -408,7 +408,10 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
 
     if (!std::isfinite(document.size.width()) || !std::isfinite(document.size.height()) ||
         document.size.width()<=0 || document.size.height()<=0 ||
-        document.size.width()>100000 || document.size.height()>100000) {
+        document.size.width()>100000 || document.size.height()>100000 ||
+        document.size.width()<1 || document.size.height()<1 ||
+        document.size.width()>64*document.size.height() ||
+        document.size.height()>64*document.size.width()) {
         result.error=QStringLiteral("The deck has invalid dimensions."); return result;
     }
     if (version >= 2) {

@@ -7,7 +7,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-WORK="${TMPDIR:-/tmp}/omashow-reproduce-$$"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/omashow-reproduce.XXXXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 if command -v qmake6 >/dev/null 2>&1; then QMAKE=qmake6; else QMAKE=qmake; fi

@@ -21,6 +21,10 @@ namespace SceneRenderer {
 // Paints into a painter already scaled so that one unit == one document unit.
 void paint(QPainter &painter, const QVector<SceneObject> &states);
 
+// The most pixels one render may ask for: a 16K picture (16384 x 8192).
+constexpr qint64 kMaxPixels = 16384LL * 8192;
+
+// Returns a null image when pixelSize is empty or larger than kMaxPixels.
 QImage render(const QVector<SceneObject> &states, const QSizeF &documentSize,
               const QSize &pixelSize, const QColor &background);
 

@@ -179,6 +179,7 @@ LinkedData::File LinkedData::read(const QString &path) {
     return result;
   }
   result.path = QFileInfo(path).canonicalFilePath();
+  result.bytes = bytes;
   result.hash = QString::fromLatin1(
       QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
   return result;

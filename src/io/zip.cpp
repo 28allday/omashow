@@ -56,7 +56,8 @@ QByteArray inflateRaw(const QByteArray &input, quint32 expectedSize) {
 
     const int result = inflate(&stream, Z_FINISH);
     inflateEnd(&stream);
-    if (result != Z_STREAM_END)
+    // A stream that ends early would leave the tail of out unwritten.
+    if (result != Z_STREAM_END || stream.total_out != expectedSize)
         return QByteArray();
     return out;
 }

@@ -1,4 +1,5 @@
 #include "io/packagedeck.h"
+#include "core/datasource.h"
 #include "core/design.h"
 #include "core/mediaasset.h"
 #include "io/bundle.h"
@@ -54,25 +55,43 @@ Package::Report Package::write(const Document &document, const QString &path,
                                                                     : object.dataSource.path;
             if (linked.isEmpty()) continue;
             const QFileInfo info(linked);
-            const bool readable = info.isReadable() && info.isFile();
-            const bool allowed = object.type != ObjectType::Media ||
-                                 approved.value(linked) == object.mediaId;
-            if (!readable) {
-                left.append(QStringLiteral("%1 — the file is not there any more")
-                                .arg(info.fileName()));
-                continue;
+            QByteArray bytes;
+            if (object.type == ObjectType::Media) {
+                const bool readable = info.isReadable() && info.isFile();
+                const bool allowed = approved.value(linked) == object.mediaId;
+                if (!readable) {
+                    left.append(QStringLiteral("%1 — the file is not there any more")
+                                    .arg(info.fileName()));
+                    continue;
+                }
+                if (!allowed) {
+                    left.append(QStringLiteral("%1 — approve it in Media preflight to include it")
+                                    .arg(info.fileName()));
+                    continue;
+                }
+                QFile source(linked);
+                if (!source.open(QIODevice::ReadOnly)) {
+                    left.append(QStringLiteral("%1 — %2").arg(info.fileName(), source.errorString()));
+                    continue;
+                }
+                bytes = source.readAll();
+            } else {
+                // A deck names its own data files, so a deck from someone else
+                // could name any file here. Only the exact file the table was
+                // linked to travels: same bytes as the hash the deck recorded.
+                const auto file = LinkedData::read(linked);
+                if (!file.error.isEmpty()) {
+                    left.append(QStringLiteral("%1 — %2").arg(info.fileName(), file.error));
+                    continue;
+                }
+                if (file.hash != object.dataSource.fileHash) {
+                    left.append(QStringLiteral("%1 — the file changed since it was linked; "
+                                               "refresh the table to include it")
+                                    .arg(info.fileName()));
+                    continue;
+                }
+                bytes = file.bytes;
             }
-            if (!allowed) {
-                left.append(QStringLiteral("%1 — approve it in Media preflight to include it")
-                                .arg(info.fileName()));
-                continue;
-            }
-            QFile source(linked);
-            if (!source.open(QIODevice::ReadOnly)) {
-                left.append(QStringLiteral("%1 — %2").arg(info.fileName(), source.errorString()));
-                continue;
-            }
-            const QByteArray bytes = source.readAll();
             assetBytes += bytes.size();
             const QString name = uniqueName(info.fileName(), names);
             entries.append({QStringLiteral("assets/") + name, bytes, false});

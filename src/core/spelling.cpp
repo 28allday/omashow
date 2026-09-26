@@ -37,7 +37,10 @@ QHash<QString, std::shared_ptr<Loaded>> &loaded() {
 QString tidyLanguage(const QString &language) {
     QString tidy = language.trimmed();
     tidy.replace('-', '_');
-    return tidy;
+    // The language comes from the deck; it names a file, so it must look like
+    // a language tag and nothing else ("en_GB", "de", "sr_Latn_RS").
+    static const QRegularExpression tag(QStringLiteral("^[A-Za-z]{2,3}(_[A-Za-z0-9]{2,8}){0,3}$"));
+    return tag.match(tidy).hasMatch() ? tidy : QString();
 }
 
 std::shared_ptr<Loaded> open(const QString &language) {

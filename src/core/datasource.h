@@ -18,6 +18,7 @@ TableData replace(const TableData &table, const QVector<QStringList> &rows,
                   bool chart);
 struct File {
   QString text, path, name, hash, error;
+  QByteArray bytes;
 };
 File read(const QString &path);
 } // namespace LinkedData

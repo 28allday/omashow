@@ -4,6 +4,7 @@
 #include "cli/describe.h"
 #include "cli/operations.h"
 #include "core/design.h"
+#include "core/mediaasset.h"
 #include "io/bundle.h"
 #include "io/exports.h"
 #include "io/interchange.h"
@@ -184,12 +185,28 @@ bool readSize(const QString &given, QSizeF *size, QString *error) {
     return false;
 }
 
-QHash<QString, QString> everythingLinked(const Document &document) {
+// The deck's own record of a linked film is not proof: a deck from someone
+// else can name any file and any hash. Approve a path only when the file there
+// opens as media and its bytes hash to what the deck says, as Media preflight
+// does in the window.
+QHash<QString, QString> everythingLinked(const Document &document, QStringList *log) {
     QHash<QString, QString> approved;
     for (const auto &slide : document.slides)
-        for (const auto &object : slide.objects)
-            if (object.type == ObjectType::Media && !object.mediaPath.isEmpty())
+        for (const auto &object : slide.objects) {
+            if (object.type != ObjectType::Media || object.mediaPath.isEmpty() ||
+                approved.contains(object.mediaPath))
+                continue;
+            const auto probed = MediaAsset::fromFile(object.mediaPath, false);
+            if (probed.ok() && probed.object.mediaId == object.mediaId) {
                 approved.insert(object.mediaPath, object.mediaId);
+                log->append(QStringLiteral("Approved linked media %1").arg(object.mediaPath));
+            } else {
+                log->append(QStringLiteral("Not approved: %1 — %2")
+                                .arg(object.mediaPath,
+                                     probed.ok() ? QStringLiteral("the file is not the one the deck linked")
+                                                 : probed.error));
+            }
+        }
     return approved;
 }
 
@@ -218,15 +235,15 @@ QString skillFolder() {
 void usage() {
     out() << QStringLiteral(R"(OmaShow — presentations for Omarchy, without a window.
 
-  omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N]
+  omashow new <file> [--theme 0-2] [--size 16:9|1920x1080] [--layout 0-2] [--slides N] [--force]
   omashow import <file.pptx|file.key> [--out <file.omashow>] [--force]
   omashow inspect <file> [--slide N] [--full]
-  omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going]
+  omashow apply <file> [ops.json|-] [--out <file>] [--dry-run] [--keep-going] [--force]
   omashow export <file> --kind pdf|images|video|package|print|pptx --out <path>
                         [--from N] [--to N] [--layout slides|notes|outline|handout]
                         [--per-page N] [--width N] [--format png|jpeg] [--fps N]
                         [--quality 0|1] [--transparent] [--stages] [--include-skipped]
-                        [--printer NAME] [--copies N] [--approve-media]
+                        [--printer NAME] [--copies N] [--approve-media] [--force]
   omashow review <file> [--include-dismissed]
   omashow ops [--filter <text>]
   omashow skill [--link] [--force]
@@ -357,6 +374,8 @@ int makeDeck(Backend &backend, const Flags &flags) {
         return refuse(QStringLiteral("a theme is 0, 1 or 2, a layout 0, 1 or 2, and a slide is "
                                      "between 240 and 10,000 across."));
     for (int i = 1; i < slides; ++i) backend.addSlide();
+    if (QFileInfo::exists(path) && !flags.has(QStringLiteral("force")))
+        return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(path));
     if (!backend.saveTo(path))
         return refuse(QStringLiteral("%1 could not be written.").arg(path));
     return say({{QStringLiteral("file"), QFileInfo(path).absoluteFilePath()},
@@ -470,6 +489,15 @@ int applyOps(Backend &backend, const Flags &flags) {
                                                   payload);
     }
     const auto destination = flags.value(QStringLiteral("out"), flags.rest.value(0));
+    // Saving over the deck that was read is the point of apply; saving over
+    // some other file that is already there needs saying.
+    const QFileInfo target(destination);
+    if (target.exists() && !flags.has(QStringLiteral("force")) &&
+        target.canonicalFilePath() != QFileInfo(flags.rest.value(0)).canonicalFilePath()) {
+        payload[QStringLiteral("written")] = false;
+        return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(destination),
+                      payload);
+    }
     if (!backend.saveTo(destination)) {
         payload[QStringLiteral("written")] = false;
         return refuse(QStringLiteral("%1 could not be written.").arg(destination), payload);
@@ -533,6 +561,9 @@ int exportDeck(Backend &backend, const Flags &flags) {
     request.printer = flags.value(QStringLiteral("printer"));
     // The interface is given a folder that exists because somebody chose it;
     // here the path is typed, so make the folder it names.
+    if (!request.path.isEmpty() && QFileInfo::exists(request.path) &&
+        !flags.has(QStringLiteral("force")))
+        return refuse(QStringLiteral("%1 already exists; --force replaces it.").arg(request.path));
     if (!request.path.isEmpty()) {
         const auto folder = QFileInfo(request.path).absolutePath();
         if (!folder.isEmpty() && !QDir().mkpath(folder))
@@ -543,8 +574,9 @@ int exportDeck(Backend &backend, const Flags &flags) {
 
     // Reading a file the deck links to is the author's decision, here as in the
     // interface — say so on the command line and it is taken.
+    QStringList approvals;
     const auto approved = flags.has(QStringLiteral("approve-media"))
-                              ? everythingLinked(backend.document())
+                              ? everythingLinked(backend.document(), &approvals)
                               : QHash<QString, QString>();
     QElapsedTimer timer;
     timer.start();
@@ -553,7 +585,7 @@ int exportDeck(Backend &backend, const Flags &flags) {
                                       [](int) {}, approved);
     QVariantMap payload{{QStringLiteral("kind"), kind},
                         {QStringLiteral("files"), outcome.files},
-                        {QStringLiteral("log"), outcome.log},
+                        {QStringLiteral("log"), approvals + outcome.log},
                         {QStringLiteral("describes"), request.describe()},
                         {QStringLiteral("milliseconds"), timer.elapsed()}};
     return outcome.ok ? say(payload) : refuse(outcome.error, payload);

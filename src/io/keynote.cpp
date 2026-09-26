@@ -148,7 +148,9 @@ public:
         if (sized) return;
         const double w = inches(props, "svg:width"), h = inches(props, "svg:height");
         if (w <= 0 || h <= 0) return;
-        doc.size = QSizeF(1920, qRound(1920 * h / w));
+        // Any shape is allowed, within what a deck can hold (as PowerPoint).
+        const double ratio = qBound(0.125, h / w, 8.0);
+        doc.size = QSizeF(1920, qRound(1920 * ratio));
         k = 1920 / w;
         pt = k / 72.0;
         sized = true;

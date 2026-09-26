@@ -18,7 +18,15 @@ if [ ! -x "$ROOT/build/omashow" ]; then
   "$ROOT/bin/build" >/dev/null
 fi
 
-rm -rf "$OUT"
+# Clearing the folder is only safe when it holds nothing but earlier frames:
+# a typo such as `bin/shot ~` must not empty a home folder.
+if [ -d "$OUT" ] && [ -n "$(find "$OUT" -mindepth 1 ! -name '*.png' -print -quit)" ]; then
+  echo "$OUT holds more than frames; choose an empty or new folder." >&2
+  exit 1
+fi
+if [ -d "$OUT" ]; then
+  find "$OUT" -mindepth 1 -maxdepth 1 -name '*.png' -type f -delete
+fi
 mkdir -p "$OUT"
 
 # QT_FORCE_STDERR_LOGGING or an offscreen run swallows every qWarning and you

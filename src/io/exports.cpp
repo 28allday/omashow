@@ -21,8 +21,11 @@
 namespace {
 
 QSize pixels(const QSizeF &slide, int width) {
-    const int w = qBound(160, width, 7680);
-    const int h = qMax(90, qRound(w * slide.height() / qMax(1.0, slide.width())));
+    const qreal ratio = slide.height() / qMax(1.0, slide.width());
+    int w = qBound(160, width, 7680);
+    // A tall slide keeps its width only while its height stays sensible.
+    if (w * ratio > 16384) w = qMax(160, int(16384 / ratio));
+    const int h = qBound(90, qRound(w * ratio), 16384);
     // Encoders want even dimensions; so does anyone scaling the result later.
     return QSize(w - (w % 2), h - (h % 2));
 }
@@ -266,7 +269,10 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
                         request.quality == 0 ? "veryfast" : "slow",
                         "-crf", request.quality == 0 ? "23" : "18",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                        "-f", "mp4", request.path};
+                        // ffmpeg reads "tcp://…", "pipe:1" or "-x" as other
+                        // things than a file; say plainly that this is one.
+                        "-f", "mp4",
+                        QStringLiteral("file:") + QFileInfo(request.path).absoluteFilePath()};
     QProcess encoder;
     encoder.start(QStringLiteral("ffmpeg"), args);
     if (!encoder.waitForStarted(5000))
