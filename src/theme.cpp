@@ -84,10 +84,12 @@ QString unquoted(QString value) {
 }
 
 OmarchyTheme::OmarchyTheme(QObject *parent) : QObject(parent) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     if (QGuiApplication::styleHints()) {
         connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
                 this, &OmarchyTheme::reload);
     }
+#endif
 
     QDBusConnection::sessionBus().connect(
         QString(),
@@ -235,11 +237,13 @@ bool OmarchyTheme::detectDarkMode() const {
             return dark;
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     if (QGuiApplication::styleHints()) {
         const Qt::ColorScheme qtScheme = QGuiApplication::styleHints()->colorScheme();
         if (qtScheme != Qt::ColorScheme::Unknown)
             return qtScheme == Qt::ColorScheme::Dark;
     }
+#endif
 
     return true;
 }

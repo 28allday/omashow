@@ -226,7 +226,13 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
                 QTextListFormat list;
                 list.setStyle(listStyleFor(o.listStyle, level));
                 list.setIndent(level);
-                if (numbered(o.listStyle)) list.setStart(level == 1 ? o.listStart : 1);
+                if (numbered(o.listStyle)) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+                    list.setStart(level == 1 ? o.listStart : 1);
+#else
+                    Q_UNUSED(o.listStart); // Qt < 6.6 always starts numbered lists at 1
+#endif
+                }
                 lists[level] = cursor.createList(list);
             } else
                 lists[level]->add(cursor.block());

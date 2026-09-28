@@ -73,7 +73,7 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
         token == QXmlStreamReader::EntityReference)
       return fail("SVG document types and custom entities are unsupported.");
     if (token == QXmlStreamReader::ProcessingInstruction &&
-        xml.processingInstructionTarget() != "xml")
+        xml.processingInstructionTarget() != QLatin1String("xml"))
       return fail("SVG processing instructions are unsupported.");
     if (token == QXmlStreamReader::StartElement) {
       const auto tag = xml.name().toString();
@@ -162,7 +162,9 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
       return fail("This SVG repeats its own parts too many times to draw.");
   }
   QSvgRenderer renderer;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
   renderer.setOptions(QtSvg::DisableAnimations);
+#endif
   if (!renderer.load(bytes) || !renderer.isValid() || renderer.animated())
     return fail("The SVG could not be rendered as a static image.");
   const auto size = renderer.defaultSize();
