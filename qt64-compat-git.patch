@@ -1,0 +1,73 @@
+diff --git a/src/core/svgasset.cpp b/src/core/svgasset.cpp
+index d2eadcd..064056c 100644
+--- a/src/core/svgasset.cpp
++++ b/src/core/svgasset.cpp
+@@ -73,7 +73,7 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
+         token == QXmlStreamReader::EntityReference)
+       return fail("SVG document types and custom entities are unsupported.");
+     if (token == QXmlStreamReader::ProcessingInstruction &&
+-        xml.processingInstructionTarget() != "xml")
++        xml.processingInstructionTarget() != QLatin1String("xml"))
+       return fail("SVG processing instructions are unsupported.");
+     if (token == QXmlStreamReader::StartElement) {
+       const auto tag = xml.name().toString();
+@@ -162,7 +162,9 @@ bool SvgAsset::decode(SceneObject &object, const QByteArray &bytes,
+       return fail("This SVG repeats its own parts too many times to draw.");
+   }
+   QSvgRenderer renderer;
++#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+   renderer.setOptions(QtSvg::DisableAnimations);
++#endif
+   if (!renderer.load(bytes) || !renderer.isValid() || renderer.animated())
+     return fail("The SVG could not be rendered as a static image.");
+   const auto size = renderer.defaultSize();
+diff --git a/src/render/textlayout.cpp b/src/render/textlayout.cpp
+index 6cec255..3e12291 100644
+--- a/src/render/textlayout.cpp
++++ b/src/render/textlayout.cpp
+@@ -226,7 +226,13 @@ std::shared_ptr<QTextDocument> layout(const SceneObject &o, qreal size) {
+                 QTextListFormat list;
+                 list.setStyle(listStyleFor(o.listStyle, level));
+                 list.setIndent(level);
+-                if (numbered(o.listStyle)) list.setStart(level == 1 ? o.listStart : 1);
++                if (numbered(o.listStyle)) {
++#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
++                    list.setStart(level == 1 ? o.listStart : 1);
++#else
++                    Q_UNUSED(o.listStart); // Qt < 6.6 always starts numbered lists at 1
++#endif
++                }
+                 lists[level] = cursor.createList(list);
+             } else
+                 lists[level]->add(cursor.block());
+diff --git a/src/theme.cpp b/src/theme.cpp
+index 98fa4e6..7a675d6 100644
+--- a/src/theme.cpp
++++ b/src/theme.cpp
+@@ -84,10 +84,12 @@ QString unquoted(QString value) {
+ }
+ 
+ OmarchyTheme::OmarchyTheme(QObject *parent) : QObject(parent) {
++#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+     if (QGuiApplication::styleHints()) {
+         connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+                 this, &OmarchyTheme::reload);
+     }
++#endif
+ 
+     QDBusConnection::sessionBus().connect(
+         QString(),
+@@ -235,11 +237,13 @@ bool OmarchyTheme::detectDarkMode() const {
+             return dark;
+     }
+ 
++#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+     if (QGuiApplication::styleHints()) {
+         const Qt::ColorScheme qtScheme = QGuiApplication::styleHints()->colorScheme();
+         if (qtScheme != Qt::ColorScheme::Unknown)
+             return qtScheme == Qt::ColorScheme::Dark;
+     }
++#endif
+ 
+     return true;
+ }
