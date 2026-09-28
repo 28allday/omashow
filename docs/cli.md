@@ -144,11 +144,16 @@ build's phase, effect, trigger, easing or reveal unit, a transition's kind or
 direction — its name from `omashow ops` works as well as its number, in any
 case and with any spacing: `["kind", "fade-through-black"]`,
 `addShape("star")`, `addChart("Stacked column")`. The same goes for a text box's
-or picture's numbered settings through `setSelectedProperty` — `listStyle`,
-`textAlign`, `verticalAlign`, `textFit`, `direction` and `imageMode` — listed
-under `vocabulary.objectChoices`: `["listStyle", "bullets"]`,
-`["textAlign", "centre"]`. A name that is not a choice is refused with the list
-of those that are.
+or shape's numbered settings through `setSelectedProperty` — `listStyle`,
+`textAlign`, `verticalAlign`, `textFit`, `direction`, `imageMode` and
+`fillStyle` — listed under `vocabulary.objectChoices`: `["listStyle", "bullets"]`,
+`["textAlign", "centre"]`, `["fillStyle", "linear"]`. A name that is not a
+choice is refused with the list of those that are.
+
+A master's footer, date and slide number are set with `setMasterField(masterId,
+key, value)`, the keys listed under `vocabulary.masterFields`. Each shows only
+once its `show…` key is `true`: `["<masterId>", "footer", "Acme"]` then
+`["<masterId>", "showFooter", true]`. `inspect` lists each master's `fields`.
 
 ## Tables and chart data
 

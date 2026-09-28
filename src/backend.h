@@ -463,10 +463,10 @@ public:
     Q_INVOKABLE QString addLayout(const QString &masterId, const QString &copyId = QString());
     Q_INVOKABLE void setLayoutProperty(const QString &id, const QString &key, const QString &value);
     Q_INVOKABLE bool deleteLayout(const QString &id, const QString &replacement = QString());
-    Q_INVOKABLE void setPlaceholderProperty(const QString &id, const QString &role, const QString &key, const QVariant &value);
-    Q_INVOKABLE void addPlaceholder(const QString &id, bool shape = false);
-    Q_INVOKABLE void movePlaceholder(const QString &id, const QString &role, int delta);
-    Q_INVOKABLE void deletePlaceholder(const QString &id, const QString &role);
+    Q_INVOKABLE void setPlaceholderProperty(const QString &layoutId, const QString &placeholderId, const QString &key, const QVariant &value);
+    Q_INVOKABLE void addPlaceholder(const QString &layoutId, bool shape = false);
+    Q_INVOKABLE void movePlaceholder(const QString &layoutId, const QString &placeholderId, int delta);
+    Q_INVOKABLE void deletePlaceholder(const QString &layoutId, const QString &placeholderId);
 
     // --- design and slides from another deck, and what this one no longer uses
     Q_INVOKABLE void importDeckDialog();

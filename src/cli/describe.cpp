@@ -213,7 +213,8 @@ QVariantMap Cli::describeDeck(const Document &d, bool full) {
     QVariantList masters, layouts, sections, shows, styles;
     for (const auto &master : d.masters)
         masters.append(QVariantMap{{QStringLiteral("id"), master.id},
-                                   {QStringLiteral("name"), master.name}});
+                                   {QStringLiteral("name"), master.name},
+                                   {QStringLiteral("fields"), Design::fieldProperties(master.fields)}});
     for (const auto &layout : d.layouts) {
         QVariantList placeholders;
         // A placeholder's id is its role ("title", "body", …); a slide's object
@@ -307,7 +308,14 @@ QVariantMap Cli::vocabulary() {
                      {QStringLiteral("direction"), indexed({QStringLiteral("auto"), QStringLiteral("left-to-right"),
                                                             QStringLiteral("right-to-left")})},
                      {QStringLiteral("imageMode"), indexed({QStringLiteral("fit"), QStringLiteral("fill"),
-                                                            QStringLiteral("stretch")})}}},
+                                                            QStringLiteral("stretch")})},
+                     {QStringLiteral("fillStyle"),
+                      indexed({QStringLiteral("solid"), QStringLiteral("linear"), QStringLiteral("radial"),
+                               QStringLiteral("pattern"), QStringLiteral("picture"), QStringLiteral("none")})}}},
+        // A footer, date or number shows only once its show… key is true.
+        {QStringLiteral("masterFields"),
+         QVariantMap{{QStringLiteral("for"), QStringLiteral("setMasterField(masterId, key, value)")},
+                     {QStringLiteral("keys"), Design::fieldProperties(MasterFields{}).keys()}}},
         {QStringLiteral("shapes"),
          QVariantMap{{QStringLiteral("for"), QStringLiteral("addShape(kind)")},
                      {QStringLiteral("kinds"), indexed(Shape::names())}}},
