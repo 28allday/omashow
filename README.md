@@ -257,7 +257,7 @@ them in place:
 | --- | --- |
 | `~/.config/omashow/` | Recent decks, panel sizes, view and review settings |
 | `~/.config/omarchy/omashow.conf` | Your presenter display choice |
-| `~/.local/share/omashow/` | Recovery copies of unsaved work, and your templates |
+| `~/.local/share/omashow/` | Recovery copies of unsaved work; your templates are in `templates/` here |
 
 OmaShow makes no network connections.
 
