@@ -7,7 +7,9 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QImageReader>
+#include <QPaintEngine>
 #include <QPainter>
+#include <cmath>
 namespace {
 bool fail(QString *error, const QString &message) {
   if (error)
@@ -53,6 +55,57 @@ QImage adjusted(const SceneObject &o) {
   cache.insert(key, new QImage(image),
                qMax(1, int(image.sizeInBytes() / 1024)));
   return image;
+}
+// Bilinear sampling reads four source pixels, so a picture drawn smaller than
+// its pixels skips some of them and fine detail turns to grain. A picture is
+// brought down to the size it has on the device by area averaging instead and
+// drawn one to one: by halves first, which are kept for every size, then the
+// remaining step of under 2x.
+QImage reduced(const QImage &from, const QSize &size, const QString &key) {
+  static thread_local QCache<QString, QImage> cache(
+      192 * 1024); // KiB, as for the adjusted pictures above.
+  if (auto *found = cache.object(key))
+    return *found;
+  const auto image =
+      from.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+  cache.insert(key, new QImage(image),
+               qMax(1, int(image.sizeInBytes() / 1024)));
+  return image;
+}
+void drawReduced(QPainter &painter, const QRectF &target, const QImage &full,
+                 const QRectF &source) {
+  const auto device = painter.deviceTransform();
+  const qreal across = target.width() * std::hypot(device.m11(), device.m12()),
+              down = target.height() * std::hypot(device.m21(), device.m22());
+  // Only for pixels: a PDF page keeps the whole picture for zoom and print.
+  if (painter.paintEngine()->type() != QPaintEngine::Raster || across < 1 ||
+      down < 1 || (source.width() < across + 1 && source.height() < down + 1)) {
+    painter.drawImage(target, full, source);
+    return;
+  }
+  auto image = full;
+  const auto id = QString::number(full.cacheKey());
+  for (qreal ratio = qMin(source.width() / across, source.height() / down);
+       ratio >= 2 && image.width() > 1 && image.height() > 1; ratio /= 2) {
+    const QSize half((image.width() + 1) / 2, (image.height() + 1) / 2);
+    image = reduced(image, half,
+                    id + QStringLiteral("/%1x%2").arg(half.width()).arg(
+                             half.height()));
+  }
+  // The whole picture at the scale that puts its shown part on the device.
+  const QSize size(
+      qBound(1, qRound(full.width() * across / source.width()), image.width()),
+      qBound(1, qRound(full.height() * down / source.height()),
+             image.height()));
+  if (size != image.size())
+    image = reduced(image, size,
+                    id + QStringLiteral("/%1x%2").arg(size.width()).arg(
+                             size.height()));
+  const qreal sx = qreal(image.width()) / full.width(),
+              sy = qreal(image.height()) / full.height();
+  painter.drawImage(target, image,
+                    QRectF(source.x() * sx, source.y() * sy,
+                           source.width() * sx, source.height() * sy));
 }
 QImage sRGB(QImage image) {
   if (image.colorSpace().isValid() &&
@@ -201,7 +254,7 @@ void ImageAsset::paint(QPainter &painter, const SceneObject &o) {
         qreal(o.vectorPicture.logicalDpiY()) / painter.device()->logicalDpiY());
     painter.drawPicture(QPointF(), o.vectorPicture);
   } else
-    painter.drawImage(target, adjusted(o), source);
+    drawReduced(painter, target, adjusted(o), source);
   painter.restore();
 }
 
