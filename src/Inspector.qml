@@ -58,6 +58,22 @@ Rectangle {
         ToolTip.text: tip
         Accessible.name: tip
     }
+    // B / I / U. The letter is the icon; the accessible name stays the word.
+    component StyleMark: Button {
+        property string tip: ""
+        property bool mark: true
+        checkable: true
+        ToolTip.visible: hovered && tip !== ""
+        ToolTip.delay: Theme.tooltipDelay
+        ToolTip.text: tip
+        Accessible.name: tip
+    }
+    // Bold is the same weight the Size row's weight menu writes: 700 on, 400
+    // off. A selected stretch uses "weight"; the whole box uses "fontWeight".
+    function bold(on) {
+        if (range.active) backend.formatSelection("weight", on ? 700 : 400)
+        else backend.setSelectedProperty("fontWeight", on ? 700 : 400)
+    }
 
     Rectangle {
         anchors.left: parent.left
@@ -453,12 +469,15 @@ Rectangle {
             }
             FieldRow {
                 label: qsTr("Style")
-                Button { objectName: "textItalic"; checkable: true; text: qsTr("Italic")
-                         checked: root.range.active ? (root.range.italic ?? false) : (root.sel.italic ?? false)
-                         onToggled: root.style("italic", checked) }
-                Button { objectName: "textUnderline"; checkable: true; text: qsTr("Underline")
-                         checked: root.range.active ? (root.range.underline ?? false) : (root.sel.underline ?? false)
-                         onToggled: root.style("underline", checked) }
+                StyleMark { objectName: "textBold"; text: "B"; font.bold: true; tip: qsTr("Bold")
+                            checked: (root.range.active ? (root.range.weight ?? 400) : (root.sel.fontWeight ?? 400)) >= 700
+                            onToggled: root.bold(checked) }
+                StyleMark { objectName: "textItalic"; text: "I"; font.italic: true; tip: qsTr("Italic")
+                            checked: root.range.active ? (root.range.italic ?? false) : (root.sel.italic ?? false)
+                            onToggled: root.style("italic", checked) }
+                StyleMark { objectName: "textUnderline"; text: "U"; font.underline: true; tip: qsTr("Underline")
+                            checked: root.range.active ? (root.range.underline ?? false) : (root.sel.underline ?? false)
+                            onToggled: root.style("underline", checked) }
                 Button { objectName: "textStrike"; checkable: true; text: qsTr("Strike")
                          visible: root.range.active
                          checked: root.range.strike ?? false
