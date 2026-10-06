@@ -120,23 +120,39 @@ void Backend::selectAll() {
       ids.append(o.id);
   selectIds(ids);
 }
-bool Backend::selectAt(qreal x, qreal y, bool extend, bool behind) {
-  const auto slide = Design::resolve(m_document, m_currentSlide);
+// The objects a click at (x, y) picks, topmost first: visible, unlocked, in
+// the group being edited, and on this slide (not the layout or master).
+static QStringList hitsAt(const Slide &resolved, const Slide &own, const QStringList &scope,
+                          qreal x, qreal y, bool firstOnly) {
   QStringList hits;
-  for (int i = slide.objects.size() - 1; i >= 0; --i) {
-    const auto &o = slide.objects.at(i);
-    if (o.hidden || o.locked || !Arrange::inScope(o, m_groupScope))
+  for (int i = resolved.objects.size() - 1; i >= 0; --i) {
+    const auto &o = resolved.objects.at(i);
+    if (o.hidden || o.locked || !Arrange::inScope(o, scope))
       continue;
-    if (!m_document.slides.at(m_currentSlide).find(o.id))
+    if (!own.find(o.id))
       continue;
     QTransform t;
     const auto c = o.rect.center();
     t.translate(c.x(), c.y());
     t.rotate(o.rotation);
     t.translate(-c.x(), -c.y());
-    if (Shape::contains(o,t.inverted().map(QPointF(x, y))))
+    if (Shape::contains(o,t.inverted().map(QPointF(x, y)))) {
       hits.append(o.id);
+      if (firstOnly)
+        break;
+    }
   }
+  return hits;
+}
+bool Backend::hitsObject(qreal x, qreal y) const {
+  if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size())
+    return false;
+  return !hitsAt(Design::resolve(m_document, m_currentSlide), m_document.slides.at(m_currentSlide),
+                 m_groupScope, x, y, true).isEmpty();
+}
+bool Backend::selectAt(qreal x, qreal y, bool extend, bool behind) {
+  const auto slide = Design::resolve(m_document, m_currentSlide);
+  const QStringList hits = hitsAt(slide, m_document.slides.at(m_currentSlide), m_groupScope, x, y, false);
   if (hits.isEmpty()) {
     if (!extend)
       clearSelection();

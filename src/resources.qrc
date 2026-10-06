@@ -16,6 +16,7 @@
         <file alias="ExportWorkspace.qml">ExportWorkspace.qml</file>
         <file alias="Theme.qml">Theme.qml</file>
         <file alias="EditCanvas.qml">EditCanvas.qml</file>
+        <file>canvascursor.js</file>
         <file alias="Inspector.qml">Inspector.qml</file>
         <file>DocumentPanel.qml</file>
         <file alias="Sheet.qml">Sheet.qml</file>
