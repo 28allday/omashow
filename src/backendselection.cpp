@@ -326,6 +326,13 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   const auto propertyKey = [&ids, &key](const SceneObject &object) {
     return ids.size() > 1 && key == "fill" && object.type == ObjectType::Text ? QString("textColor") : key;
   };
+  // Stretches with their own type size (an imported deck writes one per run
+  // when they differ) would ignore a box size, so they follow it too.
+  const auto sizedRuns = [](const SceneObject &object) {
+    for (const auto &run : object.runs)
+      if (run.fontSize > 0) return true;
+    return false;
+  };
   bool changed = false;
   for (const auto &id : ids)
     if (const auto *o = shown.find(id)) {
@@ -334,6 +341,8 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
         return;
       if (Design::properties(copy).value(propertyKey(*o)) !=
           Design::properties(*o).value(propertyKey(*o)))
+        changed = true;
+      if (key == QLatin1String("fontSize") && o->type == ObjectType::Text && sizedRuns(*o))
         changed = true;
     }
   if (!changed)
@@ -351,8 +360,20 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
         Design::markOverride(*o, QStringLiteral("text"));
         continue;
       }
+      const qreal sizeBefore = o->fontSize;
       Design::setProperty(*o, propertyKey(*o), value);
       Design::markOverride(*o, propertyKey(*o));
+      if (key == QLatin1String("fontSize") && o->type == ObjectType::Text && sizedRuns(*o)) {
+        // A new size scales every stretch by the same amount, so mixed sizes
+        // keep their proportions; asking again for the size the box already
+        // has makes the whole box that size.
+        const bool same = qFuzzyCompare(sizeBefore + 1, o->fontSize + 1) || sizeBefore <= 0;
+        const qreal ratio = same ? 1 : o->fontSize / sizeBefore;
+        for (auto &run : o->runs)
+          if (run.fontSize > 0)
+            run.fontSize = same ? 0 : qBound(1.0, run.fontSize * ratio, 2000.0);
+        o->runs = TextRuns::tidy(o->runs, o->text.size());
+      }
     }
   m_history.commit();
   if (key == "hidden" || key == "locked")

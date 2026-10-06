@@ -21,6 +21,7 @@
         <file alias="Sheet.qml">Sheet.qml</file>
         <file alias="ui/Sheets.qml">Sheets.qml</file>
         <file alias="NumField.qml">NumField.qml</file>
+        <file>FontSizeField.qml</file>
         <file>SectionLabel.qml</file>
         <file>FieldRow.qml</file>
         <file>Card.qml</file>

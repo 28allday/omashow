@@ -16,6 +16,9 @@ Rectangle {
     readonly property var sel: backend.selection
     // While text is selected on the slide, formatting applies to that stretch.
     readonly property var range: backend.textSelection
+    // Type sizes and other text measures are shown and typed in points, the
+    // way PowerPoint shows them, and stored in slide units as before.
+    readonly property real ptPerUnit: backend.ptPerUnit
     function style(key, on) {
         if (range.active) backend.formatSelection(key, on ? 1 : 2)
         else backend.setSelectedProperty(key, on)
@@ -434,12 +437,11 @@ Rectangle {
             }
             FieldRow {
                 label: qsTr("Size")
-                NumField {
-                    Layout.fillWidth: true
-                    suffix: " pt"
-                    value: root.range.active ? (root.range.fontSize ?? Theme.fsBase) : (root.sel.fontSize ?? Theme.fsBase)
-                    onCommitted: (v) => root.range.active ? backend.formatSelection("fontSize", v)
-                                                          : backend.setSelectedProperty("fontSize", v)
+                // Half points; grow / shrink beside it. One undo step per change.
+                FontSizeField {
+                    value: (root.range.active ? (root.range.fontSize ?? Theme.fsBase) : (root.sel.fontSize ?? Theme.fsBase)) * root.ptPerUnit
+                    onCommitted: (v) => root.range.active ? backend.formatSelection("fontSize", v / root.ptPerUnit)
+                                                          : backend.setSelectedProperty("fontSize", v / root.ptPerUnit)
                 }
                 ComboBox {
                     Layout.preferredWidth: Theme.s5 * 5
@@ -516,19 +518,19 @@ Rectangle {
             }
             FieldRow {
                 label: qsTr("Tab stop")
-                NumField { objectName: "textTabStop"; Layout.fillWidth: true; suffix: " pt"
-                           value: root.sel.tabStop ?? 0
-                           onCommitted: v => backend.setSelectedProperty("tabStop", v) }
+                NumField { objectName: "textTabStop"; Layout.fillWidth: true; suffix: " pt"; decimals: 1
+                           value: (root.sel.tabStop ?? 0) * root.ptPerUnit
+                           onCommitted: v => backend.setSelectedProperty("tabStop", v / root.ptPerUnit) }
             }
             FieldRow {
                 label: qsTr("Columns")
                 SpinBox { objectName: "textColumns"; Layout.fillWidth: true; from: 1; to: 6
                           value: root.sel.columns ?? 1
                           onValueModified: backend.setSelectedProperty("columns", value) }
-                NumField { objectName: "textColumnGap"; Layout.fillWidth: true; suffix: " pt"
+                NumField { objectName: "textColumnGap"; Layout.fillWidth: true; suffix: " pt"; decimals: 1
                            visible: (root.sel.columns ?? 1) > 1
-                           value: root.sel.columnGap ?? 0
-                           onCommitted: v => backend.setSelectedProperty("columnGap", v) }
+                           value: (root.sel.columnGap ?? 0) * root.ptPerUnit
+                           onCommitted: v => backend.setSelectedProperty("columnGap", v / root.ptPerUnit) }
             }
             FieldRow {
                 label: qsTr("Direction")
@@ -652,7 +654,7 @@ Rectangle {
                 Label {
                     Layout.fillWidth: true; wrapMode: Text.Wrap
                     color: (root.sel.textOverflow ?? false) ? Theme.warning : Theme.textSecondary
-                    text: (root.sel.textOverflow ?? false) ? qsTr("Some text is outside this box.") : qsTr("Displayed at %1 to fit.").arg(root.sel.effectiveFontSize)
+                    text: (root.sel.textOverflow ?? false) ? qsTr("Some text is outside this box.") : qsTr("Displayed at %1 pt to fit.").arg(Math.round((root.sel.effectiveFontSize ?? 0) * root.ptPerUnit * 10) / 10)
                 }
             }
             Button { objectName: "fitTextBox"; Layout.fillWidth: true; text: qsTr("Resize box to fit text"); onClicked: backend.fitSelectedTextBox() }
