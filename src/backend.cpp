@@ -1,6 +1,8 @@
 #include "backend.h"
 
 #include <QFontDatabase>
+#include <QFontInfo>
+#include <algorithm>
 #include "mediaplayback.h"
 #include "core/design.h"
 #include "core/review.h"
@@ -326,6 +328,24 @@ QVariantMap Backend::importReport() const {
 }
 
 QVariantList Backend::missingFonts() const { return Fonts::report(m_document); }
+
+QVariantList Backend::fontWeights(const QString &family) const {
+  const auto cached = m_fontWeights.constFind(family);
+  if (cached != m_fontWeights.cend()) return *cached;
+  QString real = family;
+  if (!QFontDatabase::hasFamily(real)) real = QFontInfo(QFont(family)).family();
+  QList<int> weights;
+  for (const auto &style : QFontDatabase::styles(real)) {
+    if (QFontDatabase::italic(real, style)) continue;
+    const int w = QFontDatabase::weight(real, style);
+    if (w > 0 && !weights.contains(w)) weights.append(w);
+  }
+  std::sort(weights.begin(), weights.end());
+  QVariantList result;
+  for (int w : weights) result.append(w);
+  m_fontWeights.insert(family, result);
+  return result;
+}
 
 int Backend::substituteFonts(const QVariantMap &replacements) {
   QMap<QString, QString> map;

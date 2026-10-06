@@ -136,6 +136,10 @@ public:
     // suggested stand-in; and the rewrite, as one undo step.
     Q_INVOKABLE QVariantList missingFonts() const;
     Q_INVOKABLE int substituteFonts(const QVariantMap &replacements);
+    // The upright weights (100-900) the typeface really has, ascending. A name
+    // that is not installed answers for the face it falls back to. Cached per
+    // family, so the inspector asks once per family change.
+    Q_INVOKABLE QVariantList fontWeights(const QString &family) const;
     Q_INVOKABLE void keepMyVersion();
     Q_INVOKABLE void reloadFromDisk();
     QString status() const { return m_status; }
@@ -621,6 +625,7 @@ private:
     std::shared_ptr<MediaAsset::Job> m_mediaJob;
     QTimer m_mediaProgressTimer;
     QHash<QString,QString> m_mediaPermissions;
+    mutable QHash<QString,QVariantList> m_fontWeights;
     int m_documentGeneration = 0, m_mediaPickerGeneration = 0;
     bool m_mediaPickerEmbed = true;
     QString m_mediaPickerSlide, m_mediaPickerTarget;

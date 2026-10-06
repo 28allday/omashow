@@ -20,6 +20,21 @@ Rectangle {
         if (range.active) backend.formatSelection(key, on ? 1 : 2)
         else backend.setSelectedProperty(key, on)
     }
+    readonly property int currentWeight: range.active ? (range.weight ?? 400) : (sel.fontWeight ?? 400)
+    // Asked once per family change; the backend caches each family's faces.
+    readonly property string weightFamily: (range.active ? range.fontFamily : sel.fontFamily) ?? Theme.fontFamily
+    readonly property var familyWeights: isText ? backend.fontWeights(weightFamily) : []
+    readonly property var weightChoices: {
+        const list = familyWeights.slice()
+        if (list.indexOf(currentWeight) < 0) list.push(currentWeight)
+        return list.sort((a, b) => a - b)
+    }
+    function weightName(w) {
+        const names = { 100: qsTr("Thin"), 200: qsTr("Extra light"), 300: qsTr("Light"), 400: qsTr("Regular"),
+                        500: qsTr("Medium"), 600: qsTr("Semibold"), 700: qsTr("Bold"), 800: qsTr("Extra bold"),
+                        900: qsTr("Black") }
+        return names[w] ?? String(w)
+    }
     readonly property bool isMedia: backend.hasSelection && sel.type === "media"
     readonly property bool isImage: backend.hasSelection && sel.type === "image"
     readonly property bool isText: backend.hasSelection && sel.type === "text"
@@ -442,13 +457,18 @@ Rectangle {
                                                           : backend.setSelectedProperty("fontSize", v)
                 }
                 ComboBox {
+                    objectName: "textWeight"
                     Layout.preferredWidth: Theme.s5 * 5
-                    model: [400, 500, 600, 700]
-                    displayText: [qsTr("Regular"), qsTr("Medium"), qsTr("Semibold"), qsTr("Bold")][currentIndex] ?? currentText
-                    currentIndex: Math.max(0, model.indexOf(root.range.active ? (root.range.weight ?? 400)
-                                                                              : (root.sel.fontWeight ?? 400)))
-                    onActivated: root.range.active ? backend.formatSelection("weight", model[currentIndex])
-                                                   : backend.setSelectedProperty("fontWeight", model[currentIndex])
+                    // Only weights the typeface really has, so each entry looks
+                    // different; the current value stays listed even if odd.
+                    // A face with a single weight has nothing to choose.
+                    model: root.weightChoices.map(w => ({ value: w, text: root.weightName(w) }))
+                    textRole: "text"
+                    valueRole: "value"
+                    visible: root.weightChoices.length > 1
+                    currentIndex: Math.max(0, root.weightChoices.indexOf(root.currentWeight))
+                    onActivated: (index) => root.range.active ? backend.formatSelection("weight", root.weightChoices[index])
+                                                              : backend.setSelectedProperty("fontWeight", root.weightChoices[index])
                 }
             }
             FieldRow {
