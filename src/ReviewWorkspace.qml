@@ -12,7 +12,8 @@ RowLayout {
     objectName: "reviewWorkspace"
     spacing: 0
     readonly property var stats: backend.statistics
-    readonly property var issues: backend.reviewIssues
+    // Read only while the room is open: the pass walks every slide.
+    readonly property var issues: visible ? backend.reviewIssues : []
     property string severity: ""
     property bool showDismissed: false
     readonly property var shownIssues: issues.filter(i => (root.showDismissed || !i.dismissed)

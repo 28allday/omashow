@@ -14,6 +14,7 @@ HEADERS += \
     src/presenter.h \
     src/slideview.h \
     src/thumbnailprovider.h \
+    src/sliderows.h \
     src/theme.h \
     src/anim/build.h \
     src/anim/evaluator.h \
@@ -43,6 +44,7 @@ SOURCES += \
     src/presenter.cpp \
     src/slideview.cpp \
     src/thumbnailprovider.cpp \
+    src/sliderows.cpp \
     src/theme.cpp \
     src/anim/build.cpp \
     src/anim/evaluator.cpp \

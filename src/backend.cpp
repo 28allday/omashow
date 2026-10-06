@@ -28,16 +28,18 @@
 #include "core/fonts.h"
 #include "io/pdf.h"
 #include "io/recovery.h"
+#include "sliderows.h"
 #include "render/scenerenderer.h"
 
 Backend::Backend(QObject *parent)
-    : QObject(parent), m_chooser(new PortalFileChooser(this)) {
+    : QObject(parent), m_chooser(new PortalFileChooser(this)), m_browserModel(new SlideRows(this)) {
   connect(this,&Backend::documentChanged,this,&Backend::slideSelectionChanged);
   connect(this,&Backend::documentChanged,this,&Backend::fileStateChanged);
   // A pending import is described against the document it would land in.
   connect(this,&Backend::documentChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::currentSlideChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
+  connect(this,&Backend::browserChanged,this,[this]{ browserSlides(); });
   connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, [this] { ++m_clipboardVersion; });

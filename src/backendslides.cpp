@@ -1,5 +1,6 @@
 #include "anim/presentation.h"
 #include "backend.h"
+#include "sliderows.h"
 #include "core/edit.h"
 #include "core/deckresize.h"
 #include "core/design.h"
@@ -233,8 +234,10 @@ QVariantList Backend::browserSlides() const {
       row["sectionStart"] = true;
     result.append(row);
   }
+  m_browserModel->sync(result);
   return result;
 }
+QObject *Backend::browserModel() const { return m_browserModel; }
 void Backend::setSectionCollapsed(const QString &id, bool collapsed) {
   if (sectionInfo(id).isEmpty() ||
       m_collapsedSections.contains(id) == collapsed)

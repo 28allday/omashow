@@ -247,14 +247,9 @@ Slide slideFromJson(const QByteArray &raw, bool *ok) {
     return slide;
 }
 
-} // namespace
-
-QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryMetadata) {
-    QVector<Zip::Entry> entries;
-    if (!recoveryMetadata.isEmpty()) entries.append({"recovery.json", recoveryMetadata, true});
-
+QJsonObject manifestJson(const Document &document) {
     QJsonObject manifest;
-    manifest[QStringLiteral("version")] = kFormatVersion;
+    manifest[QStringLiteral("version")] = Bundle::kFormatVersion;
     manifest[QStringLiteral("width")] = document.size.width();
     manifest[QStringLiteral("height")] = document.size.height();
     manifest[QStringLiteral("transitionDuration")] = document.transitionDuration;
@@ -280,6 +275,10 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     }
     manifest["shows"] = shows;
 
+    return manifest;
+}
+
+QJsonObject themeJson(const Document &document) {
     QJsonObject theme, colors, fonts;
     theme["name"] = document.theme.name;
     for (auto it = document.theme.colors.cbegin(); it != document.theme.colors.cend(); ++it)
@@ -287,7 +286,10 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
     for (auto it = document.theme.fonts.cbegin(); it != document.theme.fonts.cend(); ++it)
         fonts[it.key()] = it.value();
     theme["colors"] = colors; theme["fonts"] = fonts;
-    entries.append({"theme.json", QJsonDocument(theme).toJson(), true});
+    return theme;
+}
+
+QJsonObject designJson(const Document &document) {
     QJsonArray masters, layouts;
     for (const auto &m : document.masters) {
         QJsonArray objects;
@@ -301,20 +303,33 @@ QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryM
         for (const auto &o : l.placeholders) objects.append(objectToJson(o));
         layouts.append(QJsonObject{{"id",l.id},{"name",l.name},{"masterId",l.masterId},{"placeholders",objects}});
     }
-    entries.append({"masters/design.json", QJsonDocument(QJsonObject{{"masters",masters},{"layouts",layouts}}).toJson(), true});
+    return QJsonObject{{"masters",masters},{"layouts",layouts}};
+}
+
+QJsonObject stylesJson(const Document &document) {
+    QJsonArray styles;
+    for(const auto &style:document.objectStyles) styles.append(QJsonObject{{"id",style.id},{"name",style.name},{"appearance",objectToJson(style.appearance)}});
+    QJsonArray textStyles;
+    for(const auto &style:document.textStyles) textStyles.append(QJsonObject{{"id",style.id},{"name",style.name},{"look",objectToJson(style.look)}});
+    return QJsonObject{{"objects",styles},{"text",textStyles}};
+}
+} // namespace
+
+QByteArray Bundle::toBytes(const Document &document, const QByteArray &recoveryMetadata) {
+    QVector<Zip::Entry> entries;
+    if (!recoveryMetadata.isEmpty()) entries.append({"recovery.json", recoveryMetadata, true});
+
+    entries.append({"theme.json", QJsonDocument(themeJson(document)).toJson(), true});
+    entries.append({"masters/design.json", QJsonDocument(designJson(document)).toJson(), true});
 
     entries.append({QStringLiteral("document.json"),
-                    QJsonDocument(manifest).toJson(QJsonDocument::Indented), true});
+                    QJsonDocument(manifestJson(document)).toJson(QJsonDocument::Indented), true});
 
     for (const Slide &slide : document.slides) {
         entries.append({QStringLiteral("slides/%1.json").arg(slide.id),
                         slideToJson(slide), true});
     }
-    QJsonArray styles;
-    for(const auto &style:document.objectStyles) styles.append(QJsonObject{{"id",style.id},{"name",style.name},{"appearance",objectToJson(style.appearance)}});
-    QJsonArray textStyles;
-    for(const auto &style:document.textStyles) textStyles.append(QJsonObject{{"id",style.id},{"name",style.name},{"look",objectToJson(style.look)}});
-    entries.append({"styles.json",QJsonDocument(QJsonObject{{"objects",styles},{"text",textStyles}}).toJson(),true});
+    entries.append({"styles.json",QJsonDocument(stylesJson(document)).toJson(),true});
     QJsonArray comments;
     for (const auto &comment : document.comments)
         comments.append(QJsonObject{{"id",comment.id},{"slideId",comment.slideId},
@@ -732,4 +747,19 @@ Bundle::ReadResult Bundle::load(const QString &path) {
         return result;
     }
     return fromBytes(file.readAll());
+}
+
+QStringList Bundle::slideStamps(const Document &document) {
+    // What every slide draws from besides its own content. Compact, since the
+    // bytes are only hashed.
+    const QByteArray shared = QJsonDocument(manifestJson(document)).toJson(QJsonDocument::Compact)
+                            + QJsonDocument(themeJson(document)).toJson(QJsonDocument::Compact)
+                            + QJsonDocument(designJson(document)).toJson(QJsonDocument::Compact)
+                            + QJsonDocument(stylesJson(document)).toJson(QJsonDocument::Compact);
+    const size_t seed = qHash(shared);
+    QStringList stamps;
+    stamps.reserve(document.slides.size());
+    for (const Slide &slide : document.slides)
+        stamps.append(QString::number(qulonglong(qHash(slideToJson(slide), seed)), 16));
+    return stamps;
 }

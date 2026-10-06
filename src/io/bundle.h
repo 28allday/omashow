@@ -52,6 +52,12 @@ constexpr int kFormatVersion = 24;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 
+// A short mark for each slide that changes only when its picture would: the
+// slide's own content, or anything every slide draws from (theme, masters,
+// layouts, styles, size, order). The navigator keys thumbnails on it, so an
+// edit to one slide leaves the other thumbnails alone.
+QStringList slideStamps(const Document &document);
+
 struct ReadResult {
     bool ok = false;
     QString error;

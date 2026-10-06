@@ -23,6 +23,7 @@
 #include <atomic>
 
 class PortalFileChooser;
+class SlideRows;
 class MediaPlayback;
 class TableModel;
 
@@ -98,6 +99,9 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList customShows READ customShows NOTIFY documentChanged)
     Q_PROPERTY(QString activeShow READ activeShow WRITE setActiveShow NOTIFY documentChanged)
     Q_PROPERTY(QVariantList browserSlides READ browserSlides NOTIFY browserChanged)
+    // The same rows as a model kept up to date in place, for the navigator's
+    // views: delegates survive an edit instead of being rebuilt.
+    Q_PROPERTY(QObject *browserModel READ browserModel CONSTANT)
     Q_PROPERTY(QStringList collapsedSections READ collapsedSections NOTIFY browserChanged)
     Q_PROPERTY(QVariantList builds READ builds NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList slideObjects READ slideObjects NOTIFY selectionChanged)
@@ -423,6 +427,7 @@ public:
     Q_INVOKABLE void cancelEdit();
     QVariantList navigator() const;
     QVariantList browserSlides() const;
+    QObject *browserModel() const;
     QStringList collapsedSections() const;
     Q_INVOKABLE QVariantMap sectionInfo(const QString &id) const;
     Q_INVOKABLE void setSectionCollapsed(const QString &id, bool collapsed);
@@ -682,6 +687,11 @@ private:
     mutable int m_presentationRevision = -1, m_navigatorRevision = -1;
     mutable bool m_presentationSkipped = false;
     mutable QVariantList m_navigator;
+    // The review pass walks every slide; it is run once per revision, and only
+    // when something reads it.
+    mutable int m_reviewRevision = -1;
+    mutable QVariantList m_reviewIssues;
+    SlideRows *m_browserModel = nullptr;
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);

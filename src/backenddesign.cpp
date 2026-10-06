@@ -2,6 +2,7 @@
 #include "core/design.h"
 #include "core/edit.h"
 #include "core/review.h"
+#include "io/bundle.h"
 #include "anim/presentation.h"
 #include <QDate>
 
@@ -393,6 +394,7 @@ void Backend::deletePlaceholder(const QString &id, const QString &role) {
 }
 QVariantList Backend::navigator() const {
   if (m_navigatorRevision == m_revision) return m_navigator;
+  const QStringList stamps = Bundle::slideStamps(m_document);
   QVariantList list;
   QString previous;
   for (int i = 0; i < m_document.slides.size(); ++i) {
@@ -416,7 +418,7 @@ QVariantList Backend::navigator() const {
       if(Review::needsDescription(o) && o.altText.trimmed().isEmpty()) ++undescribed;
     }
     list.append(
-        QVariantMap{{"index", i},
+        QVariantMap{{"index", i},{"stamp",stamps.value(i)},
                     {"title",outline.isEmpty()?tr("Untitled slide"):outline.first().section('\n',0,0)},
                     {"outline",outline.join('\n')},
                     {"skipped",s.skipped},
