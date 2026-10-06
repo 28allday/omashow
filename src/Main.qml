@@ -56,27 +56,44 @@ ApplicationWindow {
     property real inspectorWidth: backend.panelState.inspectorWidth ?? Theme.wInspector
     property bool navigatorCollapsed: (backend.panelState.navigatorCollapsed ?? "false") === "true"
     property bool inspectorCollapsed: (backend.panelState.inspectorCollapsed ?? "false") === "true"
-    onNavigatorWidthChanged: backend.setPanelState("navigatorWidth", Math.round(navigatorWidth))
-    onInspectorWidthChanged: backend.setPanelState("inspectorWidth", Math.round(inspectorWidth))
+    // Saved when a drag ends, not on every move: each save rewrites the panel
+    // settings file.
+    function savePanelWidths() {
+        backend.setPanelState("navigatorWidth", Math.round(navigatorWidth))
+        backend.setPanelState("inspectorWidth", Math.round(inspectorWidth))
+    }
     onNavigatorCollapsedChanged: backend.setPanelState("navigatorCollapsed", navigatorCollapsed)
     onInspectorCollapsedChanged: backend.setPanelState("inspectorCollapsed", inspectorCollapsed)
     onNotesOpenChanged: backend.setPanelState("notesOpen", notesOpen)
     // A panel dragged to nothing, or a remembered width from a bigger screen,
     // comes back to something usable rather than disappearing.
+    function panelRoom() { return Math.max(320, win.width - 360) / 2 }
+    function clampNavigator(w) { return Math.min(Math.max(Theme.wNavigatorMin, w), panelRoom()) }
+    function clampInspector(w) { return Math.min(Math.max(Theme.wInspectorMin, w), panelRoom()) }
     function sanePanels() {
-        const room = Math.max(320, win.width - 360)
-        win.navigatorWidth = Math.min(Math.max(Theme.wNavigatorMin, win.navigatorWidth), room / 2)
-        win.inspectorWidth = Math.min(Math.max(Theme.wInspectorMin, win.inspectorWidth), room / 2)
+        const nav = clampNavigator(win.navigatorWidth), side = clampInspector(win.inspectorWidth)
+        if (nav === win.navigatorWidth && side === win.inspectorWidth) return
+        win.navigatorWidth = nav
+        win.inspectorWidth = side
+        win.savePanelWidths()
     }
+    // The width a panel had when its grip was pressed.
+    property real panelDragStart: 0
     onWidthChanged: win.sanePanels()
 
-    // The grip between a panel and the canvas.
+    // The grip between a panel and the canvas. The panel follows the pointer
+    // exactly: each move reports how far the pointer is from where it was
+    // pressed, in scene coordinates (which do not move with the grip), and the
+    // owner sets the width to where it started plus that distance. Nothing is
+    // accumulated, so there is no speed-up; the owner saves only on release.
     component PanelGrip: Item {
         id: grip
         property Item panel
         property bool fromLeft: true
         property bool collapsed: false
-        signal resized(real delta)
+        signal resizeStarted()
+        signal resizedBy(real total)     // pointer travel since the press, toward the canvas
+        signal resizeFinished()
         signal toggled()
         objectName: "panelGrip"
         implicitWidth: Theme.s2
@@ -87,10 +104,19 @@ ApplicationWindow {
             id: drag
             target: null
             yAxis.enabled: false
-            onTranslationChanged: {
-                if (!active) return
-                grip.resized(grip.fromLeft ? translation.x : -translation.x)
+            // One pixel: the panel moves at once (the default waited ~10 px, then
+            // jumped). The travel before it starts still counts, so the edge
+            // lands under the pointer. A still double-click stays a double-click.
+            dragThreshold: 1
+            // Kept while dragging even when the pointer is past a limit and off the grip.
+            cursorShape: Qt.SplitHCursor
+            function follow() {
+                const dx = centroid.scenePosition.x - centroid.scenePressPosition.x
+                grip.resizedBy(grip.fromLeft ? dx : -dx)
             }
+            // The move that starts the drag counts too, or the edge trails a step behind.
+            onActiveChanged: if (active) { grip.resizeStarted(); follow() } else grip.resizeFinished()
+            onCentroidChanged: if (active) follow()
         }
         TapHandler { onDoubleTapped: grip.toggled() }
     }
@@ -295,7 +321,7 @@ ApplicationWindow {
             { group: qsTr("View"), name: qsTr("Presenter notes"), also: "speaker script", run: () => win.notesOpen = !win.notesOpen },
             { group: qsTr("View"), name: win.navigatorCollapsed ? qsTr("Show the slide list") : qsTr("Hide the slide list"), also: "navigator panel thumbnails sidebar", run: () => win.navigatorCollapsed = !win.navigatorCollapsed },
             { group: qsTr("View"), name: win.inspectorCollapsed ? qsTr("Show the inspector") : qsTr("Hide the inspector"), also: "panel properties sidebar", run: () => win.inspectorCollapsed = !win.inspectorCollapsed },
-            { group: qsTr("View"), name: qsTr("Put the panels back"), also: "reset widths restore layout", run: () => { win.navigatorCollapsed = false; win.inspectorCollapsed = false; win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } },
+            { group: qsTr("View"), name: qsTr("Put the panels back"), also: "reset widths restore layout", run: () => { win.navigatorCollapsed = false; win.inspectorCollapsed = false; win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector; win.savePanelWidths() } },
             { group: qsTr("View"), name: qsTr("Snap to guides"), also: "align magnet", run: () => backend.snapEnabled = !backend.snapEnabled },
             { group: qsTr("View"), name: backend.reducedMotion ? qsTr("Allow movement again") : qsTr("Less movement"), also: "reduced motion animation accessibility vestibular", run: () => backend.reducedMotion = !backend.reducedMotion },
             { group: qsTr("View"), name: backend.highContrast ? qsTr("Ordinary contrast") : qsTr("Stronger contrast"), also: "high contrast accessibility legible", run: () => backend.highContrast = !backend.highContrast },
@@ -596,7 +622,7 @@ ApplicationWindow {
                                    onTriggered: win.inspectorCollapsed = !win.inspectorCollapsed }
                         MenuItem { objectName: "resetPanels"; text: qsTr("Put the panels back")
                                    onTriggered: { win.navigatorCollapsed = false; win.inspectorCollapsed = false
-                                                  win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector } }
+                                                  win.navigatorWidth = Theme.wNavigator; win.inspectorWidth = Theme.wInspector; win.savePanelWidths() } }
                         MenuItem { objectName: "commandSearchMenuItem"; text: qsTr("Find a command…"); onTriggered: commandPalette.show() }
                         MenuSeparator {}
                         MenuItem { objectName: "reducedMotionItem"; checkable: true; checked: backend.reducedMotion
@@ -831,8 +857,9 @@ ApplicationWindow {
                 objectName: "navigatorGrip"
                 visible: win.workspace === 0 || win.workspace === 2
                 collapsed: win.navigatorCollapsed
-                onResized: delta => { win.navigatorCollapsed = false
-                                      win.navigatorWidth += delta; win.sanePanels() }
+                onResizeStarted: { win.navigatorCollapsed = false; win.panelDragStart = win.navigatorWidth }
+                onResizedBy: total => win.navigatorWidth = Math.round(win.clampNavigator(win.panelDragStart + total))
+                onResizeFinished: win.savePanelWidths()
                 onToggled: win.navigatorCollapsed = !win.navigatorCollapsed
             }
 
@@ -926,8 +953,9 @@ ApplicationWindow {
                 fromLeft: false
                 visible: win.editing
                 collapsed: win.inspectorCollapsed
-                onResized: delta => { win.inspectorCollapsed = false
-                                      win.inspectorWidth += delta; win.sanePanels() }
+                onResizeStarted: { win.inspectorCollapsed = false; win.panelDragStart = win.inspectorWidth }
+                onResizedBy: total => win.inspectorWidth = Math.round(win.clampInspector(win.panelDragStart + total))
+                onResizeFinished: win.savePanelWidths()
                 onToggled: win.inspectorCollapsed = !win.inspectorCollapsed
             }
             Inspector {
