@@ -50,6 +50,8 @@ Item {
     MouseArea {
         objectName: "pathDrawingArea"
         anchors.fill: parent; enabled: root.mode===1 || root.mode===2; cursorShape: Qt.CrossCursor; preventStealing: true
+        // Hidden when idle: a disabled area still shows its cursor.
+        visible: enabled
         function add(mouse) { const p=canvas.documentPoint(mouse.x,mouse.y); const last=root.points.length?root.points[root.points.length-1]:null; if(!last || Math.hypot(p.x-last.x,p.y-last.y)*canvas.s>=3) { if(root.points.length<10000) root.points=root.points.concat([{x:p.x,y:p.y}]); ghost.requestPaint() } }
         onPressed: mouse=> { if(root.mode===2) root.points=[]; add(mouse) }
         onPositionChanged: mouse=> { if(pressed && root.mode===2) add(mouse) }

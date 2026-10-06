@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Omashow 1.0
+import "canvascursor.js" as Cursors
 
 // The Edit canvas: the slide, plus selection. The slide itself is painted by
 // SlideView (the same renderer as the export); everything here is chrome drawn
@@ -70,6 +71,17 @@ Item {
         root.forceActiveFocus()
     }
 
+    // Cursors: an arrow over empty canvas, an open hand over anything a press
+    // would move, a closed hand while moving. A handle being dragged keeps its
+    // own cursor.
+    property int handleCursor: -1
+    readonly property int dragCursor: area.dragging || area.panning ? Qt.ClosedHandCursor : root.handleCursor
+    function canMoveAt(x, y) {
+        if (cropper.active || pathTools.mode === 1 || pathTools.mode === 2) return false
+        const p = root.documentPoint(x, y)
+        return backend.hitsObject(p.x, p.y)
+    }
+
     SlideView {
         Accessible.role: Accessible.Canvas
         Accessible.name: qsTr("Slide %1 of %2").arg(backend.currentSlide + 1).arg(backend.slideCount)
@@ -95,7 +107,10 @@ Item {
         id: area
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-        cursorShape: (dragging || panning) ? Qt.ClosedHandCursor : Qt.ArrowCursor
+        cursorShape: (dragging || panning) ? Qt.ClosedHandCursor : overObject ? Qt.OpenHandCursor : Qt.ArrowCursor
+        hoverEnabled: true
+        property bool overObject: false
+        onExited: overObject = false
 
         objectName: "canvasMouseArea"
         property bool panning: false
@@ -131,6 +146,7 @@ Item {
             backend.beginEdit(qsTr("Move object"))
         }
         onPositionChanged: (mouse) => {
+            if (!pressed) { overObject = root.canMoveAt(mouse.x, mouse.y); return }
             if (panning) { view.panBy(mouse.x-panGrab.x,mouse.y-panGrab.y); panGrab = Qt.point(mouse.x,mouse.y); return }
             const p = root.documentPoint(mouse.x, mouse.y)
             if (boxSelecting) { boxEnd = p; return }
@@ -140,7 +156,8 @@ Item {
                                     startRect.width, startRect.height,
                                     root.snapTolerance, true)
         }
-        onReleased: {
+        onReleased: (mouse) => {
+            overObject = root.canMoveAt(mouse.x, mouse.y)
             if (panning) { panning = false; return }
             if (boxSelecting) {
                 boxSelecting = false
@@ -152,7 +169,7 @@ Item {
             dragging = false
             backend.endEdit()
         }
-        onCanceled: { if (dragging) backend.cancelEdit(); dragging = false; boxSelecting = false; panning = false }
+        onCanceled: { if (dragging) backend.cancelEdit(); dragging = false; boxSelecting = false; panning = false; overObject = false }
         onWheel: wheel => {
             root.commitTextEdit()
             if (wheel.modifiers & Qt.ControlModifier) {
@@ -161,6 +178,7 @@ Item {
             } else {
                 const d = wheel.pixelDelta.x || wheel.pixelDelta.y ? wheel.pixelDelta : Qt.point(wheel.angleDelta.x/2,wheel.angleDelta.y/2)
                 view.panBy(d.x,d.y)
+                overObject = root.canMoveAt(wheel.x, wheel.y)
             }
             wheel.accepted = true
         }
@@ -237,6 +255,7 @@ Item {
                 onPressed: mouse => {
                     root.forceActiveFocus(); pivot=Qt.point(backend.selection.x+backend.selection.w/2,backend.selection.y+backend.selection.h/2)
                     lastAngle=angle(mouse); totalAngle=0; backend.beginEdit(qsTr("Rotate objects"))
+                    root.handleCursor = Qt.CrossCursor
                 }
                 onPositionChanged: mouse => {
                     if(!pressed) return
@@ -245,27 +264,31 @@ Item {
                     totalAngle+=delta; lastAngle=next
                     backend.rotateSelection(totalAngle,(mouse.modifiers & Qt.ShiftModifier)!==0)
                 }
-                onReleased: backend.endEdit()
-                onCanceled: backend.cancelEdit()
+                onReleased: { root.handleCursor = -1; backend.endEdit() }
+                onCanceled: { root.handleCursor = -1; backend.cancelEdit() }
             }
         }
         // Eight handles, each resizing from its own corner or edge.
         Repeater {
             model: [
-                { hx: 0,   hy: 0,   dx: 1, dy: 1, dw: -1, dh: -1, cur: Qt.SizeFDiagCursor },
-                { hx: 0.5, hy: 0,   dx: 0, dy: 1, dw:  0, dh: -1, cur: Qt.SizeVerCursor },
-                { hx: 1,   hy: 0,   dx: 0, dy: 1, dw:  1, dh: -1, cur: Qt.SizeBDiagCursor },
-                { hx: 1,   hy: 0.5, dx: 0, dy: 0, dw:  1, dh:  0, cur: Qt.SizeHorCursor },
-                { hx: 1,   hy: 1,   dx: 0, dy: 0, dw:  1, dh:  1, cur: Qt.SizeFDiagCursor },
-                { hx: 0.5, hy: 1,   dx: 0, dy: 0, dw:  0, dh:  1, cur: Qt.SizeVerCursor },
-                { hx: 0,   hy: 1,   dx: 1, dy: 0, dw: -1, dh:  1, cur: Qt.SizeBDiagCursor },
-                { hx: 0,   hy: 0.5, dx: 1, dy: 0, dw: -1, dh:  0, cur: Qt.SizeHorCursor }
+                { hx: 0,   hy: 0,   dx: 1, dy: 1, dw: -1, dh: -1 },
+                { hx: 0.5, hy: 0,   dx: 0, dy: 1, dw:  0, dh: -1 },
+                { hx: 1,   hy: 0,   dx: 0, dy: 1, dw:  1, dh: -1 },
+                { hx: 1,   hy: 0.5, dx: 0, dy: 0, dw:  1, dh:  0 },
+                { hx: 1,   hy: 1,   dx: 0, dy: 0, dw:  1, dh:  1 },
+                { hx: 0.5, hy: 1,   dx: 0, dy: 0, dw:  0, dh:  1 },
+                { hx: 0,   hy: 1,   dx: 1, dy: 0, dw: -1, dh:  1 },
+                { hx: 0,   hy: 0.5, dx: 1, dy: 0, dw: -1, dh:  0 }
             ]
 
             Rectangle {
                 required property var modelData
-                width: Theme.szHandle
-                height: Theme.szHandle
+                required property int index
+                objectName: "resizeHandle" + index
+                // The resize cursor nearest the handle's direction once rotated.
+                readonly property int cursor: [Qt.SizeHorCursor, Qt.SizeFDiagCursor, Qt.SizeVerCursor, Qt.SizeBDiagCursor][Cursors.handleAxis(modelData.hx, modelData.hy, selection.rotation)]
+                width: Cursors.handleSize(Theme.szHandle)
+                height: width
                 radius: Theme.rHandle
                 color: Theme.handleBg
                 border.color: Theme.accent
@@ -276,7 +299,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     anchors.margins: -Theme.szHandleHit
-                    cursorShape: modelData.cur
+                    cursorShape: parent.cursor
                     property point grabDoc
                     property rect startRect
 
@@ -286,6 +309,7 @@ Item {
                         startRect = Qt.rect(backend.selection.x, backend.selection.y,
                                             backend.selection.w, (backend.selection.h ?? 0))
                         backend.beginEdit(qsTr("Resize object"))
+                        root.handleCursor = parent.cursor
                     }
                     onPositionChanged: (mouse) => {
                         if (!pressed)
@@ -301,8 +325,8 @@ Item {
                                                 startRect.height + ddy * modelData.dh,
                                                 root.snapTolerance, false)
                     }
-                    onReleased: backend.endEdit()
-                    onCanceled: backend.cancelEdit()
+                    onReleased: { root.handleCursor = -1; backend.endEdit() }
+                    onCanceled: { root.handleCursor = -1; backend.cancelEdit() }
                 }
             }
         }
@@ -384,5 +408,18 @@ Item {
             Keys.onEscapePressed: root.commitTextEdit()
             onActiveFocusChanged: if (!activeFocus) root.commitTextEdit()
         }
+    }
+
+    // While something is moved, resized or rotated, its cursor stays put
+    // wherever the pointer wanders (other handles, objects, empty canvas).
+    // Takes no buttons and passes the wheel on, so it never catches input.
+    MouseArea {
+        objectName: "dragCursorOverlay"
+        anchors.fill: parent
+        z: 100
+        acceptedButtons: Qt.NoButton
+        visible: root.dragCursor >= 0
+        cursorShape: root.dragCursor >= 0 ? root.dragCursor : Qt.ArrowCursor
+        onWheel: wheel => wheel.accepted = false
     }
 }

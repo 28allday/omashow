@@ -294,6 +294,8 @@ public:
     Q_INVOKABLE void moveSlide(int from, int to);
 
     Q_INVOKABLE bool selectAt(qreal x, qreal y, bool extend = false, bool behind = false);
+    // Whether a click at this slide point would pick (and so could move) an object.
+    Q_INVOKABLE bool hitsObject(qreal x, qreal y) const;
     Q_INVOKABLE void select(const QString &id);
     Q_INVOKABLE void clearSelection();
 
