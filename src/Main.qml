@@ -1145,6 +1145,27 @@ ApplicationWindow {
         anchors.centerIn: parent
         property var candidates: []
 
+        // Runs in the sheet's scope, not the row's: replacing `candidates`
+        // destroys the row that was clicked, and a handler still running in
+        // that row loses its ids (ReferenceError) before it can close the sheet.
+        function settle(handledPath) {
+            const remaining = backend.recoveryCandidates()
+                .filter(c => c.journalPath !== handledPath)
+            if (remaining.length === 0)
+                close()
+            candidates = remaining
+        }
+        function discard(journalPath) {
+            backend.discardRecovery(journalPath)
+            settle(journalPath)
+        }
+        function recover(journalPath) {
+            // The journal is forgotten only once the open finishes, so leave it
+            // out of what remains rather than offering it again.
+            backend.openAsync("file://" + journalPath, true)
+            settle(journalPath)
+        }
+
         ColumnLayout {
             spacing: Theme.s3
 
@@ -1178,21 +1199,11 @@ ApplicationWindow {
                     Item { Layout.fillWidth: true }
                     ToolAction {
                         text: qsTr("Discard")
-                        onClicked: {
-                            backend.discardRecovery(modelData.journalPath)
-                            recoverySheet.candidates = backend.recoveryCandidates()
-                            if (recoverySheet.candidates.length === 0)
-                                recoverySheet.close()
-                        }
+                        onClicked: recoverySheet.discard(modelData.journalPath)
                     }
                     ToolAction {
                         text: qsTr("Recover")
-                        onClicked: {
-                            backend.openAsync("file://" + modelData.journalPath, true)
-                            recoverySheet.candidates = backend.recoveryCandidates()
-                            if (recoverySheet.candidates.length === 0)
-                                recoverySheet.close()
-                        }
+                        onClicked: recoverySheet.recover(modelData.journalPath)
                     }
                 }
             }
