@@ -84,6 +84,9 @@ class Backend : public QObject {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY documentChanged)
     Q_PROPERTY(QString undoLabel READ undoLabel NOTIFY documentChanged)
     Q_PROPERTY(QSizeF slideSize READ slideSize NOTIFY documentChanged)
+    // Points per slide unit, as a pptx is written (the slide 12192000 EMU,
+    // 960 pt, wide). Type is stored in units and shown in points.
+    Q_PROPERTY(qreal ptPerUnit READ ptPerUnit NOTIFY documentChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY documentChanged)
     Q_PROPERTY(bool snapEnabled READ snapEnabled WRITE setSnapEnabled NOTIFY snapEnabledChanged)
     // The alignments the current drag is sitting on, for the canvas to draw.
@@ -262,6 +265,7 @@ public:
     bool canRedo() const { return m_history.canRedo(); }
     QString undoLabel() const { return m_history.undoLabel(); }
     QSizeF slideSize() const { return m_document.size; }
+    qreal ptPerUnit() const { return 12192000.0 / qMax(1.0, m_document.size.width()) / 12700.0; }
     bool modified() const { return m_modified; }
     bool snapEnabled() const { return m_snapEnabled; }
     void setSnapEnabled(bool enabled);
