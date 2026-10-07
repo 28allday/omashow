@@ -73,7 +73,8 @@ RowLayout {
                 ToolAction { icon.name: "plus"; text: qsTr("Build Out"); enabled: target.currentIndex >= 0; tip: qsTr("Add a build that takes the object away"); onClicked: root.add(1) }
                 Item { Layout.fillWidth: true }
                 ToolAction { icon.name: "eye"; text: qsTr("Preview"); enabled: !!root.build.targetId; tip: qsTr("Play the selected build"); onClicked: backend.previewBuild(root.selectedBuild) }
-                Button { icon.name: backend.playing ? "pause" : "play"; text: backend.playing ? qsTr("Pause") : qsTr("Play"); highlighted: true
+                // "Play Slide", not "Play": the toolbar's Play (the show) sits right above this one (#16).
+                Button { objectName: "playSlide"; icon.name: backend.playing ? "pause" : "play"; text: backend.playing ? qsTr("Pause") : qsTr("Play Slide"); highlighted: true
                          implicitHeight: Theme.hToolButton; onClicked: backend.previewSlide()
                          ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay; ToolTip.text: qsTr("Play this slide's builds  Space") }
             }
