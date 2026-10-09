@@ -8,6 +8,7 @@
 #include "render/scenerenderer.h"
 
 #include <QPainter>
+#include <QPainterPath>
 #include <QQuickWindow>
 #include <QPaintEngine>
 #include <cmath>
@@ -93,8 +94,17 @@ void SlideView::paint(QPainter *painter) {
     painter->scale(m_scale, m_scale);
     if (m_cropObject.isEmpty()) SceneRenderer::paint(*painter, m_states);
     else for (const auto &o : m_states) {
-        if (o.id == m_cropObject && o.type == ObjectType::Image)
+        if (o.id == m_cropObject && o.type == ObjectType::Image) {
+            // Only around the kept frame, so pictures with transparency stay
+            // clean inside; the kept part is then drawn normally on top.
+            const auto cut = ImageCrop::cutArea(o);
+            painter->save();
+            painter->setClipPath(cut, Qt::IntersectClip);
             SceneRenderer::paint(*painter, {ImageCrop::preview(o)});
+            if (o.imageFormat == QLatin1String("svg")) // vectors skip the colour adjustment
+                painter->fillPath(cut, QColor::fromRgbF(0, 0, 0, ImageCrop::cutDarken * ImageCrop::cutOpacity * o.opacity));
+            painter->restore();
+        }
         SceneRenderer::paint(*painter, {o});
     }
     painter->restore();

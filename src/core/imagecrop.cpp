@@ -1,5 +1,6 @@
 #include "core/imagecrop.h"
 #include "core/imageasset.h"
+#include <QPainterPath>
 #include <QTransform>
 #include <cmath>
 namespace {
@@ -43,8 +44,34 @@ SceneObject ImageCrop::preview(const SceneObject &o) {
   result.imageCrop = QRectF(0, 0, 1, 1);
   result.imageMode = 2;
   result.imageMask = 0;
-  result.opacity *= .25;
+  // Dimmed through the cached colour adjustment (computed once per picture),
+  // with only a light fade: at 25% the copy looked washed out and let the
+  // background show through. The darkening folds into the tint mix, which
+  // ImageAsset applies last: v*(1-a)+t*a, scaled by (1 - cutDarken).
+  result.opacity = o.opacity * ImageCrop::cutOpacity;
+  result.imageSaturation = o.imageSaturation * ImageCrop::cutSaturation;
+  const qreal keep = 1 - ImageCrop::cutDarken,
+              amount = 1 - keep * (1 - o.imageTintAmount),
+              tint = keep * o.imageTintAmount / amount;
+  result.imageTintAmount = amount;
+  result.imageTint = QColor::fromRgbF(o.imageTint.redF() * tint,
+                                      o.imageTint.greenF() * tint,
+                                      o.imageTint.blueF() * tint);
   return result;
+}
+QPainterPath ImageCrop::cutArea(const SceneObject &o) {
+  const auto picture = preview(o);
+  QTransform turn;
+  turn.translate(picture.rect.center().x(), picture.rect.center().y());
+  turn.rotate(o.rotation);
+  turn.translate(-picture.rect.center().x(), -picture.rect.center().y());
+  QPainterPath area;
+  area.setFillRule(Qt::OddEvenFill);
+  area.addPolygon(turn.map(QPolygonF(picture.rect)));
+  area.closeSubpath();
+  area.addPolygon(rotation(o).map(QPolygonF(frame(o) & o.rect)));
+  area.closeSubpath();
+  return area;
 }
 bool ImageCrop::resize(SceneObject &result, const SceneObject &basis,
                        int handle, const QPointF &documentPoint,
