@@ -77,6 +77,9 @@
         <file alias="ToolTip.qml">style/OmaShowStyle/ToolTip.qml</file>
         <file alias="qmldir">style/OmaShowStyle/qmldir</file>
     </qresource>
+    <qresource prefix="/fonts">
+        <file alias="office-font-map.json">fonts/office/office-font-map.json</file>
+    </qresource>
     <qresource prefix="/ui">
         <file alias="Icon.qml">ui/Icon.qml</file>
         <file alias="icons/Icons.qml">ui/icons/Icons.qml</file>

@@ -35,6 +35,7 @@ void DeckResize::scaleObject(SceneObject &o, qreal scale, const QPointF &origin)
   o.rect = QRectF(origin + (o.rect.topLeft() - origin) * scale, o.rect.size() * scale);
   Table::scale(o.table, scale);
   o.fontSize *= scale;
+  o.origFontSize *= scale;   // a swapped Office font's size before its size factor
   o.letterSpacing *= scale;
   o.paragraphSpacing *= scale;
   o.textIndent *= scale;

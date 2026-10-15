@@ -34,13 +34,24 @@ struct TextRun {
     QString fontFamily;
     QColor color;                // invalid inherits
     QString language;            // empty inherits: what this stretch is written in
+    // Font swapping on PowerPoint import (core/fontswap.h): the Office family
+    // this stretch named before a free match stood in for it, the size it had
+    // (0: it inherited the box's), the factor that size was multiplied by
+    // (1: none), and the weight before the Office family's named weight was
+    // applied (0: unchanged, 1: it inherited the box's). Written back as they
+    // were on PowerPoint save.
+    QString origFont;
+    qreal origFontSize = 0, fontScale = 1;
+    int origWeight = 0;
     bool operator==(const TextRun &other) const {
         return start == other.start && length == other.length && weight == other.weight &&
                italic == other.italic && underline == other.underline &&
                strike == other.strike && baseline == other.baseline &&
                qFuzzyCompare(fontSize + 1, other.fontSize + 1) &&
                fontFamily == other.fontFamily && color == other.color &&
-               language == other.language;
+               language == other.language && origFont == other.origFont &&
+               qFuzzyCompare(origFontSize + 1, other.origFontSize + 1) &&
+               qFuzzyCompare(fontScale, other.fontScale) && origWeight == other.origWeight;
     }
 };
 
@@ -136,6 +147,12 @@ struct SceneObject {
     qreal columnGap = 0;     // 0 uses one line of space between columns
     int direction = 0;       // 0 follows the words, 1 left to right, 2 right to left
     QString fontFamily = QStringLiteral("Inter");
+    // The Office family this box named before a free match stood in for it on
+    // PowerPoint import, with its size and weight then and the size factor
+    // applied (1: none, the match is metric-compatible). See core/fontswap.h.
+    QString origFont;
+    qreal origFontSize = 0, fontScale = 1;
+    int origWeight = 0;
     QString fillToken, textColorToken, fontToken;
     // Stretches of this text that differ from the box, in authored order.
     QVector<TextRun> runs;
@@ -192,6 +209,12 @@ struct DeckTheme {
         {QStringLiteral("heading"), QStringLiteral("Inter")},
         {QStringLiteral("body"), QStringLiteral("Inter")}
     };
+    // Theme font slot → the Office family it named before a free match stood
+    // in for it on PowerPoint import.
+    QMap<QString, QString> fontOrigins;
+    // Office family → the installed fallback that stood in for it (no mapped
+    // free match was installed), so saving knows it was not chosen by hand.
+    QMap<QString, QString> fontFallbacks;
 };
 
 struct MasterFields {

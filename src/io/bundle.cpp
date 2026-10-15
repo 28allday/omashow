@@ -37,7 +37,14 @@ QColor colorFromString(const QString &value, const QColor &fallback) {
 }
 
 QJsonObject objectToJson(const SceneObject &object) {
-    return QJsonObject::fromVariantMap(Design::properties(object));
+    auto json = QJsonObject::fromVariantMap(Design::properties(object));
+    // Only an imported PowerPoint box whose Office font was swapped carries
+    // these; leaving them out otherwise keeps every other deck readable by
+    // builds that do not know them.
+    if (object.origFont.isEmpty()) {
+        for (const auto *key : {"origFont", "origFontSize", "fontScale", "origWeight"}) json.remove(QLatin1String(key));
+    }
+    return json;
 }
 SceneObject objectFromJson(const QJsonObject &json) {
     SceneObject object;
@@ -286,6 +293,18 @@ QJsonObject themeJson(const Document &document) {
     for (auto it = document.theme.fonts.cbegin(); it != document.theme.fonts.cend(); ++it)
         fonts[it.key()] = it.value();
     theme["colors"] = colors; theme["fonts"] = fonts;
+    if (!document.theme.fontOrigins.isEmpty()) {
+        QJsonObject origins;
+        for (auto it = document.theme.fontOrigins.cbegin(); it != document.theme.fontOrigins.cend(); ++it)
+            origins[it.key()] = it.value();
+        theme["fontOrigins"] = origins;
+    }
+    if (!document.theme.fontFallbacks.isEmpty()) {
+        QJsonObject fallbacks;
+        for (auto it = document.theme.fontFallbacks.cbegin(); it != document.theme.fontFallbacks.cend(); ++it)
+            fallbacks[it.key()] = it.value();
+        theme["fontFallbacks"] = fallbacks;
+    }
     return theme;
 }
 
@@ -448,6 +467,12 @@ Bundle::ReadResult Bundle::fromBytes(const QByteArray &raw) {
             document.theme.colors[it.key()] = color;
         }
         for (auto it = fonts.begin(); it != fonts.end(); ++it) document.theme.fonts[it.key()] = it.value().toString();
+        const auto origins = theme.value("fontOrigins").toObject();
+        for (auto it = origins.begin(); it != origins.end(); ++it)
+            if (it.value().isString() && it.value().toString().size() <= 256) document.theme.fontOrigins[it.key()] = it.value().toString();
+        const auto fallbacks = theme.value("fontFallbacks").toObject();
+        for (auto it = fallbacks.begin(); it != fallbacks.end(); ++it)
+            if (it.key().size() <= 256 && it.value().isString() && it.value().toString().size() <= 256) document.theme.fontFallbacks[it.key()] = it.value().toString();
         QSet<QString> masterIds, layoutIds;
         for (const auto &value : design.value("masters").toArray()) {
             const auto json = value.toObject(); Master m;
