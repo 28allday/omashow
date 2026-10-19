@@ -31,6 +31,7 @@ QStringList Design::textStyleKeys() {
 SceneObject Design::themed(const DeckTheme &theme, SceneObject o) {
     o.fill = theme.colors.value(o.fillToken, o.fill);
     o.textColor = theme.colors.value(o.textColorToken, o.textColor);
+    o.strokeColor = theme.colors.value(o.strokeColorToken, o.strokeColor);
     o.fontFamily = theme.fonts.value(o.fontToken, o.fontFamily);
     if(o.type==ObjectType::Chart) o.chart.resolvedColors=Chart::palette(theme,o.chart.palette);
     o.table.headerFill = theme.colors.value(o.table.headerFillToken,o.table.headerFill);
@@ -61,7 +62,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"tabStop",o.tabStop},{"columns",o.columns},{"columnGap",o.columnGap},{"direction",o.direction},
             {"language",o.language},
             {"fontFamily", o.fontFamily}, {"uppercase", o.uppercase}, {"letterSpacing", o.letterSpacing},
-            {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken},
+            {"fillToken", o.fillToken}, {"textColorToken", o.textColorToken}, {"fontToken", o.fontToken}, {"strokeColorToken", o.strokeColorToken},
             {"altTitle", o.altTitle}, {"altText", o.altText}, {"runs", TextRuns::encode(o.runs)},
             {"placeholderId", o.placeholderId}, {"textStyleId", o.textStyleId}, {"overrides", o.overrides}, {"groups", o.groups}, {"locked", o.locked}, {"hidden", o.hidden}};
 }
@@ -196,6 +197,7 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "fillToken") o.fillToken = v.toString();
     else if (key == "textColorToken") o.textColorToken = v.toString();
     else if (key == "fontToken") o.fontToken = v.toString();
+    else if (key == "strokeColorToken") o.strokeColorToken = v.toString();
     else if (key == "runs") {
         // Not clipped here: the text may not have been set yet, and clipping
         // an unset string would silently drop every stretch.
@@ -244,6 +246,7 @@ Slide Design::resolve(const Document &d, int index) {
                     setProperty(o, key, values.value(key), false);
                     if (key == "fill") o.fillToken = local.fillToken;
                     if (key == "textColor") o.textColorToken = local.textColorToken;
+                    if (key == "strokeColor") o.strokeColorToken = local.strokeColorToken;
                     if (key == "fontFamily") o.fontToken = local.fontToken;
                     if (key == "imageId") ImageAsset::copyData(o,local);
                 }
@@ -266,15 +269,18 @@ Slide Design::resolve(const Document &d, int index) {
 }
 DeckTheme Design::preset(int index) {
     DeckTheme theme;
+    theme.colors.insert({{"surface", QColor(24,30,42)}, {"border", QColor(52,62,78)}});
     if (index == 1) {
         theme.name = QStringLiteral("Paper");
         theme.colors = {{"background", QColor(247,244,237)}, {"foreground", QColor(35,38,42)},
-                        {"muted", QColor(93,99,107)}, {"accent", QColor(168,58,39)}};
+                        {"muted", QColor(93,99,107)}, {"accent", QColor(168,58,39)},
+                        {"surface", QColor(236,232,222)}, {"border", QColor(205,199,186)}};
         theme.fonts["heading"] = QStringLiteral("Noto Serif");
     } else if (index == 2) {
         theme.name = QStringLiteral("Grove");
         theme.colors = {{"background", QColor(17,38,33)}, {"foreground", QColor(240,243,223)},
-                        {"muted", QColor(177,198,180)}, {"accent", QColor(216,231,144)}};
+                        {"muted", QColor(177,198,180)}, {"accent", QColor(216,231,144)},
+                        {"surface", QColor(27,54,47)}, {"border", QColor(60,92,82)}};
     }
     return theme;
 }
@@ -311,7 +317,7 @@ void Design::ensureDefaults(Document &d) {
 }
 SceneObject Design::detached(SceneObject o) {
     o.placeholderId.clear(); o.textStyleId.clear(); o.overrides.clear();
-    o.fillToken.clear(); o.textColorToken.clear(); o.fontToken.clear();
+    o.fillToken.clear(); o.textColorToken.clear(); o.fontToken.clear(); o.strokeColorToken.clear();
     if(o.type==ObjectType::Table || o.type==ObjectType::Chart) {o.table.headerFillToken.clear();o.table.borderColorToken.clear();}
     if(o.type==ObjectType::Chart && !o.chart.resolvedColors.isEmpty()) {
         const int columns=o.table.columns.size();
@@ -375,6 +381,7 @@ void Design::markOverride(SceneObject &o, const QString &key) {
     if (!o.placeholderId.isEmpty() && !o.overrides.contains(key)) o.overrides.append(key);
     if (key == "fill") o.fillToken.clear();
     if (key == "textColor") o.textColorToken.clear();
+    if (key == "strokeColor") o.strokeColorToken.clear();
     if (key == "fontFamily") o.fontToken.clear();
 }
 void Design::reset(SceneObject &o, bool geometry) {

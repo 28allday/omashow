@@ -136,7 +136,7 @@ struct SceneObject {
     qreal columnGap = 0;     // 0 uses one line of space between columns
     int direction = 0;       // 0 follows the words, 1 left to right, 2 right to left
     QString fontFamily = QStringLiteral("Inter");
-    QString fillToken, textColorToken, fontToken;
+    QString fillToken, textColorToken, fontToken, strokeColorToken;
     // Stretches of this text that differ from the box, in authored order.
     QVector<TextRun> runs;
     // What a screen reader would be told this is. Never rendered.

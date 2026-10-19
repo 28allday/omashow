@@ -114,7 +114,7 @@ effect number.
 | Tables and charts | `addTable` / `addChart`, then **`table.setCells`** with a list of rows — the chart's row 0 is series names, column 0 categories. From the top-left it replaces the whole grid. Cell styling: `table.selectCell` then `table.formatCells`; `table.setTableOption headerRows true`. `inspect` shows the words as `cells` |
 | Equations | `addEquation`, then `setSelectedProperty` `text` with TeX-ish source |
 | Words on a shape | `putTextOnShape` with a text box and a shape selected |
-| Design | `applyTheme`, `applyLayout`, `setThemeToken` (a colour or font of the theme) |
+| Design | `applyTheme`, `applyLayout`, `setThemeToken` (a colour or font of the theme), `applyOmarchyTheme` (an Omarchy theme's colours, e.g. `"flexoki-light"`; titles take its accent, body text its foreground, and it adds `surface` (box fills) and `border` (`strokeColorToken`) colours; `omarchyThemes` lists them) |
 | Movement | `addBuild`, `setBuildProperty`, `setSlideTransition` |
 | Bullets one at a time | `addBuild(id, "in", "reveal")` then `setBuildProperty(i, "unit", "paragraphs")` — only `reveal` takes a unit |
 | Speaker | `setSlideNotes` |
