@@ -37,7 +37,11 @@ QColor colorFromString(const QString &value, const QColor &fallback) {
 }
 
 QJsonObject objectToJson(const SceneObject &object) {
-    return QJsonObject::fromVariantMap(Design::properties(object));
+    auto properties = Design::properties(object);
+    // Not saved, so older OmaShow still opens the deck; Omarchy theme
+    // switches relink borders by colour instead.
+    properties.remove(QStringLiteral("strokeColorToken"));
+    return QJsonObject::fromVariantMap(properties);
 }
 SceneObject objectFromJson(const QJsonObject &json) {
     SceneObject object;

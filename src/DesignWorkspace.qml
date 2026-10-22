@@ -168,6 +168,7 @@ RowLayout {
         }
         ComboBox {
             objectName: "omarchyThemeBox"
+            visible: count > 0
             Layout.fillWidth: true
             model: backend.omarchyThemes()
             readonly property int shown: model.indexOf(typeof root.previewTheme === "string" ? root.previewTheme : root.previewTheme < 0 ? root.info.name : "")

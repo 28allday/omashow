@@ -5,7 +5,6 @@
 #include "anim/presentation.h"
 #include "theme.h"
 #include <QDir>
-#include <QFileInfo>
 #include <QDate>
 
 QVariantMap Backend::design() const {
@@ -119,22 +118,9 @@ static QStringList omarchyThemeDirs() {
           qEnvironmentVariable("OMARCHY_PATH", QStringLiteral("/usr/share/omarchy")) +
               QStringLiteral("/themes")};
 }
-QStringList Backend::omarchyThemes() const {
-  QStringList names;
-  for (const auto &dir : omarchyThemeDirs())
-    for (const auto &name : QDir(dir).entryList(QDir::Dirs | QDir::NoDotAndDotDot))
-      if (QFileInfo::exists(dir + '/' + name + QStringLiteral("/colors.toml")))
-        names += name;
-  names.removeDuplicates();
-  names.sort();
-  return names;
-}
-// Takes a theme's colours, keeps the deck's fonts. "Matte Black" and
-// "matte-black" both name the folder.
-bool Backend::omarchyRestyle(Document &d, const QString &name) {
-  const auto folder = name.trimmed().toLower().replace(QLatin1Char(' '), QLatin1Char('-'));
-  if (folder.isEmpty() || folder.contains(QLatin1Char('/')))
-    return false;
+// A theme folder's deck colours, or none when its colors.toml is missing or
+// lacks a valid colour the deck needs.
+static QMap<QString, QColor> omarchyColors(const QString &folder) {
   QHash<QString, QString> colors;
   for (const auto &dir : omarchyThemeDirs()) {
     colors = OmarchyTheme::colorsFromFile(dir + '/' + folder + QStringLiteral("/colors.toml"));
@@ -155,9 +141,29 @@ bool Backend::omarchyRestyle(Document &d, const QString &name) {
   for (const auto &[deck, omarchy] : sources) {
     const QColor color(colors.value(omarchy));
     if (!color.isValid())
-      return false;
+      return {};
     next[deck] = color;
   }
+  return next;
+}
+QStringList Backend::omarchyThemes() const {
+  QStringList names;
+  for (const auto &dir : omarchyThemeDirs())
+    for (const auto &name : QDir(dir).entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+      if (!names.contains(name) && !omarchyColors(name).isEmpty())
+        names += name;
+  names.sort();
+  return names;
+}
+// Takes a theme's colours, keeps the deck's fonts. "Matte Black" and
+// "matte-black" both name the folder.
+bool Backend::omarchyRestyle(Document &d, const QString &name) {
+  const auto folder = name.trimmed().toLower().replace(QLatin1Char(' '), QLatin1Char('-'));
+  if (folder.isEmpty() || folder.contains(QLatin1Char('/')))
+    return false;
+  const auto next = omarchyColors(folder);
+  if (next.isEmpty())
+    return false;
   // Titles take the accent and body text the theme's own text colour. A
   // colour picked by hand that equals one of the old theme's colours becomes
   // that colour's token, so it follows along.
