@@ -248,13 +248,13 @@ Sheet {
                 ComboBox { Layout.fillWidth: true; model: [qsTr("Top"),qsTr("Middle"),qsTr("Bottom")]; currentIndex: root.cell.verticalAlign ?? 1; Accessible.name: qsTr("Cell vertical alignment"); onActivated: root.format("verticalAlign",currentIndex) }
                 ComboBox { Layout.fillWidth: true; model: [qsTr("Clip with overflow warning"),qsTr("Shrink text to fit")]; currentIndex: root.cell.textFit ?? 0; Accessible.name: qsTr("Cell text fit"); onActivated: root.format("textFit",currentIndex) }
                 Label { textFormat: Text.PlainText; text: qsTr("Text colour"); color: Theme.textMuted }
-                TextField { Layout.fillWidth: true; text: root.cell.textColor ?? ""; Accessible.name: qsTr("Cell text colour"); onEditingFinished: root.format("textColor",text) }
+                ColorField { Layout.fillWidth: true; value: root.cell.textColor ?? ""; accessibleName: qsTr("Cell text colour"); onPicked: v => root.format("textColor",v) }
                 Label { textFormat: Text.PlainText; text: qsTr("Fill colour"); color: Theme.textMuted }
-                TextField { Layout.fillWidth: true; text: root.cell.fill ?? ""; Accessible.name: qsTr("Cell fill colour"); onEditingFinished: root.format("fill",text) }
+                ColorField { Layout.fillWidth: true; value: root.cell.fill ?? ""; accessibleName: qsTr("Cell fill colour"); onPicked: v => root.format("fill",v) }
                 Button { text: qsTr("Use table fill"); onClicked: root.format("fill",null) }
                 NumField { Layout.fillWidth: true; label: qsTr("Padding"); value: root.cell.padding ?? 12; onCommitted: value => root.format("padding",value) }
                 NumField { Layout.fillWidth: true; label: qsTr("Border"); value: root.cell.borderWidth ?? 1; step: .5; onCommitted: value => root.format("borderWidth",value) }
-                TextField { Layout.fillWidth: true; text: root.cell.borderColor ?? ""; Accessible.name: qsTr("Cell border colour"); onEditingFinished: root.format("borderColor",text) }
+                ColorField { Layout.fillWidth: true; value: root.cell.borderColor ?? ""; accessibleName: qsTr("Cell border colour"); onPicked: v => root.format("borderColor",v) }
                 Label { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: (root.info.overflow ?? 0)>0; text: qsTr("%1 cells overflow. Increase their space, reduce padding/font size, or use Shrink text to fit.").arg(root.info.overflow ?? 0); color: Theme.accent }
                 }
             }

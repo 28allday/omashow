@@ -391,6 +391,8 @@ Item {
                 }
             }
             selectByMouse: true
+            // The words stay selected while the colour chooser is in front.
+            persistentSelection: true
             // The inspector formats whatever is selected here, so it needs to
             // know what that is — and to be rebuilt when the looks change.
             onSelectionStartChanged: backend.setTextSelection(selectionStart, selectionEnd)
@@ -398,7 +400,7 @@ Item {
             Connections {
                 target: backend
                 function onTextFormattingChanged() {
-                    if (!textEditor.activeFocus) return
+                    if (!root.editingText) return
                     const from = textEditor.selectionStart, to = textEditor.selectionEnd
                     textEditor.text = backend.selection.editHtml
                     textEditor.select(from, to)
@@ -406,7 +408,12 @@ Item {
             }
 
             Keys.onEscapePressed: root.commitTextEdit()
-            onActiveFocusChanged: if (!activeFocus) root.commitTextEdit()
+            onActiveFocusChanged: if (!activeFocus && !Sheets.holdsTextEdit) root.commitTextEdit()
+            // The colour chooser closed: the words it coloured go on being edited.
+            Connections {
+                target: Sheets
+                function onHoldsTextEditChanged() { if (!Sheets.holdsTextEdit && root.editingText) textEditor.forceActiveFocus() }
+            }
         }
     }
 

@@ -45,13 +45,16 @@ Rectangle {
     // With nothing selected the map is empty, and the panel's bindings still
     // evaluate even though it is hidden — so the colour reads go through here
     // rather than handing QColor an undefined.
-    readonly property color swatch: {
-        const value = root.isText ? root.sel.textColor : root.sel.fill
-        return value !== undefined ? value : Theme.controlBg
-    }
     readonly property string swatchText: {
+        // Selected words have a colour of their own.
+        if (isText && range.active)
+            return (range.mixed ?? []).includes("color") ? "" : (range.color ?? "")
         const value = root.isText ? root.sel.textColor : root.sel.fill
         return value !== undefined ? value : ""
+    }
+    function pickColour(v) {
+        if (isText && range.active) backend.formatSelection("color", v)
+        else backend.setSelectedProperty(isText ? "textColor" : "fill", v)
     }
 
     Connections {
@@ -138,13 +141,9 @@ Rectangle {
         }
         FieldRow {
             label: qsTr("Background")
-            Rectangle {
-                implicitWidth: Theme.hControl; implicitHeight: Theme.hControl; radius: Theme.rControl
-                color: backend.slideDesign.background || Theme.controlBg
-                border.color: Theme.borderStrong; border.width: Theme.hairline
-            }
-            TextField { Layout.fillWidth: true; text: backend.slideDesign.background ?? ""; font.family: Theme.monoFamily
-                        placeholderText: qsTr("Master"); onEditingFinished: backend.setSlideBackground(text) }
+            ColorField { value: backend.slideDesign.background ?? ""; placeholder: qsTr("Master")
+                         accessibleName: qsTr("Slide background colour")
+                         onPicked: v => backend.setSlideBackground(v) }
         }
         FieldRow {
             label: ""
@@ -249,21 +248,11 @@ Rectangle {
             FieldRow {
                 label: root.isText ? qsTr("Colour") : qsTr("Fill")
                 visible: !root.isImage && !root.isMedia
-                Rectangle {
-                    implicitWidth: Theme.hControl + Theme.s3
-                    implicitHeight: Theme.hControl
-                    radius: Theme.rControl
-                    color: root.swatch
-                    border.color: Theme.borderStrong
-                    border.width: Theme.hairline
-                }
-                TextField {
-                    Layout.fillWidth: true
-                    text: root.swatchText
-                    font.family: Theme.monoFamily
-                    Accessible.name: root.isText ? qsTr("Text colour") : qsTr("Fill colour")
-                    onEditingFinished:
-                        backend.setSelectedProperty(root.isText ? "textColor" : "fill", text)
+                ColorField {
+                    value: root.swatchText
+                    placeholder: (root.range.mixed ?? []).includes("color") ? qsTr("Mixed") : ""
+                    accessibleName: root.isText ? qsTr("Text colour") : qsTr("Fill colour")
+                    onPicked: v => root.pickColour(v)
                 }
             }
 
