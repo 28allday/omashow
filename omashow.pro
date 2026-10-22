@@ -183,3 +183,5 @@ HEADERS += src/io/interchange.h src/io/pptx.h src/io/keynote.h src/io/pptxwriter
 SOURCES += src/io/interchange.cpp src/io/pptx.cpp src/io/keynote.cpp src/io/pptxwriter.cpp
 HEADERS += src/core/fonts.h
 SOURCES += src/core/fonts.cpp
+HEADERS += src/core/fontswap.h
+SOURCES += src/core/fontswap.cpp

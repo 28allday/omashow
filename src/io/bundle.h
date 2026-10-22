@@ -48,7 +48,9 @@ namespace Bundle {
 // Format 23 adds the language a deck, a box or a stretch of text is written in,
 // the words the deck has been taught, and whether it smartens punctuation.
 // Format 24 adds the cover, uncover, fade-through-black, zoom and whirl transitions.
-constexpr int kFormatVersion = 24;
+// Format 25 adds the Office font a box was written in and the size that makes
+// its stand-in set as wide (origFont, origFontSize, fontScale, origWeight).
+constexpr int kFormatVersion = 25;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

@@ -4,6 +4,7 @@
 #include "core/chart.h"
 #include "core/design.h"
 #include "core/fonts.h"
+#include "core/fontswap.h"
 #include "core/mediaasset.h"
 #include "core/shape.h"
 #include "core/table.h"
@@ -1427,7 +1428,16 @@ struct Writer {
 
 namespace PptxWriter {
 
-QByteArray bytes(const Document &document, QStringList *warnings, const std::shared_ptr<Workers::Job> &job) {
+// What PowerPoint is given: the deck with every Office font that was swapped
+// for a free match on import named again, at its own size (FontSwap::revert).
+static Document forPowerPoint(const Document &document) {
+    Document copy = document;
+    FontSwap::revert(copy);
+    return copy;
+}
+
+QByteArray bytes(const Document &original, QStringList *warnings, const std::shared_ptr<Workers::Job> &job) {
+    const Document document = forPowerPoint(original);
     Writer writer(document);
     writer.job = job;
     const auto out = writer.run();
@@ -1453,8 +1463,12 @@ Report write(const Document &document, const QString &path, const std::shared_pt
     report.lines.prepend(QStringLiteral("Wrote %1 slides as PowerPoint.").arg(document.slides.size()));
     // The deck names its typefaces and cannot carry them: say which, so the
     // person it goes to can be told.
-    const auto families = Fonts::families(document);
-    if (!families.isEmpty()) report.lines.append(QStringLiteral("It asks for the typefaces %1; anyone opening it needs them installed to see it as designed.").arg(families.keys().join(QStringLiteral(", "))));
+    // Office's own fonts (named again in place of their free matches) are
+    // on every computer with PowerPoint, so they are not listed.
+    QStringList families;
+    for (const auto &family : Fonts::families(forPowerPoint(document)).keys())
+        if (!FontSwap::isOffice(family)) families.append(family);
+    if (!families.isEmpty()) report.lines.append(QStringLiteral("It asks for the typefaces %1; anyone opening it needs them installed to see it as designed.").arg(families.join(QStringLiteral(", "))));
     return report;
 }
 

@@ -1034,6 +1034,18 @@ ApplicationWindow {
                         onClicked: backend.dismissImportReport()
                     }
                 }
+                // Office fonts this computer lacks, and the free matches drawn instead.
+                Label {
+                    objectName: "importFontSwaps"
+                    readonly property var swaps: parent.parent.report.fontSwaps ?? []
+                    visible: swaps.length > 0
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Theme.s5
+                    wrapMode: Text.Wrap
+                    color: Theme.textSecondary
+                    text: qsTr("Office fonts drawn with free matches: %1. Saving as PowerPoint names the originals again.")
+                          .arg(swaps.map(s => s.office + " → " + s.free + (s.metric ? "" : " (" + Math.round(s.size * 100) + "% size)")).join(", "))
+                }
                 Repeater {
                     model: parent.parent.open ? parent.parent.notes : []
                     delegate: Label {

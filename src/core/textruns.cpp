@@ -153,15 +153,21 @@ QVector<TextRun> TextRuns::afterEdit(const QVector<TextRun> &runs, const QString
 
 QVariantList TextRuns::encode(const QVector<TextRun> &runs) {
     QVariantList rows;
-    for (const auto &run : runs)
-        rows.append(QVariantMap{{"start", run.start}, {"length", run.length},
-                                {"weight", run.weight}, {"italic", run.italic},
-                                {"underline", run.underline}, {"strike", run.strike},
-                                {"baseline", run.baseline}, {"fontSize", run.fontSize},
-                                {"fontFamily", run.fontFamily},
-                                {"color", run.color.isValid() ? run.color.name(QColor::HexArgb)
-                                                              : QString()},
-                                {"language", run.language}});
+    for (const auto &run : runs) {
+        QVariantMap row{{"start", run.start}, {"length", run.length},
+                        {"weight", run.weight}, {"italic", run.italic},
+                        {"underline", run.underline}, {"strike", run.strike},
+                        {"baseline", run.baseline}, {"fontSize", run.fontSize},
+                        {"fontFamily", run.fontFamily},
+                        {"color", run.color.isValid() ? run.color.name(QColor::HexArgb) : QString()},
+                        {"language", run.language}};
+        // Font swapping on PowerPoint import: written only when it happened.
+        if (!run.origFont.isEmpty()) row.insert("origFont", run.origFont);
+        if (run.origFontSize > 0) row.insert("origFontSize", run.origFontSize);
+        if (!qFuzzyCompare(run.fontScale, 1.0)) row.insert("fontScale", run.fontScale);
+        if (run.origWeight) row.insert("origWeight", run.origWeight);
+        rows.append(row);
+    }
     return rows;
 }
 
@@ -173,7 +179,7 @@ bool TextRuns::decode(const QVariant &value, QVector<TextRun> &runs) {
         const auto map = row.toMap();
         static const QSet<QString> known{"start", "length", "weight", "italic", "underline",
                                          "strike", "baseline", "fontSize", "fontFamily", "color",
-                                         "language"};
+                                         "language", "origFont", "origFontSize", "fontScale", "origWeight"};
         for (auto it = map.cbegin(); it != map.cend(); ++it)
             if (!known.contains(it.key())) return false;
         TextRun run;
@@ -203,6 +209,16 @@ bool TextRuns::decode(const QVariant &value, QVector<TextRun> &runs) {
         }
         run.language = map.value("language").toString();
         if (run.language.size() > 32) return false;
+        run.origFont = map.value("origFont").toString();
+        if (run.origFont.size() > 256) return false;
+        run.origFontSize = map.value("origFontSize", 0).toDouble();
+        if (!std::isfinite(run.origFontSize) || run.origFontSize < 0 || run.origFontSize > 4000) return false;
+        run.fontScale = map.value("fontScale", 1).toDouble();
+        if (!std::isfinite(run.fontScale) || run.fontScale <= 0 || run.fontScale > 10) return false;
+        run.origWeight = map.value("origWeight", 0).toInt();
+        // 1 marks a weight the stretch inherited before the swap set one.
+        if (run.origWeight > 1 && (run.origWeight < 100 || run.origWeight > 900)) return false;
+        if (run.origWeight < 0) return false;
         parsed.append(run);
     }
     runs = parsed;

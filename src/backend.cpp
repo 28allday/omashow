@@ -1,4 +1,5 @@
 #include "backend.h"
+#include "core/fontswap.h"
 
 #include <QFontDatabase>
 #include <QFontInfo>
@@ -326,7 +327,8 @@ QVariantMap Backend::importReport() const {
           {QStringLiteral("name"), QFileInfo(m_importedFrom).fileName()},
           {QStringLiteral("kind"), Interchange::kindName(Interchange::kindOf(m_importedFrom))},
           {QStringLiteral("warnings"), m_importWarnings},
-          {QStringLiteral("missingFonts"), Fonts::missing(m_document)}};
+          {QStringLiteral("missingFonts"), Fonts::missing(m_document)},
+          {QStringLiteral("fontSwaps"), FontSwap::swapped(m_document)}};
 }
 
 QVariantList Backend::missingFonts() const { return Fonts::report(m_document); }

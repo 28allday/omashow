@@ -1,5 +1,7 @@
 #include "io/interchange.h"
 
+#include "core/fontswap.h"
+
 #include "io/bundle.h"
 #include "io/keynote.h"
 #include "io/pptx.h"
@@ -70,12 +72,18 @@ Result fromBytes(const QByteArray &raw, Kind kind) {
         result.ok = read.ok;
         result.error = read.error;
         result.document = read.document;
+        // A saved deck naming Office fonts (or a fallback from another
+        // computer) gets this computer's best free match too.
+        if (result.ok && !qEnvironmentVariableIsSet("OMASHOW_NO_FONT_SWAP")) FontSwap::apply(result.document);
     } else if (kind == PowerPoint) {
         const auto read = Pptx::read(raw);
         result.ok = read.ok;
         result.error = read.error;
         result.document = read.document;
         result.warnings = read.warnings;
+        // Office fonts this computer lacks become their measured free matches;
+        // what they were is kept and written back on PowerPoint save.
+        if (result.ok && !qEnvironmentVariableIsSet("OMASHOW_NO_FONT_SWAP")) FontSwap::apply(result.document);
     } else if (kind == Keynote) {
         const auto read = Keynote::read(raw);
         result.ok = read.ok;

@@ -35,3 +35,13 @@ language a deck is written in.
 OmaShow bundles no fonts. It uses the fonts installed on the system (Inter
 when present). PDF export embeds subsets of the fonts a deck uses; the licence
 of a font chosen for a deck is that font's own.
+
+## Office font map
+
+`src/fonts/office/office-font-map.json` (compiled in as `:/fonts/office-font-map.json`)
+is **office-font-map** by JesusLovesYou1013
+(https://github.com/JesusLovesYou1013/office-font-map), licensed under the
+Creative Commons Attribution-ShareAlike 4.0 International licence (CC BY-SA 4.0,
+https://creativecommons.org/licenses/by-sa/4.0/), which is compatible with
+OmaShow's GPL 3. It lists the best free matches per Office font with their
+measured size, width and line factors. It contains no fonts.
