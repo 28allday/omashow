@@ -25,9 +25,12 @@ T.Button {
     // Icon after the label, for forward actions ("Next →"). Opt in with
     // `property bool iconTrailing: true`.
     readonly property bool trailing: control["iconTrailing"] === true && !under
+    // A square letter mark (B / I / U). Opt in with `property bool mark: true`.
+    // Same hit size as an icon button; the letter stays visible.
+    readonly property bool mark: control["mark"] === true
 
     padding: 0
-    leftPadding: iconOnly ? Theme.s1 : under ? Theme.s2 : Theme.s3
+    leftPadding: iconOnly || mark ? Theme.s1 : under ? Theme.s2 : Theme.s3
     rightPadding: leftPadding
     topPadding: under ? Theme.s2 : Theme.s1
     bottomPadding: topPadding
@@ -90,7 +93,7 @@ T.Button {
     }
 
     background: Rectangle {
-        implicitWidth: control.iconOnly ? Theme.szIconHit : Theme.hControl * 2
+        implicitWidth: control.iconOnly || control.mark ? Theme.szIconHit : Theme.hControl * 2
         implicitHeight: control.under ? Theme.hToolTile : Theme.hControl
         radius: Theme.rControl
         color: {

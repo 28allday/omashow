@@ -34,7 +34,7 @@ Sheet {
             ColumnLayout {
                 Layout.fillWidth: true
                 Label { text: qsTr("Current"); color: Theme.textMuted }
-                Image { Layout.fillWidth: true; Layout.preferredHeight: Theme.wInspector/2; fillMode: Image.PreserveAspectFit; source: "image://slides/"+backend.currentSlide+"/"+backend.revision; sourceSize.width: 640; cache: false }
+                Image { Layout.fillWidth: true; Layout.preferredHeight: Theme.wInspector/2; fillMode: Image.PreserveAspectFit; source: "image://slides/"+backend.currentSlide+"/"+(backend.navigator[backend.currentSlide]?.stamp ?? ""); sourceSize.width: 640; cache: false }
             }
             ColumnLayout {
                 Layout.fillWidth: true

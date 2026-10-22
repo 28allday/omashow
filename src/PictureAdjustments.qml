@@ -21,7 +21,7 @@ ColumnLayout {
         NumField { objectName: "imageBrightness"; Layout.fillWidth: true; label: qsTr("Brightness %"); value: (root.sel.imageBrightness??0)*100; onCommitted: v=>backend.setSelectedProperty("imageBrightness",v/100) }
         NumField { objectName: "imageContrast"; Layout.fillWidth: true; label: qsTr("Contrast %"); value: (root.sel.imageContrast??1)*100; onCommitted: v=>backend.setSelectedProperty("imageContrast",v/100) }
         NumField { objectName: "imageSaturation"; Layout.fillWidth: true; label: qsTr("Saturation %"); value: (root.sel.imageSaturation??1)*100; onCommitted: v=>backend.setSelectedProperty("imageSaturation",v/100) }
-        TextField { Layout.fillWidth: true; text: root.sel.imageTint??"#000000"; Accessible.name: qsTr("Tint colour"); onEditingFinished: backend.setSelectedProperty("imageTint",text) }
+        ColorField { Layout.fillWidth: true; value: root.sel.imageTint??"#000000"; accessibleName: qsTr("Tint colour"); onPicked: v => backend.setSelectedProperty("imageTint",v) }
         NumField { Layout.fillWidth: true; label: qsTr("Tint %"); value: (root.sel.imageTintAmount??0)*100; onCommitted: v=>backend.setSelectedProperty("imageTintAmount",v/100) }
         Button { objectName: "resetImageAdjustments"; text: qsTr("Reset colour adjustments"); onClicked: backend.resetImageAdjustments() }
     }

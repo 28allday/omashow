@@ -23,6 +23,7 @@
 #include <atomic>
 
 class PortalFileChooser;
+class SlideRows;
 class MediaPlayback;
 class TableModel;
 
@@ -84,6 +85,9 @@ class Backend : public QObject {
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY documentChanged)
     Q_PROPERTY(QString undoLabel READ undoLabel NOTIFY documentChanged)
     Q_PROPERTY(QSizeF slideSize READ slideSize NOTIFY documentChanged)
+    // Points per slide unit, as a pptx is written (the slide 12192000 EMU,
+    // 960 pt, wide). Type is stored in units and shown in points.
+    Q_PROPERTY(qreal ptPerUnit READ ptPerUnit NOTIFY documentChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY documentChanged)
     Q_PROPERTY(bool snapEnabled READ snapEnabled WRITE setSnapEnabled NOTIFY snapEnabledChanged)
     // The alignments the current drag is sitting on, for the canvas to draw.
@@ -95,6 +99,9 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList customShows READ customShows NOTIFY documentChanged)
     Q_PROPERTY(QString activeShow READ activeShow WRITE setActiveShow NOTIFY documentChanged)
     Q_PROPERTY(QVariantList browserSlides READ browserSlides NOTIFY browserChanged)
+    // The same rows as a model kept up to date in place, for the navigator's
+    // views: delegates survive an edit instead of being rebuilt.
+    Q_PROPERTY(QObject *browserModel READ browserModel CONSTANT)
     Q_PROPERTY(QStringList collapsedSections READ collapsedSections NOTIFY browserChanged)
     Q_PROPERTY(QVariantList builds READ builds NOTIFY selectionChanged)
     Q_PROPERTY(QVariantList slideObjects READ slideObjects NOTIFY selectionChanged)
@@ -136,6 +143,10 @@ public:
     // suggested stand-in; and the rewrite, as one undo step.
     Q_INVOKABLE QVariantList missingFonts() const;
     Q_INVOKABLE int substituteFonts(const QVariantMap &replacements);
+    // The upright weights (100-900) the typeface really has, ascending. A name
+    // that is not installed answers for the face it falls back to. Cached per
+    // family, so the inspector asks once per family change.
+    Q_INVOKABLE QVariantList fontWeights(const QString &family) const;
     Q_INVOKABLE void keepMyVersion();
     Q_INVOKABLE void reloadFromDisk();
     QString status() const { return m_status; }
@@ -258,6 +269,7 @@ public:
     bool canRedo() const { return m_history.canRedo(); }
     QString undoLabel() const { return m_history.undoLabel(); }
     QSizeF slideSize() const { return m_document.size; }
+    qreal ptPerUnit() const { return 12192000.0 / qMax(1.0, m_document.size.width()) / 12700.0; }
     bool modified() const { return m_modified; }
     bool snapEnabled() const { return m_snapEnabled; }
     void setSnapEnabled(bool enabled);
@@ -294,6 +306,8 @@ public:
     Q_INVOKABLE void moveSlide(int from, int to);
 
     Q_INVOKABLE bool selectAt(qreal x, qreal y, bool extend = false, bool behind = false);
+    // Whether a click at this slide point would pick (and so could move) an object.
+    Q_INVOKABLE bool hitsObject(qreal x, qreal y) const;
     Q_INVOKABLE void select(const QString &id);
     Q_INVOKABLE void clearSelection();
 
@@ -413,6 +427,7 @@ public:
     Q_INVOKABLE void cancelEdit();
     QVariantList navigator() const;
     QVariantList browserSlides() const;
+    QObject *browserModel() const;
     QStringList collapsedSections() const;
     Q_INVOKABLE QVariantMap sectionInfo(const QString &id) const;
     Q_INVOKABLE void setSectionCollapsed(const QString &id, bool collapsed);
@@ -625,6 +640,7 @@ private:
     std::shared_ptr<MediaAsset::Job> m_mediaJob;
     QTimer m_mediaProgressTimer;
     QHash<QString,QString> m_mediaPermissions;
+    mutable QHash<QString,QVariantList> m_fontWeights;
     int m_documentGeneration = 0, m_mediaPickerGeneration = 0;
     bool m_mediaPickerEmbed = true;
     QString m_mediaPickerSlide, m_mediaPickerTarget;
@@ -675,6 +691,11 @@ private:
     mutable int m_presentationRevision = -1, m_navigatorRevision = -1;
     mutable bool m_presentationSkipped = false;
     mutable QVariantList m_navigator;
+    // The review pass walks every slide; it is run once per revision, and only
+    // when something reads it.
+    mutable int m_reviewRevision = -1;
+    mutable QVariantList m_reviewIssues;
+    SlideRows *m_browserModel = nullptr;
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);

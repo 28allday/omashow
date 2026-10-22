@@ -94,7 +94,13 @@ QVariantList Backend::comments() const { return Review::threads(m_document); }
 
 QVariantMap Backend::statistics() const { return Review::statistics(m_document); }
 
-QVariantList Backend::reviewIssues() const { return Review::issues(m_document); }
+QVariantList Backend::reviewIssues() const {
+    if (m_reviewRevision != m_revision) {
+        m_reviewIssues = Review::issues(m_document);
+        m_reviewRevision = m_revision;
+    }
+    return m_reviewIssues;
+}
 
 QVariantList Backend::readingOrder() const {
     if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size()) return {};

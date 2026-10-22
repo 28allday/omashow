@@ -1,6 +1,9 @@
 #include "backend.h"
+#include "core/fontswap.h"
 
 #include <QFontDatabase>
+#include <QFontInfo>
+#include <algorithm>
 #include "mediaplayback.h"
 #include "core/design.h"
 #include "core/review.h"
@@ -26,16 +29,18 @@
 #include "core/fonts.h"
 #include "io/pdf.h"
 #include "io/recovery.h"
+#include "sliderows.h"
 #include "render/scenerenderer.h"
 
 Backend::Backend(QObject *parent)
-    : QObject(parent), m_chooser(new PortalFileChooser(this)) {
+    : QObject(parent), m_chooser(new PortalFileChooser(this)), m_browserModel(new SlideRows(this)) {
   connect(this,&Backend::documentChanged,this,&Backend::slideSelectionChanged);
   connect(this,&Backend::documentChanged,this,&Backend::fileStateChanged);
   // A pending import is described against the document it would land in.
   connect(this,&Backend::documentChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::currentSlideChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
+  connect(this,&Backend::browserChanged,this,[this]{ browserSlides(); });
   connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, [this] { ++m_clipboardVersion; });
@@ -322,10 +327,29 @@ QVariantMap Backend::importReport() const {
           {QStringLiteral("name"), QFileInfo(m_importedFrom).fileName()},
           {QStringLiteral("kind"), Interchange::kindName(Interchange::kindOf(m_importedFrom))},
           {QStringLiteral("warnings"), m_importWarnings},
-          {QStringLiteral("missingFonts"), Fonts::missing(m_document)}};
+          {QStringLiteral("missingFonts"), Fonts::missing(m_document)},
+          {QStringLiteral("fontSwaps"), FontSwap::swapped(m_document)}};
 }
 
 QVariantList Backend::missingFonts() const { return Fonts::report(m_document); }
+
+QVariantList Backend::fontWeights(const QString &family) const {
+  const auto cached = m_fontWeights.constFind(family);
+  if (cached != m_fontWeights.cend()) return *cached;
+  QString real = family;
+  if (!QFontDatabase::hasFamily(real)) real = QFontInfo(QFont(family)).family();
+  QList<int> weights;
+  for (const auto &style : QFontDatabase::styles(real)) {
+    if (QFontDatabase::italic(real, style)) continue;
+    const int w = QFontDatabase::weight(real, style);
+    if (w > 0 && !weights.contains(w)) weights.append(w);
+  }
+  std::sort(weights.begin(), weights.end());
+  QVariantList result;
+  for (int w : weights) result.append(w);
+  m_fontWeights.insert(family, result);
+  return result;
+}
 
 int Backend::substituteFonts(const QVariantMap &replacements) {
   QMap<QString, QString> map;

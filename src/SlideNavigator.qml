@@ -27,6 +27,16 @@ FocusScope {
         if (mode === 2) return Theme.hRow + Theme.hControl * 3
         return thumbHeight
     }
+    // What each badge on a thumbnail means.
+    function badgeTip(name) {
+        return name === "sparkles" ? qsTr("Has builds")
+             : name === "notebook-pen" ? qsTr("Has presenter notes")
+             : name === "clapperboard" ? qsTr("Has film or sound")
+             : name === "message-square-text" ? qsTr("Has open comments")
+             : name === "arrow-left-right" ? qsTr("Has its own transition")
+             : name === "triangle-alert" ? qsTr("A picture here has no description")
+             : ""
+    }
     signal editRequested()
     signal lightTableRequested()
     Item { id: keyboardFocus; focus: true }
@@ -169,7 +179,7 @@ FocusScope {
         objectName: "navigatorList"
         visible: !root.sorter
         anchors.top: header.bottom; anchors.bottom: parent.bottom; width: parent.width
-        clip: true; model: visible ? root.rows : []; currentIndex: root.visibleIndex(backend.currentSlide)
+        clip: true; model: visible ? backend.browserModel : null; currentIndex: root.visibleIndex(backend.currentSlide)
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar {}
         delegate: slideCard
@@ -182,7 +192,7 @@ FocusScope {
         clip: true
         cellWidth: width / Math.max(1,Math.floor(width/Theme.wInspector))
         cellHeight: root.cardHeight
-        model: visible ? root.rows : []; currentIndex: root.visibleIndex(backend.currentSlide)
+        model: visible ? backend.browserModel : null; currentIndex: root.visibleIndex(backend.currentSlide)
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar {}
         delegate: slideCard
@@ -274,11 +284,16 @@ FocusScope {
                 clip: true
 
                 Image {
+                    id: thumb
                     visible: !row.modelData.collapsed && (root.sorter || root.mode === 0)
                     anchors.fill: parent; anchors.margins: row.selected ? Theme.selectionRing : Theme.hairline
                     fillMode: Image.PreserveAspectFit
-                    source: "image://slides/"+row.slide+"/"+backend.revision; sourceSize.width: root.sorter ? 640 : 320; cache: false
+                    // Keyed on the slide's own stamp, not the deck revision, so an
+                    // edit elsewhere leaves this picture as it is.
+                    source: "image://slides/"+row.slide+"/"+(row.modelData.stamp ?? ""); sourceSize.width: root.sorter ? 640 : 320
                     opacity: row.modelData.skipped ? .4 : 1
+                    // The old picture stays up while the new one is drawn (Qt 6.8+).
+                    Component.onCompleted: if ("retainWhileLoading" in thumb) thumb.retainWhileLoading = true
                 }
                 // What the thumbnail cannot show: skipped, builds, notes, media,
                 // comments, how the show arrives, and anything undescribed.
@@ -293,6 +308,9 @@ FocusScope {
                             objectName: "slideBadge_" + modelData
                             width: Theme.szIcon + Theme.s1; height: width; radius: Theme.rHandle
                             color: Theme.withAlpha(Theme.showBg, 0.65)
+                            HoverHandler { id: badgeHover }
+                            ToolTip.visible: badgeHover.hovered; ToolTip.delay: Theme.tooltipDelay
+                            ToolTip.text: root.badgeTip(modelData)
                             Icon { anchors.centerIn: parent; name: parent.modelData; size: Theme.szIcon - 4
                                    color: parent.modelData === "triangle-alert" ? Theme.warning : Theme.textPrimary }
                         }

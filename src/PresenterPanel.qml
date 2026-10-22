@@ -203,7 +203,9 @@ Rectangle {
                         orientation: ListView.Horizontal
                         spacing: Theme.s3
                         clip: true
-                        model: backend.navigator
+                        // Only while presenting: the strip is rebuilt whenever
+                        // the deck changes, which would be every step of a drag.
+                        model: root.visible ? backend.navigator : []
                         currentIndex: backend.currentSlide
                         onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
                         ScrollBar.horizontal: ScrollBar {}
@@ -224,7 +226,7 @@ Rectangle {
                                 border.color: parent.current ? Theme.accent : Theme.border
                                 Image { anchors.fill: parent; anchors.margins: parent.border.width; fillMode: Image.PreserveAspectFit
                                         opacity: modelData.skipped ? .4 : 1
-                                        source: "image://slides/"+index+"/"+backend.revision; sourceSize.width: 320; cache: false }
+                                        source: "image://slides/"+index+"/"+(backend.navigator[index]?.stamp ?? ""); sourceSize.width: 320; cache: false }
                                 Rectangle {
                                     visible: modelData.skipped
                                     anchors.right: parent.right; anchors.top: parent.top; anchors.margins: Theme.s1 + 2
@@ -275,7 +277,7 @@ Rectangle {
                         color: Theme.showBg
                         Image { anchors.fill: parent; fillMode: Image.PreserveAspectFit; cache: false
                                 visible: presenter.nextSlideIndex >= 0
-                                source: presenter.nextSlideIndex >= 0 ? "image://slides/" + presenter.nextSlideIndex + "/" + backend.revision : ""; sourceSize.width: 640 }
+                                source: presenter.nextSlideIndex >= 0 ? "image://slides/" + presenter.nextSlideIndex + "/" + (backend.navigator[presenter.nextSlideIndex]?.stamp ?? "") : ""; sourceSize.width: 640 }
                         Label { anchors.centerIn: parent; visible: presenter.nextSlideIndex < 0; text: qsTr("End of show"); color: Theme.textMuted }
                     }
                 }

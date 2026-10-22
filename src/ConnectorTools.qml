@@ -35,7 +35,7 @@ ColumnLayout {
         CheckBox { text: qsTr("End arrow"); checked: root.sel.connectorArrowEnd??true; onToggled: backend.setSelectedProperty("connectorArrowEnd",checked) }
     }
     NumField { Layout.fillWidth: true; label: qsTr("Width"); value: root.sel.strokeWidth??3; onCommitted: v=>backend.setSelectedProperty("strokeWidth",v) }
-    TextField { Layout.fillWidth: true; text: root.sel.strokeColor??"#ffffff"; Accessible.name: qsTr("Connector colour"); onEditingFinished: backend.setSelectedProperty("strokeColor",text) }
+    ColorField { Layout.fillWidth: true; value: root.sel.strokeColor??"#ffffff"; accessibleName: qsTr("Connector colour"); onPicked: v => backend.setSelectedProperty("strokeColor",v) }
     ComboBox { Layout.fillWidth: true; model: [qsTr("Solid"),qsTr("Dash"),qsTr("Dot"),qsTr("Dash dot"),qsTr("Dash dot dot")]; currentIndex: root.sel.strokeStyle??0; onActivated: backend.setSelectedProperty("strokeStyle",currentIndex) }
     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; text: qsTr("Attached endpoints follow their objects. Detach into a path to edit its points freely.") }
     Button { objectName: "detachConnector"; text: qsTr("Detach into path"); onClicked: backend.convertToPath() }

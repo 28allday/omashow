@@ -1,7 +1,7 @@
 # Maintainer: Gavin Nugent
 
 pkgname=omashow
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Keyboard-first presentation editor and presenter for Omarchy'
 arch=('x86_64' 'aarch64')
@@ -9,15 +9,28 @@ url='https://github.com/28allday/omashow'
 license=('GPL-3.0-or-later')
 install='omashow.install'
 options=('!debug')
+# Everything OmaShow needs to run is a dependency, so the package installs and
+# runs straight away: the Qt modules and the Wayland plugin, the picture
+# formats it offers, the film and sound codecs, the file-chooser portal, the
+# PowerPoint and Keynote readers, a spelling dictionary, and the typefaces.
 depends=('hicolor-icon-theme' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-multimedia'
-         'ffmpeg' 'zlib' 'xdg-desktop-portal' 'hunspell' 'hunspell-dictionary'
-         'libetonyek' 'librevenge')
-# Spelling needs a dictionary, but which one is the person's choice: every
-# hunspell-* language package provides hunspell-dictionary, and pacman asks
-# which. ./bin/install offers British English first. More can be added later;
+         'qt6-wayland' 'qt6-imageformats'
+         'ffmpeg' 'zlib' 'xdg-desktop-portal' 'hunspell' 'hunspell-en_gb'
+         'libetonyek' 'librevenge'
+         # Inter is the typeface the interface and new decks are set in; Noto
+         # Serif is a built-in theme's heading face.
+         'inter-font' 'noto-fonts'
+         # The free stand-ins the Office font table draws PowerPoint decks
+         # with (src/fonts/office/office-font-map.json), so a deck written in
+         # Calibri, Cambria, Arial, Georgia and the rest looks right on first
+         # open without hunting for fonts.
+         'ttf-liberation' 'ttf-carlito' 'ttf-caladea' 'ttf-croscore' 'gsfonts'
+         'ttf-dejavu' 'ttf-roboto' 'ttf-lato' 'ttf-opensans' 'ttf-fira-sans'
+         'ttf-ibm-plex' 'ttf-cascadia-code' 'adobe-source-sans-fonts'
+         'adobe-source-serif-fonts' 'adobe-source-code-pro-fonts')
+# British English comes with the package; other languages can be added, and
 # the deck's language (Document ▸ Language) picks between them.
-optdepends=('hunspell-en_gb: British English spelling'
-            'hunspell-en_us: American English spelling')
+optdepends=('hunspell-en_us: American English spelling')
 makedepends=('gcc' 'make' 'pkgconf')
 source=()
 sha256sums=()

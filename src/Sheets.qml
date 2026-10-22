@@ -9,6 +9,9 @@ import QtQuick
 // things would reach the deck behind it instead of the dialog in front.
 QtObject {
     property int count: 0
+    // A colour chooser opened over words being edited keeps that edit open
+    // behind it, so the chosen colour reaches those words.
+    property bool holdsTextEdit: false
     function opened() { count += 1 }
     function closed() { if (count > 0) count -= 1 }
 }

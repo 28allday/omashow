@@ -14,6 +14,7 @@ HEADERS += \
     src/presenter.h \
     src/slideview.h \
     src/thumbnailprovider.h \
+    src/sliderows.h \
     src/theme.h \
     src/anim/build.h \
     src/anim/evaluator.h \
@@ -43,6 +44,7 @@ SOURCES += \
     src/presenter.cpp \
     src/slideview.cpp \
     src/thumbnailprovider.cpp \
+    src/sliderows.cpp \
     src/theme.cpp \
     src/anim/build.cpp \
     src/anim/evaluator.cpp \
@@ -181,3 +183,5 @@ HEADERS += src/io/interchange.h src/io/pptx.h src/io/keynote.h src/io/pptxwriter
 SOURCES += src/io/interchange.cpp src/io/pptx.cpp src/io/keynote.cpp src/io/pptxwriter.cpp
 HEADERS += src/core/fonts.h
 SOURCES += src/core/fonts.cpp
+HEADERS += src/core/fontswap.h
+SOURCES += src/core/fontswap.cpp

@@ -120,23 +120,39 @@ void Backend::selectAll() {
       ids.append(o.id);
   selectIds(ids);
 }
-bool Backend::selectAt(qreal x, qreal y, bool extend, bool behind) {
-  const auto slide = Design::resolve(m_document, m_currentSlide);
+// The objects a click at (x, y) picks, topmost first: visible, unlocked, in
+// the group being edited, and on this slide (not the layout or master).
+static QStringList hitsAt(const Slide &resolved, const Slide &own, const QStringList &scope,
+                          qreal x, qreal y, bool firstOnly) {
   QStringList hits;
-  for (int i = slide.objects.size() - 1; i >= 0; --i) {
-    const auto &o = slide.objects.at(i);
-    if (o.hidden || o.locked || !Arrange::inScope(o, m_groupScope))
+  for (int i = resolved.objects.size() - 1; i >= 0; --i) {
+    const auto &o = resolved.objects.at(i);
+    if (o.hidden || o.locked || !Arrange::inScope(o, scope))
       continue;
-    if (!m_document.slides.at(m_currentSlide).find(o.id))
+    if (!own.find(o.id))
       continue;
     QTransform t;
     const auto c = o.rect.center();
     t.translate(c.x(), c.y());
     t.rotate(o.rotation);
     t.translate(-c.x(), -c.y());
-    if (Shape::contains(o,t.inverted().map(QPointF(x, y))))
+    if (Shape::contains(o,t.inverted().map(QPointF(x, y)))) {
       hits.append(o.id);
+      if (firstOnly)
+        break;
+    }
   }
+  return hits;
+}
+bool Backend::hitsObject(qreal x, qreal y) const {
+  if (m_currentSlide < 0 || m_currentSlide >= m_document.slides.size())
+    return false;
+  return !hitsAt(Design::resolve(m_document, m_currentSlide), m_document.slides.at(m_currentSlide),
+                 m_groupScope, x, y, true).isEmpty();
+}
+bool Backend::selectAt(qreal x, qreal y, bool extend, bool behind) {
+  const auto slide = Design::resolve(m_document, m_currentSlide);
+  const QStringList hits = hitsAt(slide, m_document.slides.at(m_currentSlide), m_groupScope, x, y, false);
   if (hits.isEmpty()) {
     if (!extend)
       clearSelection();
@@ -326,6 +342,13 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   const auto propertyKey = [&ids, &key](const SceneObject &object) {
     return ids.size() > 1 && key == "fill" && object.type == ObjectType::Text ? QString("textColor") : key;
   };
+  // Stretches with their own type size (an imported deck writes one per run
+  // when they differ) would ignore a box size, so they follow it too.
+  const auto sizedRuns = [](const SceneObject &object) {
+    for (const auto &run : object.runs)
+      if (run.fontSize > 0) return true;
+    return false;
+  };
   bool changed = false;
   for (const auto &id : ids)
     if (const auto *o = shown.find(id)) {
@@ -334,6 +357,8 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
         return;
       if (Design::properties(copy).value(propertyKey(*o)) !=
           Design::properties(*o).value(propertyKey(*o)))
+        changed = true;
+      if (key == QLatin1String("fontSize") && o->type == ObjectType::Text && sizedRuns(*o))
         changed = true;
     }
   if (!changed)
@@ -351,8 +376,20 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
         Design::markOverride(*o, QStringLiteral("text"));
         continue;
       }
+      const qreal sizeBefore = o->fontSize;
       Design::setProperty(*o, propertyKey(*o), value);
       Design::markOverride(*o, propertyKey(*o));
+      if (key == QLatin1String("fontSize") && o->type == ObjectType::Text && sizedRuns(*o)) {
+        // A new size scales every stretch by the same amount, so mixed sizes
+        // keep their proportions; asking again for the size the box already
+        // has makes the whole box that size.
+        const bool same = qFuzzyCompare(sizeBefore + 1, o->fontSize + 1) || sizeBefore <= 0;
+        const qreal ratio = same ? 1 : o->fontSize / sizeBefore;
+        for (auto &run : o->runs)
+          if (run.fontSize > 0)
+            run.fontSize = same ? 0 : qBound(1.0, run.fontSize * ratio, 2000.0);
+        o->runs = TextRuns::tidy(o->runs, o->text.size());
+      }
     }
   m_history.commit();
   if (key == "hidden" || key == "locked")

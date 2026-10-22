@@ -135,7 +135,7 @@ Sheet {
                                     anchors.fill: parent; anchors.margins: Theme.s2
                                     fillMode: Image.PreserveAspectFit; sourceSize.width: 800; cache: false
                                     source: !root.preview.ok ? "" : index === 0
-                                        ? "image://slides/" + root.slide.index + "/" + backend.revision
+                                        ? "image://slides/" + root.slide.index + "/" + (backend.navigator[root.slide.index]?.stamp ?? "")
                                         : "image://slides/layout-apply/" + root.slide.index + "/" + root.preview.revision
                                 }
                             }
