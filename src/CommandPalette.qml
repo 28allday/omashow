@@ -18,7 +18,12 @@ Sheet {
     padding: 0
     property var commands: []
     property int highlighted: 0
+    // Only while the palette is open. The command list is made afresh whenever
+    // the deck or the selection changes, and rebuilding forty rows of it behind
+    // a closed palette on every step of a drag was most of what made moving
+    // and resizing feel slow.
     readonly property var matches: {
+        if (!root.visible) return []
         const needle = filter.text.trim().toLowerCase()
         const rows = root.commands.filter(command => command.enabled === undefined || command.enabled)
         if (needle.length === 0) return rows.slice(0, 40)

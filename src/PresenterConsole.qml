@@ -13,7 +13,8 @@ ApplicationWindow {
     minimumWidth: Theme.wPresenterMinimum; minimumHeight: Theme.hPresenterMinimum
     color: Theme.windowBg
     font.family: Theme.fontFamily; font.pixelSize: Theme.fsControl
-    PresenterPanel { anchors.fill: parent }
+    // Hidden with its window, so the panel does no work between shows.
+    PresenterPanel { anchors.fill: parent; visible: presenterWindow.visible }
     Connections {
         target: presenter
         function onExternalLinkRequested(url) { externalLink.open(); presenterWindow.requestActivate() }

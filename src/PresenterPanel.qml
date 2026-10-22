@@ -203,7 +203,9 @@ Rectangle {
                         orientation: ListView.Horizontal
                         spacing: Theme.s3
                         clip: true
-                        model: backend.navigator
+                        // Only while presenting: the strip is rebuilt whenever
+                        // the deck changes, which would be every step of a drag.
+                        model: root.visible ? backend.navigator : []
                         currentIndex: backend.currentSlide
                         onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
                         ScrollBar.horizontal: ScrollBar {}
