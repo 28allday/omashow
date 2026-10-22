@@ -86,8 +86,9 @@ RowLayout {
                     Action { icon.name: "arrow-down"; text: qsTr("Move down"); enabled: !!root.master.id; onClicked: backend.moveMaster(root.master.id, 1) }
                 }
                 Heading { text: qsTr("MASTER BACKGROUND") }
-                TextField { Layout.fillWidth: true; enabled: !!root.master.id; text: root.master.background ?? "";
-                            onEditingFinished: backend.setMasterProperty(root.master.id, "background", text) }
+                ColorField { enabled: !!root.master.id; value: root.master.background ?? ""
+                             accessibleName: qsTr("Master background colour")
+                             onPicked: v => backend.setMasterProperty(root.master.id, "background", v) }
                 Action { text: root.master.backgroundToken ? qsTr("Linked to theme background") : qsTr("Use theme background");
                          enabled: !!root.master.id && !root.master.backgroundToken;
                          onClicked: backend.setMasterProperty(root.master.id, "backgroundToken", "background") }
@@ -275,10 +276,10 @@ RowLayout {
                             onActivated: root.setPlaceholder("fontWeight", model[currentIndex])
                         }
                         Heading { text: qsTr("COLOUR") }
-                        TextField {
-                            Layout.fillWidth: true
-                            text: (root.placeholder.type === "text" ? root.placeholder.textColor : root.placeholder.fill) ?? ""
-                            onEditingFinished: root.setPlaceholder(root.placeholder.type === "text" ? "textColor" : "fill", text)
+                        ColorField {
+                            value: (root.placeholder.type === "text" ? root.placeholder.textColor : root.placeholder.fill) ?? ""
+                            accessibleName: root.placeholder.type === "text" ? qsTr("Placeholder text colour") : qsTr("Placeholder fill colour")
+                            onPicked: v => root.setPlaceholder(root.placeholder.type === "text" ? "textColor" : "fill", v)
                         }
                         ComboBox {
                             Layout.fillWidth: true
@@ -304,10 +305,9 @@ RowLayout {
                             FieldRow {
                                 required property string modelData
                                 label: modelData.charAt(0).toUpperCase() + modelData.slice(1)
-                                Rectangle { implicitWidth: Theme.hControl; implicitHeight: Theme.hControl; radius: Theme.rControl
-                                            color: root.info.colors[modelData] ?? Theme.controlBg; border.color: Theme.borderStrong; border.width: Theme.hairline }
-                                TextField { objectName: "themeColor_" + modelData; Layout.fillWidth: true; text: root.info.colors[modelData]; font.family: Theme.monoFamily
-                                            onEditingFinished: backend.setThemeToken(modelData, text, false) }
+                                ColorField { field.objectName: "themeColor_" + modelData; value: root.info.colors[modelData] ?? ""
+                                             accessibleName: qsTr("Theme colour %1").arg(modelData)
+                                             onPicked: v => backend.setThemeToken(modelData, v, false) }
                             }
                         }
                         Heading { text: qsTr("TEXT CONTRAST") }

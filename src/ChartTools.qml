@@ -42,8 +42,8 @@ ColumnLayout {
     SectionLabel { text: qsTr("COLOURS") }
     ComboBox { objectName: "chartPalette"; Layout.fillWidth: true; model: [qsTr("Theme · restrained"),qsTr("Muted categories"),qsTr("High contrast · patterned")]; currentIndex: root.chart.palette ?? 0; Accessible.name: qsTr("Chart palette"); onActivated: root.update("palette",currentIndex) }
     ComboBox { id: series; Layout.fillWidth: true; model: root.sel.chartSeries ?? []; textRole: "name"; valueRole: "id"; Accessible.name: qsTr("Chart series or category") }
-    TextField { id: seriesColor; Layout.fillWidth: true; text: (root.sel.chartSeries ?? [])[series.currentIndex]?.color ?? ""; Accessible.name: qsTr("Series colour"); onEditingFinished: backend.setChartSeriesColor(series.currentValue,text) }
-    Button { text: qsTr("Set deck palette slot %1").arg(series.currentIndex+1); enabled: series.currentIndex>=0 && series.currentIndex<8; onClicked: backend.setChartThemeColor(series.currentIndex,seriesColor.text) }
+    ColorField { id: seriesColor; Layout.fillWidth: true; value: (root.sel.chartSeries ?? [])[series.currentIndex]?.color ?? ""; accessibleName: qsTr("Series colour"); onPicked: v => backend.setChartSeriesColor(series.currentValue,v) }
+    Button { text: qsTr("Set deck palette slot %1").arg(series.currentIndex+1); enabled: series.currentIndex>=0 && series.currentIndex<8; onClicked: backend.setChartThemeColor(series.currentIndex,seriesColor.field.text) }
     Label { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textMuted; font.pixelSize: Theme.fsCaption; text: qsTr("Deck palette colours update every chart using Theme. Series colour overrides affect this chart only.") }
     Button { text: qsTr("Use palette colour"); enabled: series.currentIndex>=0; onClicked: backend.setChartSeriesColor(series.currentValue,"") }
     Label { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: root.message.length>0; text: root.message; color: Theme.accent }

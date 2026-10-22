@@ -10,7 +10,7 @@ ColumnLayout {
     ComboBox { objectName: "shapeKind"; Layout.fillWidth: true; model: backend.shapeNames; currentIndex: root.sel.shapeKind ?? 0; displayText: root.sel.shapeKind===99?qsTr("Editable path"):currentText; onActivated: backend.setSelectedProperty("shapeKind",currentIndex) }
     SectionLabel { text: qsTr("FILL TYPE") }
     ComboBox { objectName: "shapeFillStyle"; Layout.fillWidth: true; model: [qsTr("Solid"),qsTr("Linear gradient"),qsTr("Radial gradient"),qsTr("Pattern"),qsTr("Picture"),qsTr("None")]; currentIndex: root.sel.fillStyle ?? 0; onActivated: { if(currentIndex===4 && !root.sel.imageId) backend.setShapeImageDialog(); else backend.setSelectedProperty("fillStyle",currentIndex) } }
-    TextField { objectName: "shapeSecondaryColor"; Layout.fillWidth: true; visible: (root.sel.fillStyle??0)>=1 && (root.sel.fillStyle??0)<=3; text: root.sel.fillSecondary ?? "#ffffff"; placeholderText: qsTr("Second colour"); Accessible.name: qsTr("Second fill colour"); onEditingFinished: backend.setSelectedProperty("fillSecondary",text) }
+    ColorField { field.objectName: "shapeSecondaryColor"; Layout.fillWidth: true; visible: (root.sel.fillStyle??0)>=1 && (root.sel.fillStyle??0)<=3; value: root.sel.fillSecondary ?? "#ffffff"; placeholder: qsTr("Second colour"); accessibleName: qsTr("Second fill colour"); onPicked: v => backend.setSelectedProperty("fillSecondary",v) }
     NumField { objectName: "shapeFillAngle"; Layout.fillWidth: true; visible: root.sel.fillStyle===1; label: qsTr("Angle"); value: root.sel.fillAngle ?? 0; onCommitted: v=>backend.setSelectedProperty("fillAngle",v) }
     ComboBox { Layout.fillWidth: true; visible: root.sel.fillStyle===3; model: [qsTr("Dense 1"),qsTr("Dense 2"),qsTr("Dense 3"),qsTr("Dense 4"),qsTr("Dense 5"),qsTr("Dense 6"),qsTr("Dense 7"),qsTr("Horizontal"),qsTr("Vertical"),qsTr("Cross"),qsTr("Backward diagonal"),qsTr("Forward diagonal"),qsTr("Diagonal cross")]; currentIndex: root.sel.patternStyle ?? 9; onActivated: backend.setSelectedProperty("patternStyle",currentIndex) }
     Button { Layout.fillWidth: true; visible: root.sel.fillStyle===4; text: qsTr("Choose picture…"); onClicked: backend.setShapeImageDialog() }
@@ -19,7 +19,7 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth: true
         NumField { objectName: "shapeStrokeWidth"; Layout.preferredWidth: 140; Layout.fillWidth: true; label: qsTr("Width"); value: root.sel.strokeWidth ?? 0; onCommitted: v=>backend.setSelectedProperty("strokeWidth",v) }
-        TextField { objectName: "shapeStrokeColor"; Layout.minimumWidth: 0; Layout.preferredWidth: 120; Layout.fillWidth: true; text: root.sel.strokeColor ?? "#000000"; Accessible.name: qsTr("Stroke colour"); onEditingFinished: backend.setSelectedProperty("strokeColor",text) }
+        ColorField { field.objectName: "shapeStrokeColor"; Layout.minimumWidth: 0; Layout.preferredWidth: 120; Layout.fillWidth: true; value: root.sel.strokeColor ?? "#000000"; accessibleName: qsTr("Stroke colour"); onPicked: v => backend.setSelectedProperty("strokeColor",v) }
     }
     ComboBox { objectName: "shapeStrokeStyle"; Layout.fillWidth: true; model: [qsTr("Solid"),qsTr("Dash"),qsTr("Dot"),qsTr("Dash dot"),qsTr("Dash dot dot")]; currentIndex: root.sel.strokeStyle ?? 0; onActivated: backend.setSelectedProperty("strokeStyle",currentIndex) }
     RowLayout {
@@ -29,7 +29,7 @@ ColumnLayout {
     CheckBox { text: qsTr("Offset shadow"); checked: root.sel.shadowEnabled ?? false; onToggled: backend.setSelectedProperty("shadowEnabled",checked) }
     ColumnLayout {
         visible: root.sel.shadowEnabled ?? false; Layout.fillWidth: true
-        TextField { Layout.fillWidth: true; text: root.sel.shadowColor ?? "#64000000"; Accessible.name: qsTr("Shadow colour"); onEditingFinished: backend.setSelectedProperty("shadowColor",text) }
+        ColorField { Layout.fillWidth: true; value: root.sel.shadowColor ?? "#64000000"; accessibleName: qsTr("Shadow colour"); onPicked: v => backend.setSelectedProperty("shadowColor",v) }
         RowLayout {
             NumField { Layout.fillWidth: true; label: qsTr("X"); value: root.sel.shadowX ?? 8; onCommitted: v=>backend.setSelectedProperty("shadowX",v) }
             NumField { Layout.fillWidth: true; label: qsTr("Y"); value: root.sel.shadowY ?? 8; onCommitted: v=>backend.setSelectedProperty("shadowY",v) }
