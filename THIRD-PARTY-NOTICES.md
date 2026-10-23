@@ -14,7 +14,7 @@ work, each under its own licence.
 
 | Component | Licence |
 |---|---|
-| [Qt 6](https://www.qt.io) — Core, Gui, Qml, Quick, Quick Controls, Svg, Multimedia, Concurrent, DBus | LGPL-3.0 / GPL-3.0 |
+| [Qt 6](https://www.qt.io) — Core, Gui, Qml, Quick, Quick Controls, Svg, Multimedia, Concurrent, DBus, Network | LGPL-3.0 / GPL-3.0 |
 | [FFmpeg](https://ffmpeg.org) — libavformat, libavcodec, libavutil, libswscale | LGPL-2.1-or-later; GPL-3.0 as built with `--enable-gpl --enable-version3` by Arch Linux |
 | [zlib](https://zlib.net) | zlib licence |
 | [Hunspell](https://hunspell.github.io) | GPL-2.0-or-later / LGPL-2.1-or-later / MPL-1.1 |
@@ -45,3 +45,16 @@ Creative Commons Attribution-ShareAlike 4.0 International licence (CC BY-SA 4.0,
 https://creativecommons.org/licenses/by-sa/4.0/), which is compatible with
 OmaShow's GPL 3. It lists the best free matches per Office font with their
 measured size, width and line factors. It contains no fonts.
+
+## Free fonts downloaded on request
+
+`src/fonts/office/font-sources.json` lists, for the free matches OmaShow can
+fetch, the exact files in the google/fonts repository
+(https://github.com/google/fonts) at one pinned commit, each with its size and
+SHA-256. When a person asks for them (the font check on opening a deck, or
+the Extra fonts pack),
+OmaShow downloads those files, checks each one against its SHA-256 before
+using it, and keeps them in its own font folder
+(`$XDG_DATA_HOME/omashow-fonts`), which only OmaShow reads. Each family's
+licence file is downloaded beside it. The fonts are under their own licences,
+almost all the SIL Open Font License 1.1; none is bundled with OmaShow.

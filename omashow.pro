@@ -185,3 +185,6 @@ HEADERS += src/core/fonts.h
 SOURCES += src/core/fonts.cpp
 HEADERS += src/core/fontswap.h
 SOURCES += src/core/fontswap.cpp
+QT += network
+HEADERS += src/core/fontsandbox.h src/core/fontdownloader.h
+SOURCES += src/core/fontsandbox.cpp src/core/fontdownloader.cpp src/backendfonts.cpp

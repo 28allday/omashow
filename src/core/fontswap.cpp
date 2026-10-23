@@ -1,4 +1,6 @@
+#include "core/fontsandbox.h"
 #include "core/fontswap.h"
+#include "core/fontdownloader.h"
 
 #include <QSet>
 
@@ -70,7 +72,7 @@ const QHash<QString, Entry> &table() {
     return loaded;
 }
 
-bool installed(const QString &family) { return QFontDatabase::hasFamily(family); }
+bool installed(const QString &family) { return FontSandbox::available(family); }
 
 // Sizes written back must be the ones read: a size untouched since the swap
 // is restored from what was stored, not divided back with rounding.
@@ -528,6 +530,94 @@ QVariantList FontSwap::swapped(const Document &document) {
     return tallyList(tally);
 }
 
+
+
+
+namespace {
+QVariantMap installRow(const FontSwap::Option &best, const QStringList &offices) {
+    return {{QStringLiteral("family"), best.family}, {QStringLiteral("offices"), offices},
+            {QStringLiteral("metric"), best.metric}, {QStringLiteral("package"), best.package},
+            {QStringLiteral("googleFonts"), best.googleFonts}, {QStringLiteral("github"), best.github},
+            // Whether OmaShow can fetch it (pinned files), and how much.
+            {QStringLiteral("downloadable"), FontDownloader::downloadable(best.family)},
+            {QStringLiteral("bytes"), double(FontDownloader::bytesFor({best.family}))}};
+}
+// The free family OmaShow would fetch for an Office font: the best match
+// when it can be downloaded, else the first that can (Aptos: Intos has no
+// pinned files, Zalando Sans has).
+const FontSwap::Option *choice(const QVector<FontSwap::Option> &opts) {
+    if (opts.isEmpty()) return nullptr;
+    const FontSwap::Option *want = &opts.first();
+    if (!FontDownloader::downloadable(want->family))
+        for (const auto &o : opts) if (FontDownloader::downloadable(o.family)) { want = &o; break; }
+    return want;
+}
+
+// all: the Extra fonts pack (every Office font, installed rows marked);
+// otherwise only what is missing here.
+QVariantList rowsFor(const QStringList &offices, bool all = false) {
+    QMap<QString, QStringList> byFamily;
+    QHash<QString, FontSwap::Option> option;
+    for (const auto &office : offices) {
+        const auto opts = FontSwap::options(office);
+        const auto *want = choice(opts);
+        if (!want) continue;
+        if (all) {
+            if (!FontDownloader::downloadable(want->family)) continue;
+        } else {
+            if (installed(office) || installed(opts.first().family)) continue;
+            bool better = false;   // a match ahead of the choice is here already
+            for (const auto &o : opts) { if (&o == want) break; if (installed(o.family)) better = true; }
+            if (better || (want != &opts.first() && installed(want->family))) continue;
+        }
+        byFamily[want->family].append(table().value(office.toLower()).name);
+        option.insert(want->family, *want);
+    }
+    QVariantList rows;
+    for (auto it = byFamily.cbegin(); it != byFamily.cend(); ++it) {
+        QStringList names = it.value();
+        names.removeDuplicates();
+        auto row = installRow(option.value(it.key()), names);
+        row.insert(QStringLiteral("installed"), installed(it.key()) || FontDownloader::complete(it.key()));
+        rows.append(row);
+    }
+    return rows;
+}
+} // namespace
+
+// The Extra fonts pack: the free match OmaShow would fetch for every Office
+// font in the map, each row marked installed or not.
+QVariantList FontSwap::pack() {
+    QStringList offices;
+    for (const auto &entry : table()) offices.append(entry.name);
+    offices.sort(Qt::CaseInsensitive);
+    auto rows = rowsFor(offices, true);
+    // Tests only: a pack of just these families (comma list), so a local
+    // server can stand in for the whole one.
+    const auto only = qEnvironmentVariable("OMASHOW_FONT_TEST_PACK").split(QLatin1Char(','), Qt::SkipEmptyParts);
+    if (!only.isEmpty()) rows.removeIf([&](const QVariant &r) { return !only.contains(r.toMap().value(QStringLiteral("family")).toString()); });
+    return rows;
+}
+
+QVariantList FontSwap::needed(const Document &document) {
+    QStringList offices;
+    QSet<QString> seen;
+    const auto note = [&](const QString &family) {
+        if (family.isEmpty() || seen.contains(family)) return;
+        seen.insert(family);
+        if (!installed(family) && isOffice(family)) offices.append(family);
+    };
+    eachObject(document, [&](const SceneObject &o) {
+        note(o.origFont.isEmpty() ? o.fontFamily : o.origFont);
+        for (const auto &run : o.runs) note(run.origFont.isEmpty() ? run.fontFamily : run.origFont);
+        for (const auto &cell : o.table.cells)
+            note(cell.style.value(cell.style.contains(QStringLiteral("origFont")) ? QStringLiteral("origFont") : QStringLiteral("fontFamily")).toString());
+    });
+    for (auto it = document.theme.fonts.cbegin(); it != document.theme.fonts.cend(); ++it)
+        note(document.theme.fontOrigins.value(it.key(), it.value()));
+    offices.removeDuplicates();
+    return rowsFor(offices);
+}
 
 
 FontSwap::VerticalFix FontSwap::verticalFix(const SceneObject &o, qreal size) {

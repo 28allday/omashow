@@ -37,6 +37,8 @@
         <file alias="ConnectorTools.qml">ConnectorTools.qml</file>
         <file alias="LinkDialog.qml">LinkDialog.qml</file>
         <file alias="FontsDialog.qml">FontsDialog.qml</file>
+        <file alias="FontCheckDialog.qml">FontCheckDialog.qml</file>
+        <file alias="FontSettingsDialog.qml">FontSettingsDialog.qml</file>
         <file alias="CropOverlay.qml">CropOverlay.qml</file>
         <file>MediaTools.qml</file>
     <file>MediaPreflight.qml</file>
@@ -81,6 +83,7 @@
     </qresource>
     <qresource prefix="/fonts">
         <file alias="office-font-map.json">fonts/office/office-font-map.json</file>
+        <file alias="font-sources.json">fonts/office/font-sources.json</file>
     </qresource>
     <qresource prefix="/ui">
         <file alias="Icon.qml">ui/Icon.qml</file>

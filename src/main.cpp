@@ -1,5 +1,7 @@
 // OmaShow — native presentations for Omarchy.
 
+#include "core/fontsandbox.h"
+
 #include <QGuiApplication>
 #include <QFont>
 #include <QIcon>
@@ -161,6 +163,9 @@ int main(int argc, char *argv[]) {
         QSurfaceFormat::setDefaultFormat(format);
     }
     QGuiApplication app(argc, argv);
+    // Extra fonts from OmaShow's own folder, for this process only;
+    // fontconfig never sees them, so the rest of the system is unaffected.
+    FontSandbox::load();
     Workers::Session workerSession;
 
     // The identity trio. setDesktopFileName is what becomes the Wayland app_id,

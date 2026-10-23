@@ -21,13 +21,12 @@ depends=('hicolor-icon-theme' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-multim
          # Serif is a built-in theme's heading face.
          'inter-font' 'noto-fonts'
          # The free stand-ins the Office font table draws PowerPoint decks
-         # with (src/fonts/office/office-font-map.json), so a deck written in
-         # Calibri, Cambria, Arial, Georgia and the rest looks right on first
-         # open without hunting for fonts.
-         'ttf-liberation' 'ttf-carlito' 'ttf-caladea' 'ttf-croscore' 'gsfonts'
-         'ttf-dejavu' 'ttf-roboto' 'ttf-lato' 'ttf-opensans' 'ttf-fira-sans'
-         'ttf-ibm-plex' 'ttf-cascadia-code' 'adobe-source-sans-fonts'
-         'adobe-source-serif-fonts' 'adobe-source-code-pro-fonts')
+         # with (src/fonts/office/office-font-map.json) that aren't on Google
+         # Fonts. The rest (Carlito, Caladea, Roboto, Lato, Open Sans, Fira
+         # Sans, IBM Plex Sans, Source Sans/Serif/Code Pro and hundreds more)
+         # OmaShow downloads into its own folder when a deck needs them, so
+         # they don't fill every other app's font list.
+         'ttf-liberation' 'ttf-croscore' 'gsfonts' 'ttf-dejavu')
 # British English comes with the package; other languages can be added, and
 # the deck's language (Document ▸ Language) picks between them.
 optdepends=('hunspell-en_us: American English spelling')

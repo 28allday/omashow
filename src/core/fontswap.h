@@ -80,6 +80,13 @@ void revert(Document &document);
 struct VerticalFix { qreal line = 1; qreal shift = 0; };
 VerticalFix verticalFix(const SceneObject &o, qreal size);
 
+// Free families worth installing for this deck: the best match of every
+// Office family it names (swapped or not) when that match is not installed.
+// {family, offices, package, googleFonts, github, metric, downloadable, bytes, installed}
+QVariantList needed(const Document &document);
+// The Extra fonts pack: for every Office family in the table the free family
+// OmaShow would download, {..., installed}.
+QVariantList pack();
 // What has been swapped in this deck: {office, free, metric, size, uses}.
 QVariantList swapped(const Document &document);
 

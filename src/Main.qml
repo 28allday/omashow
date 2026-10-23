@@ -209,7 +209,7 @@ ApplicationWindow {
                } }
     Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && (win.workspace === 2 || win.workspace === 4)
                onActivated: backend.togglePlay() }
-    Shortcut { sequence: "F5"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible; onActivated: win.startShow() }
+    Shortcut { sequence: "F5"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !backend.fontGate; onActivated: win.startShow() }
     Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused; onActivated: helpSheet.open() }
     Shortcut { sequence: "F1"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running; onActivated: { win.commitEditors(); helpGuide.open() } }
     Shortcut { sequence: "Ctrl+Q"; context: Qt.ApplicationShortcut; enabled: !presenter.running; onActivated: win.close() }
@@ -259,7 +259,7 @@ ApplicationWindow {
         discardSheet.open()
     }
 
-    function startShow() { win.commitEditors(); presenter.start(false,false) }
+    function startShow() { if (backend.fontGate) return; win.commitEditors(); presenter.start(false,false) }
     function endShow() { presenter.stop() }
     SlideSizeDialog { id: slideSizeDialog }
     LayoutApplyDialog { id: layoutApplyDialog }
@@ -367,6 +367,58 @@ ApplicationWindow {
     Connections { target: backend; function onTableEditorRequested() { win.commitEditors(); tableEditor.show() } }
     LinkDialog { id: linkDialog }
     FontsDialog { id: fontsDialog }
+    // Free fonts an opened deck needs (its Office fonts' look-alikes).
+    FontCheckDialog { id: fontCheckDialog }
+    // Format ▸ Free fonts…: the settings, the Extra fonts pack, what is downloaded.
+    FontSettingsDialog { id: fontSettingsDialog; onPackRequested: fontCheckDialog.showPack() }
+    // While an opening deck's fonts are fetched without asking, a short
+    // loading state (and nothing to click behind it: no show can start).
+    Popup {
+        id: fontGateLoading
+        objectName: "fontGateLoading"
+        parent: Overlay.overlay; anchors.centerIn: parent
+        modal: true; closePolicy: Popup.NoAutoClose
+        visible: backend.fontGateSilent
+        Overlay.modal: Rectangle { color: Theme.withAlpha(Theme.showBg, .65) }
+        background: Rectangle { color: Theme.panelBg; border.color: Theme.border; radius: Theme.rControl }
+        ColumnLayout {
+            spacing: Theme.s2
+            Label { text: backend.fontDownloadRunning ? qsTr("Getting the free fonts this presentation needs…") : qsTr("Checking fonts…") }
+            ProgressBar {
+                Layout.preferredWidth: 280
+                indeterminate: !backend.fontDownloadRunning || backend.fontDownloadTotal <= 0
+                from: 0; to: Math.max(1, backend.fontDownloadTotal); value: backend.fontDownloadDone
+            }
+            // Never stuck behind a slow connection: open it now with similar fonts.
+            Button {
+                objectName: "fontGateFallback"
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Use fallback fonts")
+                onClicked: backend.skipFontGate()
+            }
+        }
+    }
+    // Never in the middle of a show: a check or arrived fonts wait until it
+    // ends; editors are committed before fonts are applied.
+    property var pendingFontCheck: null
+    Connections {
+        target: backend
+        function onFontCheckRequested(source, rows) {
+            win.pendingFontCheck = null   // a newer deck replaces any held check
+            if (presenter.running) win.pendingFontCheck = { source: source, rows: rows }
+            else Qt.callLater(() => fontCheckDialog.check(source, rows))
+        }
+        function onFontDownloadChanged() { if (backend.fontsPending && !presenter.running) Qt.callLater(win.applyArrivedFonts) }
+    }
+    Connections {
+        target: presenter
+        function onStateChanged() {
+            if (presenter.running) return
+            if (win.pendingFontCheck) { const p = win.pendingFontCheck; win.pendingFontCheck = null; fontCheckDialog.check(p.source, p.rows) }
+            if (backend.fontsPending) win.applyArrivedFonts()
+        }
+    }
+    function applyArrivedFonts() { if (!backend.fontsPending || presenter.running) return; win.commitEditors(); backend.applyArrivedFonts() }
     MediaOptimisation { id: mediaOptimisation }
     Connections { target: backend; function onMediaOptimisationRequested() { win.commitEditors(); mediaOptimisation.show() } }
     MediaPreflight { id: mediaPreflight; onEditRequested: win.workspace=0 }
@@ -565,6 +617,7 @@ ApplicationWindow {
                         MenuItem { text: qsTr("Combine shapes…"); enabled: backend.selectionCount > 1; onTriggered: { win.commitEditors(); combineShapesDialog.open() } }
                         MenuItem { text: qsTr("Theme and slide size"); icon.name: "palette"; onTriggered: win.chooseSidebar(2) }
                         MenuItem { text: qsTr("Edit masters and layouts"); onTriggered: { win.commitEditors(); win.workspace = 1 } }
+                        MenuItem { objectName: "freeFontsItem"; text: qsTr("Free fonts…"); onTriggered: fontSettingsDialog.show() }
                         MenuSeparator {}
                         MenuItem {
                             objectName: "smartPunctuationItem"
@@ -1133,6 +1186,14 @@ ApplicationWindow {
                     // What just happened, for anything reading the window aloud.
                     Accessible.role: Accessible.StaticText
                     Accessible.name: text
+                }
+                // The Extra fonts pack's progress; a click opens it.
+                StatusText {
+                    objectName: "packStatus"
+                    visible: backend.packStatus !== ""
+                    text: backend.packStatus
+                    font.underline: packStatusMouse.containsMouse
+                    MouseArea { id: packStatusMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: fontCheckDialog.showPack() }
                 }
                 StatusText { visible: showGuard.engaged; text: showGuard.state; color: Theme.success }
 

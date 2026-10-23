@@ -29,6 +29,13 @@ public:
     QString redoLabel() const;
 
     bool undo(Document &document);
+    // Changes every snapshot the same way (fonts that arrived are used in
+    // undo states too, so Undo never brings the fallbacks back).
+    template <typename F> void rewrite(F change) {
+        for (auto &e : m_past) change(e.document);
+        for (auto &e : m_future) change(e.document);
+        if (m_hasPending) change(m_pending.document);
+    }
     bool redo(Document &document);
 
 private:

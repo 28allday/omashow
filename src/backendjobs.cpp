@@ -63,18 +63,13 @@ void Backend::openAsync(const QUrl &url, bool recovery) {
             emit failed(tr("The deck changed while opening. Your current edits have been kept.")); return;
         }
         if (!result.read.ok) { setStatus(result.read.error); emit failed(result.read.error); return; }
-        if (Interchange::isForeign(result.read.kind)) {
-            acceptImported(result.read.document, url.toLocalFile(), Interchange::kindName(result.read.kind), result.read.warnings);
-            return;
-        }
-        acceptOpen(result.read.document, recovery ? QUrl() : url);
-        if (recovery) {
-            m_modified = true;
-            setFileUrl(result.original.isEmpty() ? QUrl() : QUrl::fromLocalFile(result.original));
-            emit documentChanged();
-            Recovery::forget(url.toLocalFile());
-            setStatus(tr("Recovered — save to keep your recovered work"));
-        }
+        Gate gate;
+        gate.document = result.read.document; gate.url = url; gate.source = url.toLocalFile();
+        gate.foreign = Interchange::isForeign(result.read.kind);
+        gate.kind = Interchange::kindName(result.read.kind); gate.warnings = result.read.warnings;
+        gate.recovery = recovery; gate.original = result.original;
+        if (recovery) gate.source.clear();   // a recovered journal: no check
+        gateOpen(gate);
     });
     watcher->setFuture(QtConcurrent::run(Workers::io(), [url, recovery, job] {
         Result result;

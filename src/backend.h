@@ -11,6 +11,7 @@
 
 #include <QVariantMap>
 #include <QHash>
+#include <QSet>
 #include <functional>
 #include "core/mediaasset.h"
 
@@ -52,6 +53,33 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantMap fileState READ fileState NOTIFY fileStateChanged)
     // What a deck opened from PowerPoint or Keynote could not bring across.
     Q_PROPERTY(QVariantMap importReport READ importReport NOTIFY importReportChanged)
+    // Free fonts for Office fonts a deck names (core/fontswap.h): an opened
+    // deck that needs downloadable ones is held, not shown, until they are in
+    // or the person chooses fallbacks; fonts that arrive are used in place.
+    Q_PROPERTY(bool fontGate READ fontGate NOTIFY fontGateChanged)
+    Q_PROPERTY(bool fontsPending READ fontsPending NOTIFY fontDownloadChanged)
+    Q_PROPERTY(bool fontDownloadRunning READ fontDownloadRunning NOTIFY fontDownloadChanged)
+    Q_PROPERTY(double fontDownloadDone READ fontDownloadDone NOTIFY fontDownloadChanged)
+    Q_PROPERTY(double fontDownloadTotal READ fontDownloadTotal NOTIFY fontDownloadChanged)
+    // Settings (Format ▸ Free fonts…): whether opening a deck checks its fonts
+    // at all (off: fallbacks, no popup, nothing fetched), whether missing free
+    // fonts are fetched without asking, and the Extra fonts pack: the free
+    // match for every Office font in the map, fetched into OmaShow's folder.
+    Q_PROPERTY(bool fontCheckOnOpen READ fontCheckOnOpen WRITE setFontCheckOnOpen NOTIFY fontAutoDownloadChanged)
+    Q_PROPERTY(bool fontAutoDownload READ fontAutoDownload WRITE setFontAutoDownload NOTIFY fontAutoDownloadChanged)
+    Q_PROPERTY(bool extraFontsPack READ extraFontsPack WRITE setExtraFontsPack NOTIFY extraFontsPackChanged)
+    Q_PROPERTY(bool packRunning READ packRunning NOTIFY fontDownloadChanged)
+    Q_PROPERTY(int packReady READ packReady NOTIFY fontDownloadChanged)
+    Q_PROPERTY(int packTotal READ packTotal NOTIFY fontDownloadChanged)
+    Q_PROPERTY(double packDone READ packDone NOTIFY fontDownloadChanged)
+    Q_PROPERTY(double packBytes READ packBytes NOTIFY fontDownloadChanged)
+    Q_PROPERTY(QString packStatus READ packStatus NOTIFY fontDownloadChanged)
+    // A deck held while its fonts are fetched without asking: the window
+    // shows a short loading state with "Use fallback fonts".
+    Q_PROPERTY(bool fontGateSilent READ fontGateSilent NOTIFY fontGateChanged)
+    Q_PROPERTY(bool fontRemoveRunning READ fontRemoveRunning NOTIFY fontRemoveChanged)
+    Q_PROPERTY(int fontRemoveDone READ fontRemoveDone NOTIFY fontRemoveChanged)
+    Q_PROPERTY(int fontRemoveTotal READ fontRemoveTotal NOTIFY fontRemoveChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString operation READ operation NOTIFY operationChanged)
@@ -138,6 +166,49 @@ public:
     QString fileName() const;
     QVariantMap fileState() const;
     QVariantMap importReport() const;
+    // Free fonts: what the open deck could fetch, fetching it into OmaShow's
+    // own folder (core/fontsandbox.h), and using it once it is in.
+    Q_INVOKABLE QVariantList fontsToInstall() const;
+    Q_INVOKABLE bool downloadFonts(const QStringList &families);
+    Q_INVOKABLE void cancelFontDownload();
+    Q_INVOKABLE void applyArrivedFonts();
+    Q_INVOKABLE void finishFontGate();
+    Q_INVOKABLE QString fontSandboxDir() const;
+    Q_INVOKABLE bool openFontSandbox();
+    Q_INVOKABLE bool fontCheckHidden(const QString &source) const;
+    Q_INVOKABLE void setFontCheckHidden(const QString &source, bool hidden);
+    bool fontGate() const { return m_gate.active; }
+    bool fontsPending() const { return m_fontsPending; }
+    bool fontDownloadRunning() const;
+    double fontDownloadDone() const;
+    double fontDownloadTotal() const;
+    Q_INVOKABLE QVariantList fontSwaps() const;
+    Q_INVOKABLE QVariantList fontPack() const;
+    Q_INVOKABLE bool downloadPack();
+    Q_INVOKABLE void cancelPack();
+    Q_INVOKABLE void skipFontGate();
+    // The free fonts OmaShow has downloaded into its own folder: {family, bytes}.
+    Q_INVOKABLE QVariantList downloadedFonts() const;
+    // Unticking the Extra fonts pack: removes what OmaShow downloaded (only
+    // that), one folder at a time with progress. Stops downloads and turns
+    // the pack off first.
+    Q_INVOKABLE void removeDownloadedFonts();
+    bool fontCheckOnOpen() const;
+    void setFontCheckOnOpen(bool on);
+    bool fontAutoDownload() const;
+    void setFontAutoDownload(bool on);
+    bool extraFontsPack() const;
+    void setExtraFontsPack(bool on);
+    bool packRunning() const { return !m_packLeft.isEmpty(); }
+    int packReady() const;
+    int packTotal() const;
+    double packDone() const;
+    double packBytes() const;
+    QString packStatus() const { return m_packStatus; }
+    bool fontGateSilent() const { return m_gate.active && m_gate.silent; }
+    bool fontRemoveRunning() const { return !m_fontRemoveLeft.isEmpty(); }
+    int fontRemoveDone() const { return m_fontRemoveTotal - int(m_fontRemoveLeft.size()); }
+    int fontRemoveTotal() const { return m_fontRemoveTotal; }
     Q_INVOKABLE void dismissImportReport();
     // Typefaces the deck names that are not installed here, each with a
     // suggested stand-in; and the rewrite, as one undo step.
@@ -549,6 +620,17 @@ public:
 signals:
     void opened();
     void importReportChanged();
+    void fontGateChanged();
+    void fontDownloadChanged();
+    void fontDownloadFinished(const QStringList &installed, const QVariantMap &failed, bool offline, bool cancelled);
+    // A deck was opened that names Office fonts whose free matches can be
+    // downloaded: rows as FontSwap::needed.
+    void fontCheckRequested(const QString &source, const QVariantList &rows);
+    void fontAutoDownloadChanged();
+    void extraFontsPackChanged();
+    void packFinished(int ready, int total, const QVariantMap &failed, bool offline);
+    void fontRemoveChanged();
+    void fontRemoveFinished(int removed);
     void importReady();
     void deckImportChanged();
     void findChanged();
@@ -593,6 +675,41 @@ signals:
     void guidesChanged();
 
 private:
+    // Free font downloads for the open deck.
+    class FontDownloader *m_fontDownloader = nullptr;
+    void ensureDownloader();
+    void familyArrived(const QString &family);
+    void familyLost(const QString &family, const QString &why, bool network);
+    void finishDeck();
+    void runFinished(const QStringList &installed, const QVariantMap &failed, bool offline, bool cancelled);
+    QStringList m_deckFamilies, m_deckInstalled, m_packFamilies;
+    QSet<QString> m_deckLeft, m_deckNeeded, m_packLeft;
+    QVariantMap m_deckFailed, m_packFailed;
+    bool m_deckCancelled = false, m_fontsPending = false;
+    // The pack's rows, built once and kept up to date as families settle.
+    const QVariantList &packRows() const;
+    mutable QVariantList m_packRows;
+    mutable bool m_packRowsBuilt = false;
+    mutable int m_packReadyCount = 0;
+    QString m_packStatus;
+    QStringList m_fontRemoveLeft;   // family folders still to delete
+    int m_fontRemoveTotal = 0;
+    void removeNextFont();
+    // An opened deck waiting for its font check.
+    struct Gate {
+        bool active = false;
+        Document document;
+        QUrl url;
+        QString source, kind, original;
+        QStringList warnings;
+        bool foreign = false, recovery = false, silent = false;
+        int id = 0;
+    } m_gate;
+    bool m_gateHandled = false;   // the opening deck's check is done: no second popup
+    int m_gateIds = 0;
+    void gateOpen(Gate gate);
+    void completeOpen(const Gate &gate);
+    void requestFontCheck(const QString &source);
     int m_clipboardVersion = 0;
     bool m_copyPending = false, m_pasteAfterCopy = false;
     struct ImageRequest {
