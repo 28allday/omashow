@@ -147,9 +147,25 @@ int captureInterface(QQmlApplicationEngine &engine, Backend &backend, Presenter 
 int main(int argc, char *argv[]) {
     // A verb means there is nobody watching: no window, no graphics device, and
     // no reason to need a display. Everything else keeps the behaviour it had.
-    const bool headless = argc > 1 && Cli::isVerb(QString::fromLocal8Bit(argv[1]));
-    if (headless && qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-        qputenv("QT_QPA_PLATFORM", "offscreen");
+    const QString first = argc > 1 ? QString::fromLocal8Bit(argv[1]) : QString();
+    const bool headless = Cli::isVerb(first);
+    // Nor does asking for help. The platform is replaced, not defaulted: an
+    // Omarchy session exports QT_QPA_PLATFORM=wayland;xcb to every process,
+    // which is no use over SSH, on a console or in an agent's sandbox, and Qt
+    // aborts rather than fail politely when it cannot reach the display. A
+    // platform that already draws nowhere (offscreen, with or without a
+    // config file, or minimal) is kept as given.
+    static const QStringList asksForHelp{QStringLiteral("--help"), QStringLiteral("-h"),
+                                         QStringLiteral("--help-all"), QStringLiteral("--version"),
+                                         QStringLiteral("-v")};
+    if (headless || asksForHelp.contains(first)) {
+        const auto platform = qEnvironmentVariable("QT_QPA_PLATFORM");
+        if (!platform.startsWith(QLatin1String("offscreen")) && !platform.startsWith(QLatin1String("minimal")))
+            qputenv("QT_QPA_PLATFORM", "offscreen");
+        // The platform theme Omarchy names (gtk3) opens the display for itself
+        // and ends the process when it cannot; nothing headless needs a theme.
+        qunsetenv("QT_QPA_PLATFORMTHEME");
+    }
 
     // FBO-backed QPainter is supported on Qt's OpenGL renderer. Honour explicit
     // platform/backend choices, including the software screenshot harness.
