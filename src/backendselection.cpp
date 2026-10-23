@@ -407,21 +407,40 @@ void Backend::deleteSelected() {
   clearSelection();
   touch();
 }
+// Moves the selection |delta| places up (positive) or down the stacking
+// order, stopping at the ends: a large delta is bring-to-front or
+// send-to-back. Nothing moving is nothing done, so it is not an edit.
 void Backend::raiseSelected(int delta) {
   const auto ids = selectedIds();
-  if (ids.isEmpty())
+  if (ids.isEmpty() || delta == 0)
     return;
   m_history.begin(m_document,
                   delta > 0 ? tr("Bring forward") : tr("Send backward"));
   auto &objects = m_document.slides[m_currentSlide].objects;
-  if (delta > 0) {
-    for (int i = objects.size() - 2; i >= 0; --i)
-      if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i + 1).id))
-        objects.swapItemsAt(i, i + 1);
-  } else {
-    for (int i = 1; i < objects.size(); ++i)
-      if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i - 1).id))
-        objects.swapItemsAt(i, i - 1);
+  const qint64 steps = qMin<qint64>(qAbs(qint64(delta)), objects.size());
+  bool movedAtAll = false;
+  for (qint64 step = 0; step < steps; ++step) {
+    bool moved = false;
+    if (delta > 0) {
+      for (int i = objects.size() - 2; i >= 0; --i)
+        if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i + 1).id)) {
+          objects.swapItemsAt(i, i + 1);
+          moved = true;
+        }
+    } else {
+      for (int i = 1; i < objects.size(); ++i)
+        if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i - 1).id)) {
+          objects.swapItemsAt(i, i - 1);
+          moved = true;
+        }
+    }
+    if (!moved)
+      break;
+    movedAtAll = true;
+  }
+  if (!movedAtAll) {
+    m_history.abandon();
+    return;
   }
   m_history.commit();
   touch();

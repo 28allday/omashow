@@ -98,7 +98,14 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "connectorArrowEnd") o.connectorArrowEnd=v.toBool();
     else if (key == "shapeKind") { const int k=v.toInt(); if(k!=Shape::custom && (k<0 || k>=Shape::names().size())) return false; o.shapeKind=k; }
     else if (key == "pathWinding") o.pathWinding=v.toBool();
-    else if (key == "pathData") { if(!Shape::decode(v.toList())) return false; o.pathData=v.toList(); }
+    else if (key == "pathData") {
+        if(!Shape::decode(v.toList())) return false;
+        o.pathData=v.toList();
+        // A shape drawn from a path is a custom shape: a preset kind would go
+        // on drawing its preset and the path would sit unseen. Words on a path
+        // (textKind 2) keep their own kind.
+        if (o.type == ObjectType::Rect && !o.connector) o.shapeKind = Shape::custom;
+    }
     else if (key == "fillStyle") o.fillStyle=qBound(0,v.toInt(),5);
     else if (key == "fillSecondary") o.fillSecondary=QColor(v.toString());
     else if (key == "fillAngle") o.fillAngle=n;
