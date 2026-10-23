@@ -107,6 +107,8 @@ effect number.
 |---|---|
 | Move around | `setCurrentSlide`, `select`, `selectIds`, `selectAll` |
 | Inside a group | `select` with an id reaches into groups and edits only that object. Naming objects in different groups brings each group's siblings along, and the result says so in a warning |
+| Stacking | `raiseSelected(delta)` moves that many places; a large delta is bring-to-front or send-to-back |
+| Custom shapes | `addPath` with points, or `setSelectedProperty` `pathData` with `[["M",0,0],["L",1,1],["Z"]]` in the box's unit square (it makes the shape custom); `inspect --full` shows the path |
 | Slides | `addSlide`, `duplicateSlide`, `deleteSlide`, `moveSlide`, `setSlidesSkipped` |
 | Words | `addText`, then `setSelectedProperty` with `text`, `fontSize`, `fontWeight`, `textColor`, `textAlign`, `verticalAlign`, `lineHeight`, `listStyle` |
 | Geometry | `setSelectedProperty` with `x`, `y`, `w`, `h`, `rotation`, `opacity` |

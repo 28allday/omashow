@@ -694,6 +694,7 @@ private:
     mutable int m_reviewRevision = -1;
     mutable QVariantList m_reviewIssues;
     SlideRows *m_browserModel = nullptr;
+    bool m_browserSyncPending = false;
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);
