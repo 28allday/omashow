@@ -418,6 +418,8 @@ public:
     Q_INVOKABLE void selectRegion(qreal x, qreal y, qreal w, qreal h, bool extend = false);
     Q_INVOKABLE void groupSelected();
     Q_INVOKABLE void ungroupSelected();
+    // By id from a script, reaching into groups: see backendselection.cpp.
+    Q_INVOKABLE void selectNamed(const QStringList &ids);
     Q_INVOKABLE void enterGroup();
     Q_INVOKABLE void leaveGroup();
     Q_INVOKABLE void alignSelected(const QString &mode, int reference = 0);

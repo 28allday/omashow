@@ -106,6 +106,7 @@ effect number.
 | What | Operation |
 |---|---|
 | Move around | `setCurrentSlide`, `select`, `selectIds`, `selectAll` |
+| Inside a group | `select` with an id reaches into groups and edits only that object. Naming objects in different groups brings each group's siblings along, and the result says so in a warning |
 | Slides | `addSlide`, `duplicateSlide`, `deleteSlide`, `moveSlide`, `setSlidesSkipped` |
 | Words | `addText`, then `setSelectedProperty` with `text`, `fontSize`, `fontWeight`, `textColor`, `textAlign`, `verticalAlign`, `lineHeight`, `listStyle` |
 | Geometry | `setSelectedProperty` with `x`, `y`, `w`, `h`, `rotation`, `opacity` |

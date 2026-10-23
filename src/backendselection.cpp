@@ -104,6 +104,40 @@ void Backend::selectIds(const QStringList &requested) {
   m_selectedId = ids.isEmpty() ? QString() : ids.last();
   emit selectionChanged();
 }
+// A script naming an object means that object, not the group it sits in
+// (#26). The group scope moves to the deepest group every named object
+// shares, so each named object is a unit of its own where it can be; named
+// objects in different groups still take their group's siblings along, as a
+// click would, and selectedIds() shows that. select() and selectIds() are
+// what a click does: they keep the scope where the person put it.
+void Backend::selectNamed(const QStringList &ids) {
+  const auto slide = Design::resolve(m_document, m_currentSlide);
+  QStringList scope;
+  bool found = false;
+  for (const auto &id : ids)
+    if (const auto *o = slide.find(id)) {
+      if (!found) {
+        scope = o->groups;
+        found = true;
+        continue;
+      }
+      int shared = 0;
+      while (shared < scope.size() && shared < o->groups.size() &&
+             scope.at(shared) == o->groups.at(shared))
+        ++shared;
+      scope = scope.mid(0, shared);
+    }
+  if (!found) {
+    clearSelection();
+    return;
+  }
+  if (scope != m_groupScope) {
+    m_groupScope = scope;
+    m_selectedIds.clear();
+    m_selectedId.clear();
+  }
+  selectIds(ids);
+}
 void Backend::select(const QString &id) {
   selectIds(id.isEmpty() ? QStringList() : QStringList{id});
 }

@@ -349,8 +349,32 @@ QVariantList Cli::describeOperations(const QString &filter) {
 
 static Cli::OpResult runResolved(Backend &backend, const QVariantMap &op, const QString &name);
 
+// What the selection holds beyond the objects that were named: objects named
+// in different groups take each group's siblings along, as a click would, and
+// a script about to edit "the selection" should hear so (#26).
+static QString selectionBeyond(const Backend &backend, const QStringList &named) {
+    QStringList extra;
+    for (const auto &id : backend.selectedIds())
+        if (!named.contains(id)) extra.append(id);
+    if (extra.isEmpty()) return {};
+    return QStringLiteral("the selection also holds %1, grouped with what was named; name every "
+                          "object you mean, or select them one at a time.")
+        .arg(extra.join(QStringLiteral(", ")));
+}
+
+// The ids an operation names, for the ops that select by id.
+static QStringList namedIds(const QVariant &given) {
+    QStringList ids;
+    if (given.metaType().id() == QMetaType::QVariantList)
+        for (const auto &row : given.toList()) ids.append(row.toString());
+    else if (given.isValid())
+        ids.append(given.toString());
+    return ids;
+}
+
 Cli::OpResult Cli::runOperation(Backend &backend, const QVariantMap &op) {
     OpResult result;
+    QString widened;
     const auto name = op.value(QStringLiteral("op")).toString();
     if (name.isEmpty()) {
         result.error = QStringLiteral("every operation needs an \"op\".");
@@ -374,14 +398,8 @@ Cli::OpResult Cli::runOperation(Backend &backend, const QVariantMap &op) {
         backend.setCurrentSlide(slide);
     }
     if (op.contains(QStringLiteral("select"))) {
-        const auto wanted = op.value(QStringLiteral("select"));
-        QStringList ids;
-        if (wanted.metaType().id() == QMetaType::QVariantList)
-            for (const auto &row : wanted.toList()) ids.append(row.toString());
-        else
-            ids.append(wanted.toString());
-        if (ids.size() == 1) backend.select(ids.first());
-        else backend.selectIds(ids);
+        const auto ids = namedIds(op.value(QStringLiteral("select")));
+        backend.selectNamed(ids);
         QStringList missing;
         const auto selected = backend.selectedIds();
         for (const auto &id : ids)
@@ -394,6 +412,28 @@ Cli::OpResult Cli::runOperation(Backend &backend, const QVariantMap &op) {
                                .arg(backend.currentSlide());
             return result;
         }
+        widened = selectionBeyond(backend, ids);
+    }
+
+    // From a script an id means that object, even inside a group (#26), so
+    // the selecting operations go to selectNamed rather than to what a click
+    // does; selectIds keeps the click's meaning for scripts that want it.
+    static const QStringList byName{QStringLiteral("select"), QStringLiteral("selectNamed")};
+    if (byName.contains(name)) {
+        auto ids = namedIds(op.value(QStringLiteral("args")));
+        if (ids.size() == 1 && op.value(QStringLiteral("args")).toList().value(0).metaType().id() == QMetaType::QVariantList)
+            ids = namedIds(op.value(QStringLiteral("args")).toList().value(0));
+        backend.selectNamed(ids);
+        QStringList missing;
+        for (const auto &id : ids)
+            if (!backend.selectedIds().contains(id)) missing.append(id);
+        if (!missing.isEmpty()) {
+            result.error = QStringLiteral("nothing called %1 on slide %2.").arg(missing.join(QStringLiteral(", "))).arg(backend.currentSlide());
+            return result;
+        }
+        result.ok = true;
+        result.warning = selectionBeyond(backend, ids);
+        return result;
     }
 
     // What the deck looked like before, and anything the backend says went
@@ -407,6 +447,13 @@ Cli::OpResult Cli::runOperation(Backend &backend, const QVariantMap &op) {
     result = runResolved(backend, op, name);
     QObject::disconnect(listening);
     result.changed = backend.revision() != before;
+    if (name == QStringLiteral("selectIds") && result.ok) {
+        auto ids = namedIds(op.value(QStringLiteral("args")));
+        // selectIds takes one list; the list itself may have been given bare.
+        if (ids.size() == 1 && op.value(QStringLiteral("args")).toList().value(0).metaType().id() == QMetaType::QVariantList)
+            ids = namedIds(op.value(QStringLiteral("args")).toList().value(0));
+        widened = selectionBeyond(backend, ids);
+    }
     if (!complaint.isEmpty()) {
         if (result.ok && !result.changed) result.ok = false;
         if (!result.ok) result.error = complaint;
@@ -430,6 +477,8 @@ Cli::OpResult Cli::runOperation(Backend &backend, const QVariantMap &op) {
     if (result.ok && !result.changed && !result.value.isValid() && looksLikeAnEdit)
         result.warning = QStringLiteral("%1 ran but changed nothing: check the key, the value and "
                                         "what is selected, unless it was already so.").arg(name);
+    if (!widened.isEmpty())
+        result.warning = result.warning.isEmpty() ? widened : result.warning + QLatin1Char(' ') + widened;
     return result;
 }
 
