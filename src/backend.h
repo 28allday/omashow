@@ -462,6 +462,10 @@ public:
     Q_INVOKABLE void setupDesign();
     Q_INVOKABLE void applyTheme(int index);
     Q_INVOKABLE void setThemeToken(const QString &name, const QString &value, bool font = false);
+    Q_INVOKABLE QStringList omarchyThemes() const;
+    Q_INVOKABLE void applyOmarchyTheme(const QString &name);
+    // Gives d an Omarchy theme's colours; false, leaving d alone, when there is no such theme.
+    static bool omarchyRestyle(Document &d, const QString &name);
     Q_INVOKABLE void applyLayout(const QString &id);
     QVariantMap layoutPreview() const;
     const Document &layoutPreviewDocument() const { return m_layoutPreviewDocument; }

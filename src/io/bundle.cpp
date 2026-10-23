@@ -44,6 +44,9 @@ QJsonObject objectToJson(const SceneObject &object) {
     if (object.origFont.isEmpty()) {
         for (const auto *key : {"origFont", "origFontSize", "fontScale", "origWeight"}) json.remove(QLatin1String(key));
     }
+    // Not saved, so older OmaShow still opens the deck; Omarchy theme
+    // switches relink borders by colour instead.
+    json.remove(QLatin1String("strokeColorToken"));
     return json;
 }
 SceneObject objectFromJson(const QJsonObject &json) {

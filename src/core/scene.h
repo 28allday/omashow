@@ -153,7 +153,7 @@ struct SceneObject {
     QString origFont;
     qreal origFontSize = 0, fontScale = 1;
     int origWeight = 0;
-    QString fillToken, textColorToken, fontToken;
+    QString fillToken, textColorToken, fontToken, strokeColorToken;
     // Stretches of this text that differ from the box, in authored order.
     QVector<TextRun> runs;
     // What a screen reader would be told this is. Never rendered.
