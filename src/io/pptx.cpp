@@ -349,6 +349,7 @@ struct Look {
     bool lineSet = false, line = false;
     QColor lineColor;
     qreal lineWidthEmu = 0;
+    bool lineWidthSet = false;
     int dash = 0;
     bool shadow = false;
     QColor shadowColor;
@@ -397,11 +398,20 @@ bool readFill(const Node *owner, Look &look, const ColorContext &ctx) {
 
 void readLine(const Node *ln, Look &look, const ColorContext &ctx) {
     if (!ln) return;
-    look.lineSet = true;
-    look.lineWidthEmu = ln->attr(QStringLiteral("w"), QStringLiteral("9525")).toDouble();
+    if (ln->has(QStringLiteral("w"))) {
+        look.lineWidthEmu = ln->attr(QStringLiteral("w")).toDouble();
+        look.lineWidthSet = true;
+    } else if (!look.lineWidthSet) look.lineWidthEmu = 9525;
     Look inner;
     readFill(ln, inner, ctx);
-    if (inner.fillSet && inner.fillStyle == 5) { look.line = false; return; }
+    // An <a:ln> that says nothing about its fill (PowerPoint writes an empty
+    // one on most text boxes) has no line of its own: the line comes from the
+    // shape's <p:style> lnRef or an inherited placeholder, or there is none.
+    // PowerPoint and LibreOffice draw nothing for it; this used to be a thin
+    // black frame round every such box.
+    if (!inner.fillSet) return;
+    look.lineSet = true;
+    if (inner.fillStyle == 5) { look.line = false; return; }
     look.lineColor = inner.fill.isValid() ? inner.fill : QColor(Qt::black);
     // A fully transparent line is no line.
     if (inner.fill.isValid() && inner.fill.alpha() == 0) { look.line = false; return; }
@@ -441,7 +451,7 @@ void applyStyleRefs(const Node *style, Look &look, const ColorContext &ctx) {
             const auto color = colorIn(ref, ctx);
             if (idx > 0 && color.isValid()) {
                 look.lineSet = true; look.line = true; look.lineColor = color;
-                look.lineWidthEmu = 9525.0 * idx;
+                if (!look.lineWidthSet) look.lineWidthEmu = 9525.0 * idx;
             }
         }
     }
