@@ -2,6 +2,7 @@
 
 #include "anim/build.h"
 #include "anim/presentation.h"
+#include "core/connector.h"
 #include "core/edit.h"
 #include "core/imageasset.h"
 #include "core/link.h"
@@ -346,6 +347,7 @@ struct Look {
     QColor fill, fill2;
     qreal angle = 0;
     QString blipRid;
+    const Node *blipFill = nullptr;   // the picture fill itself, for its crop and stretch
     bool lineSet = false, line = false;
     QColor lineColor;
     qreal lineWidthEmu = 0;
@@ -388,6 +390,7 @@ bool readFill(const Node *owner, Look &look, const ColorContext &ctx) {
         }
         if (k.name == QLatin1String("blipFill")) {
             look.fillSet = true; look.fillStyle = 5;
+            look.blipFill = &k;
             if (const Node *blip = k.child(QStringLiteral("blip"))) look.blipRid = blip->attr(QStringLiteral("embed"));
             return true;
         }
@@ -706,6 +709,80 @@ QRectF xfrmRect(const Node *xfrm, const Units &u) {
 
 struct Placement { QRectF rect; qreal rotation = 0; bool flipH = false, flipV = false; bool valid = false; };
 
+// A connector as PowerPoint drew it, waiting until the shapes its ends are
+// glued to (stCxn, endCxn) have been read: they may come after it.
+struct PendingConnector {
+    QString id, from, to;   // the object made for it; the shapes' cNvPr ids
+    QPainterPath path;      // its line on the slide, start to end
+    int route = -1;         // OmaShow's route that could draw it: 0 straight, 1 elbow, -1 none
+    bool head = false, tail = false;
+};
+
+// The line of a straight or bent connector preset, as presetShapeDefinitions
+// draws it in its frame, then flipped and turned onto the slide. A shape that
+// is not one of these gives an empty path.
+QPainterPath connectorPath(const QString &kind, const Placement &place, const Node *prst) {
+    const qreal w = place.rect.width(), h = place.rect.height();
+    qreal adj[3] = {50000, 50000, 50000};
+    if (const Node *list = prst ? prst->child(QStringLiteral("avLst")) : nullptr)
+        for (const auto *gd : list->all(QStringLiteral("gd"))) {
+            const auto name = gd->attr(QStringLiteral("name")), formula = gd->attr(QStringLiteral("fmla"));
+            if (!formula.startsWith(QLatin1String("val "))) continue;
+            bool ok = false;
+            const qreal value = formula.mid(4).toDouble(&ok);
+            if (!ok || !std::isfinite(value)) continue;
+            if (name == QLatin1String("adj1") || name == QLatin1String("adj")) adj[0] = value;
+            else if (name == QLatin1String("adj2")) adj[1] = value;
+            else if (name == QLatin1String("adj3")) adj[2] = value;
+        }
+    const qreal x1 = w * adj[0] / 100000, y2 = h * adj[1] / 100000, x3 = w * adj[2] / 100000;
+    QVector<QPointF> points;
+    if (kind.startsWith(QLatin1String("straight")) || kind == QLatin1String("line") || kind.isEmpty())
+        points = {{0, 0}, {w, h}};
+    else if (kind == QLatin1String("bentConnector2"))
+        points = {{0, 0}, {w, 0}, {w, h}};
+    else if (kind == QLatin1String("bentConnector3"))
+        points = {{0, 0}, {x1, 0}, {x1, h}, {w, h}};
+    else if (kind == QLatin1String("bentConnector4"))
+        points = {{0, 0}, {x1, 0}, {x1, y2}, {w, y2}, {w, h}};
+    else if (kind == QLatin1String("bentConnector5"))
+        points = {{0, 0}, {x1, 0}, {x1, y2}, {x3, y2}, {x3, h}, {w, h}};
+    else
+        return {};
+    QTransform onSlide;
+    onSlide.translate(place.rect.center().x(), place.rect.center().y());
+    onSlide.rotate(place.rotation);
+    onSlide.scale(place.flipH ? -1 : 1, place.flipV ? -1 : 1);
+    onSlide.translate(-w / 2, -h / 2);
+    QPainterPath path;
+    path.moveTo(onSlide.map(points.first()));
+    for (int i = 1; i < points.size(); ++i) path.lineTo(onSlide.map(points.at(i)));
+    return path;
+}
+
+// Whether two lines run through the same corners, within a unit.
+bool sameLine(const QPainterPath &a, const QPainterPath &b) {
+    // Corners that fall on a straight run (a zero-length or collinear step)
+    // do not count, so an elbow that comes out straight still matches.
+    const auto corners = [](const QPainterPath &path) {
+        QVector<QPointF> points;
+        for (int i = 0; i < path.elementCount(); ++i) {
+            const QPointF p = path.elementAt(i);
+            if (!points.isEmpty() && QLineF(points.last(), p).length() < .5) continue;
+            if (points.size() >= 2) {
+                const QPointF u = points.last() - points.at(points.size() - 2), v = p - points.last();
+                if (std::abs(u.x() * v.y() - u.y() * v.x()) < .5 * QLineF(QPointF(), u).length()) points.removeLast();
+            }
+            points.append(p);
+        }
+        return points;
+    };
+    const auto x = corners(a), y = corners(b);
+    if (x.size() != y.size()) return false;
+    for (int i = 0; i < x.size(); ++i) if (QLineF(x.at(i), y.at(i)).length() > 1) return false;
+    return true;
+}
+
 Placement placementOf(const Node *xfrm, const Units &u, const GroupSpace &space) {
     Placement p;
     if (!xfrm) return p;
@@ -885,6 +962,7 @@ struct Reader {
         QHash<QString, QString> *spidToObject = nullptr;
         MasterFields *fields = nullptr;
         bool fieldsSeen = false;
+        QVector<PendingConnector> *connectors = nullptr;   // a slide's, to glue once every shape is in
     };
 
     TextContext textContext(const Scope &scope) const {
@@ -1029,6 +1107,9 @@ struct Reader {
         Look look;
         const auto &color = scope.master->color;
         readFill(spPr, look, color);
+        // A picture fill is read from the shape's own part; one inherited from
+        // a layout or master names a picture in that part instead.
+        const Node *ownPicture = look.blipFill;
         if (spPr) readLine(spPr->child(QStringLiteral("ln")), look, color);
         if (spPr) readEffects(spPr->child(QStringLiteral("effectLst")), look, color);
         for (const auto *from : {layoutSp, masterSp}) {
@@ -1038,7 +1119,22 @@ struct Reader {
             if (!look.lineSet && pr) readLine(pr->child(QStringLiteral("ln")), look, color);
         }
         applyStyleRefs(sp->child(QStringLiteral("style")), look, color);
-        if (!look.blipRid.isEmpty()) warnings.add(QStringLiteral("A shape filled with a picture was given no fill"), scope.slideNumber);
+        SceneObject picture;
+        bool pictureFill = false;
+        if (const Node *blip = ownPicture ? ownPicture->child(QStringLiteral("blip")) : nullptr) {
+            const auto mediaPath = blipMedia(blip, scope.partPath);
+            if (!mediaPath.isEmpty()) pictureFill = decodePicture(picture, mediaPath, scope.slideNumber);
+            else if (!pkg.external(scope.partPath, blip->attr(QStringLiteral("link"))).isEmpty())
+                warnings.add(QStringLiteral("A picture linked from outside the deck was left out"), scope.slideNumber);
+            if (pictureFill) {
+                if (ownPicture->child(QStringLiteral("tile")))
+                    warnings.add(QStringLiteral("A tiled picture fill was drawn once, filling the shape"), scope.slideNumber);
+                else if (const Node *rect = ownPicture->path({"stretch", "fillRect"});
+                         rect && std::any_of(rect->attrs.cbegin(), rect->attrs.cend(), [](const QString &v) { return v.toDouble() != 0; }))
+                    warnings.add(QStringLiteral("A picture fill's offsets were left off"), scope.slideNumber);
+            }
+        }
+        if (!look.blipRid.isEmpty() && !pictureFill) warnings.add(QStringLiteral("A shape filled with a picture was given no fill"), scope.slideNumber);
 
         // Words.
         const Node *txBody = sp->child(QStringLiteral("txBody"));
@@ -1047,7 +1143,7 @@ struct Reader {
         RunLook fallback;
         { ParaLook para; resolveLevel(chain, 0, para, fallback, textContext(scope)); }
 
-        const bool visibleBox = (look.fillSet && look.fillStyle != 5) || look.line;
+        const bool visibleBox = (look.fillSet && look.fillStyle != 5) || look.line || pictureFill;
         const QString spid = [&] {
             const Node *nv = sp->child(QStringLiteral("nvSpPr"));
             const Node *c = nv ? nv->child(QStringLiteral("cNvPr")) : nullptr;
@@ -1072,6 +1168,15 @@ struct Reader {
             box.type = ObjectType::Rect;
             finish(box, place, groups);
             applyLook(box, look);
+            if (pictureFill) {
+                // Stretched over the frame, as PowerPoint fills a shape; tiled,
+                // drawn once to cover it.
+                ImageAsset::copyData(box, picture);
+                box.fillStyle = 4;
+                box.imageMode = ownPicture->child(QStringLiteral("tile")) ? 1 : 2;
+                box.imageCrop = cropOf(ownPicture);
+                applyBlipLook(box, ownPicture->child(QStringLiteral("blip")), false);
+            }
             const Node *prst = spPr ? spPr->child(QStringLiteral("prstGeom")) : nullptr;
             const Node *cust = spPr ? spPr->child(QStringLiteral("custGeom")) : nullptr;
             qreal corner = 0;
@@ -1130,6 +1235,42 @@ struct Reader {
     }
 
     // ---- pictures and films
+
+    // The file a blip draws: a vector original beside the bitmap is the better picture.
+    QString blipMedia(const Node *blip, const QString &partPath) const {
+        QVector<const Node *> svgs;
+        blip->collect(QStringLiteral("svgBlip"), svgs);
+        if (!svgs.isEmpty()) {
+            const auto svgPath = pkg.target(partPath, svgs.first()->attr(QStringLiteral("embed")));
+            if (pkg.has(svgPath)) return svgPath;
+        }
+        return pkg.target(partPath, blip->attr(QStringLiteral("embed")));
+    }
+
+    // The part of the picture a blipFill shows (srcRect), as fractions.
+    static QRectF cropOf(const Node *blipFill) {
+        const Node *src = blipFill ? blipFill->child(QStringLiteral("srcRect")) : nullptr;
+        if (!src) return QRectF(0, 0, 1, 1);
+        const qreal l = src->attr(QStringLiteral("l"), QStringLiteral("0")).toDouble() / 100000.0;
+        const qreal t = src->attr(QStringLiteral("t"), QStringLiteral("0")).toDouble() / 100000.0;
+        const qreal r = src->attr(QStringLiteral("r"), QStringLiteral("0")).toDouble() / 100000.0;
+        const qreal b = src->attr(QStringLiteral("b"), QStringLiteral("0")).toDouble() / 100000.0;
+        if (l + r < 1 && t + b < 1 && (l > 0 || t > 0 || r > 0 || b > 0)) return QRectF(l, t, 1 - l - r, 1 - t - b);
+        return QRectF(0, 0, 1, 1);
+    }
+
+    // A blip's own adjustments. Its transparency is the whole object's, so a
+    // shape's outline would fade with it: only a picture takes it.
+    static void applyBlipLook(SceneObject &o, const Node *blip, bool withOpacity) {
+        for (const auto &k : blip->kids) {
+            if (k.name == QLatin1String("alphaModFix")) { if (withOpacity) o.opacity = qBound(0.0, k.attr(QStringLiteral("amt"), QStringLiteral("100000")).toDouble() / 100000.0, 1.0); }
+            else if (k.name == QLatin1String("grayscl")) o.imageSaturation = 0;
+            else if (k.name == QLatin1String("lum")) {
+                o.imageBrightness = k.attr(QStringLiteral("bright"), QStringLiteral("0")).toDouble() / 100000.0;
+                o.imageContrast = 1 + k.attr(QStringLiteral("contrast"), QStringLiteral("0")).toDouble() / 100000.0;
+            }
+        }
+    }
 
     bool decodePicture(SceneObject &o, const QString &mediaPath, int slideNumber) {
         const auto bytes = pkg.bytes(mediaPath);
@@ -1192,16 +1333,7 @@ struct Reader {
         const Node *blipFill = pic->child(QStringLiteral("blipFill"));
         const Node *blip = blipFill ? blipFill->child(QStringLiteral("blip")) : nullptr;
         if (!blip) return;
-        QString rid = blip->attr(QStringLiteral("embed"));
-        // A vector original beside the bitmap is the better picture.
-        QVector<const Node *> svgs;
-        blip->collect(QStringLiteral("svgBlip"), svgs);
-        QString mediaPath;
-        if (!svgs.isEmpty()) {
-            const auto svgPath = pkg.target(scope.partPath, svgs.first()->attr(QStringLiteral("embed")));
-            if (pkg.has(svgPath)) mediaPath = svgPath;
-        }
-        if (mediaPath.isEmpty()) mediaPath = pkg.target(scope.partPath, rid);
+        const QString mediaPath = blipMedia(blip, scope.partPath);
         if (mediaPath.isEmpty()) {
             if (!pkg.external(scope.partPath, blip->attr(QStringLiteral("link"))).isEmpty())
                 warnings.add(QStringLiteral("A picture linked from outside the deck was left out"), scope.slideNumber);
@@ -1214,13 +1346,7 @@ struct Reader {
         finish(o, place, groups);
         o.fillStyle = 5;
         o.imageMode = 2; // the frame is the picture, as PowerPoint places it
-        if (const Node *src = blipFill->child(QStringLiteral("srcRect"))) {
-            const qreal l = src->attr(QStringLiteral("l"), QStringLiteral("0")).toDouble() / 100000.0;
-            const qreal t = src->attr(QStringLiteral("t"), QStringLiteral("0")).toDouble() / 100000.0;
-            const qreal r = src->attr(QStringLiteral("r"), QStringLiteral("0")).toDouble() / 100000.0;
-            const qreal b = src->attr(QStringLiteral("b"), QStringLiteral("0")).toDouble() / 100000.0;
-            if (l + r < 1 && t + b < 1 && (l > 0 || t > 0 || r > 0 || b > 0)) o.imageCrop = QRectF(l, t, 1 - l - r, 1 - t - b);
-        }
+        o.imageCrop = cropOf(blipFill);
         if (spPr) {
             if (const Node *prst = spPr->child(QStringLiteral("prstGeom"))) {
                 const auto p = prst->attr(QStringLiteral("prst"));
@@ -1236,14 +1362,7 @@ struct Reader {
             applyLook(o, look);
             o.fillStyle = 5;
         }
-        for (const auto &k : blip->kids) {
-            if (k.name == QLatin1String("alphaModFix")) o.opacity = qBound(0.0, k.attr(QStringLiteral("amt"), QStringLiteral("100000")).toDouble() / 100000.0, 1.0);
-            else if (k.name == QLatin1String("grayscl")) o.imageSaturation = 0;
-            else if (k.name == QLatin1String("lum")) {
-                o.imageBrightness = k.attr(QStringLiteral("bright"), QStringLiteral("0")).toDouble() / 100000.0;
-                o.imageContrast = 1 + k.attr(QStringLiteral("contrast"), QStringLiteral("0")).toDouble() / 100000.0;
-            }
-        }
+        applyBlipLook(o, blip, true);
         if (!name.isEmpty()) o.altTitle = name;
         if (!descr.isEmpty()) o.altText = descr;
         o.hidden = cNvPr && cNvPr->attr(QStringLiteral("hidden")) == QLatin1String("1");
@@ -1572,6 +1691,11 @@ struct Reader {
         if (spPr) readLine(spPr->child(QStringLiteral("ln")), look, scope.master->color);
         applyStyleRefs(cxn->child(QStringLiteral("style")), look, scope.master->color);
         if (!look.line) return;
+        const Node *prst = spPr ? spPr->child(QStringLiteral("prstGeom")) : nullptr;
+        const auto kind = prst ? prst->attr(QStringLiteral("prst")) : QString();
+        const bool straight = kind.isEmpty() || kind.startsWith(QLatin1String("straight")) || kind == QLatin1String("line");
+        // Taken from the frame as written: a level line has no height.
+        const QPainterPath line = connectorPath(kind, place, prst);
         SceneObject o;
         o.id = Edit::newId(QStringLiteral("shape"));
         o.type = ObjectType::Rect;
@@ -1581,11 +1705,12 @@ struct Reader {
         look.fillSet = true; look.fillStyle = 5;
         applyLook(o, look);
         o.shapeKind = 13;
-        const Node *prst = spPr ? spPr->child(QStringLiteral("prstGeom")) : nullptr;
-        const auto kind = prst ? prst->attr(QStringLiteral("prst")) : QString();
-        if (!kind.isEmpty() && !kind.startsWith(QLatin1String("straight")) && kind != QLatin1String("line"))
+        if (line.isEmpty())
             warnings.add(QStringLiteral("A %1 connector was drawn straight").arg(kind), scope.slideNumber);
-        if (place.rect.height() > 2 && place.rect.width() > 2) {
+        if (!straight && !line.isEmpty()) {
+            // A bent connector: its own corners.
+            Shape::assignPath(o, line);
+        } else if (place.rect.height() > 2 && place.rect.width() > 2) {
             QPainterPath path;
             if (place.flipV != place.flipH) { path.moveTo(place.rect.bottomLeft()); path.lineTo(place.rect.topRight()); }
             else { path.moveTo(place.rect.topLeft()); path.lineTo(place.rect.bottomRight()); }
@@ -1602,6 +1727,85 @@ struct Reader {
         const Node *nv = cxn->child(QStringLiteral("nvCxnSpPr"));
         const Node *cNvPr = nv ? nv->child(QStringLiteral("cNvPr")) : nullptr;
         if (scope.spidToObject && cNvPr) scope.spidToObject->insert(cNvPr->attr(QStringLiteral("id")), o.id);
+        // Kept for gluing: what it is attached to and its arrowheads. headEnd
+        // sits at the line's start and tailEnd at its end.
+        if (scope.connectors && !line.isEmpty()) {
+            PendingConnector pending;
+            pending.id = o.id;
+            pending.path = line;
+            pending.route = straight ? 0 : 1;
+            const Node *ends = nv ? nv->child(QStringLiteral("cNvCxnSpPr")) : nullptr;
+            if (const Node *st = ends ? ends->child(QStringLiteral("stCxn")) : nullptr) pending.from = st->attr(QStringLiteral("id"));
+            if (const Node *en = ends ? ends->child(QStringLiteral("endCxn")) : nullptr) pending.to = en->attr(QStringLiteral("id"));
+            const Node *ln = spPr ? spPr->child(QStringLiteral("ln")) : nullptr;
+            const auto arrow = [ln](const char *end) {
+                const Node *node = ln ? ln->child(QLatin1String(end)) : nullptr;
+                return node && !node->attr(QStringLiteral("type")).isEmpty() && node->attr(QStringLiteral("type")) != QLatin1String("none");
+            };
+            pending.head = arrow("headEnd");
+            pending.tail = arrow("tailEnd");
+            scope.connectors->append(pending);
+        }
+    }
+
+    // A connector glued to a shape, or carrying arrowheads, becomes a connector
+    // when OmaShow's own straight or elbow route draws it the same way: glued
+    // where it was, so it follows the shapes when they move, with its
+    // arrowheads. Any other keeps the line PowerPoint drew, fixed where it was;
+    // a free line without arrowheads stays a line, which has handles.
+    void glueConnectors(QVector<SceneObject> &objects, const QVector<PendingConnector> &pending,
+                        const QHash<QString, QString> &spidToObject, int slideNumber) {
+        for (const auto &p : pending) {
+            const int at = [&] { for (int i = 0; i < objects.size(); ++i) if (objects.at(i).id == p.id) return i; return -1; }();
+            if (at < 0) continue;
+            const QPointF start = p.path.elementAt(0), end = p.path.elementAt(p.path.elementCount() - 1);
+            SceneObject live = objects.at(at);
+            live.connector = true;
+            live.connectorRoute = p.route;
+            live.connectorStart = start;
+            live.connectorEnd = end;
+            live.connectorArrowStart = p.head;
+            live.connectorArrowEnd = p.tail;
+            live.shapeKind = Shape::custom;
+            live.rotation = 0;
+            live.fillStyle = 5;
+            // The shape an end is glued to, and the side of it the end sits on.
+            QVector<SceneObject> targets;
+            const auto glue = [&](const QString &spid, const QPointF &point, QString &id, int &side) {
+                const auto targetId = spidToObject.value(spid);
+                if (spid.isEmpty() || targetId.isEmpty() || targetId == p.id) return;
+                for (const auto &t : objects) {
+                    if (t.id != targetId || t.connector) continue;
+                    int best = 0; qreal nearest = 1.5;
+                    for (int s = 1; s <= 4; ++s) {
+                        const qreal d = QLineF(Connector::anchor(t, s, point), point).length();
+                        if (d <= nearest) { nearest = d; best = s; }
+                    }
+                    if (best) { id = t.id; side = best; targets.append(t); }
+                    return;
+                }
+            };
+            glue(p.from, start, live.connectorFrom, live.connectorFromSide);
+            glue(p.to, end, live.connectorTo, live.connectorToSide);
+            const bool arrows = p.head || p.tail;
+            if (live.connectorFrom.isEmpty() && live.connectorTo.isEmpty() && !arrows) continue;
+            const auto routed = [&](const SceneObject &candidate) {
+                auto trial = targets;
+                trial.append(candidate);
+                Connector::resolve(trial);
+                return trial.last();
+            };
+            auto made = routed(live);
+            if (!sameLine(Shape::worldPath(made), p.path) && arrows && (!live.connectorFrom.isEmpty() || !live.connectorTo.isEmpty())) {
+                // Glued, OmaShow would route it differently; free, it may still
+                // match, and keep its arrowheads.
+                live.connectorFrom.clear(); live.connectorTo.clear();
+                live.connectorFromSide = live.connectorToSide = 0;
+                made = routed(live);
+            }
+            if (sameLine(Shape::worldPath(made), p.path)) objects[at] = made;
+            else if (arrows) warnings.add(QStringLiteral("A connector's arrowheads were left off"), slideNumber);
+        }
     }
 
     void convertGroup(const Node *grp, Scope &scope, const GroupSpace &space, const QStringList &groups) {
@@ -1937,6 +2141,8 @@ struct Reader {
         scope.slideId = slide.id;
         scope.objects = &slide.objects;
         scope.spidToObject = &spidToObject;
+        QVector<PendingConnector> connectors;
+        scope.connectors = &connectors;
         Master *masterRecord = nullptr;
         for (auto &m : doc.masters) if (m.id == master.id) masterRecord = &m;
         MasterFields fields = masterRecord ? masterRecord->fields : MasterFields();
@@ -1954,12 +2160,14 @@ struct Reader {
             decoration.partPath = layoutPath;
             decoration.slide = nullptr;
             decoration.spidToObject = nullptr;
+            decoration.connectors = nullptr;
             decoration.fields = nullptr;
             convertDecoration(layoutRoot, decoration);
             for (auto &o : slide.objects) if (o.groups.isEmpty() && !o.locked && o.type != ObjectType::Image) o.locked = true;
         }
         const Node *tree = spTreeOf(root);
         if (tree) convertChildren(tree, scope, GroupSpace(), {});
+        glueConnectors(slide.objects, connectors, spidToObject, number);
         if (masterRecord && scope.fieldsSeen) masterRecord->fields = fields;
 
         // Words for the speaker.

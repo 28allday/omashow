@@ -5,6 +5,7 @@
 #include "core/design.h"
 #include "core/fonts.h"
 #include "core/fontswap.h"
+#include "core/imageasset.h"
 #include "core/mediaasset.h"
 #include "core/shape.h"
 #include "core/table.h"
@@ -298,7 +299,8 @@ struct Writer {
         x.end(); // custGeom
     }
 
-    void writeFill(Xml &x, const SceneObject &o, int slide) {
+    void writeFill(Xml &x, const SceneObject &o, SlideCtx &ctx) {
+        const int slide = ctx.number;
         switch (o.fillStyle) {
         case 0: writeSolidFill(x, o.fill, o.opacity); break;
         case 1: case 2: {
@@ -318,10 +320,42 @@ struct Writer {
             x.start("a:bgClr"); writeColor(x, o.fillSecondary, o.opacity); x.end();
             x.end();
             break;
-        case 4:
-            warnings.add(QStringLiteral("A shape filled with a picture was given a plain fill"), slide);
-            writeSolidFill(x, o.fill, o.opacity);
+        case 4: {
+            const auto rel = pictureRel(o, ctx);
+            if (rel.isEmpty()) {
+                warnings.add(QStringLiteral("A shape filled with a picture was given a plain fill"), slide);
+                writeSolidFill(x, o.fill, o.opacity);
+                break;
+            }
+            // What the shape shows of the picture, and where: stretched and
+            // filled are a source rectangle; fitted is the whole crop, set in.
+            const QSizeF whole = ImageAsset::size(o);
+            const QRectF source = ImageAsset::sourceRect(o);
+            x.start("a:blipFill").attr("rotWithShape", "1");
+            x.start("a:blip").attr("r:embed", rel);
+            if (qFuzzyIsNull(o.imageSaturation)) x.empty("a:grayscl");
+            if (!qFuzzyIsNull(o.imageBrightness) || !qFuzzyCompare(o.imageContrast, 1.0))
+                x.start("a:lum").attr("bright", qRound(qBound(-1.0, o.imageBrightness, 1.0) * 100000)).attr("contrast", qRound(qBound(-1.0, o.imageContrast - 1.0, 1.0) * 100000)).end();
+            if (o.imageTintAmount > 0) warnings.add(QStringLiteral("A picture's tint was left off"), slide);
+            x.end();
+            if (!whole.isEmpty() && !source.isEmpty()) {
+                const qreal l = source.left() / whole.width(), t = source.top() / whole.height();
+                const qreal r = 1 - source.right() / whole.width(), b = 1 - source.bottom() / whole.height();
+                if (l > 1e-5 || t > 1e-5 || r > 1e-5 || b > 1e-5)
+                    x.start("a:srcRect").attr("l", qRound(l * 100000)).attr("t", qRound(t * 100000)).attr("r", qRound(r * 100000)).attr("b", qRound(b * 100000)).end();
+            }
+            x.start("a:stretch");
+            if (o.imageMode == 0 && !source.isEmpty() && !o.rect.isEmpty()) {
+                QSizeF fitted = source.size();
+                fitted.scale(o.rect.size(), Qt::KeepAspectRatio);
+                const qreal side = (o.rect.width() - fitted.width()) / 2 / o.rect.width();
+                const qreal top = (o.rect.height() - fitted.height()) / 2 / o.rect.height();
+                x.start("a:fillRect").attr("l", qRound(side * 100000)).attr("t", qRound(top * 100000)).attr("r", qRound(side * 100000)).attr("b", qRound(top * 100000)).end();
+            } else x.empty("a:fillRect");
+            x.end();
+            x.end();
             break;
+        }
         default: x.empty("a:noFill"); break;
         }
     }
@@ -500,7 +534,7 @@ struct Writer {
             x.end();
             x.end();
         } else writeCustomGeometry(x, o);
-        writeFill(x, o, ctx.number);
+        writeFill(x, o, ctx);
         writeLine(x, o);
         writeEffects(x, o);
         x.end();
@@ -554,7 +588,9 @@ struct Writer {
         x.end();
     }
 
-    void writePicture(Xml &x, const SceneObject &o, SlideCtx &ctx) {
+    // The picture an object carries, written once into the package and
+    // related to this slide; empty, and said, when it has nothing to write.
+    QString pictureRel(const SceneObject &o, SlideCtx &ctx) {
         QByteArray data = o.imageData;
         QString extension = o.imageFormat.toLower(), mime;
         if (extension == QLatin1String("jpg")) extension = QStringLiteral("jpeg");
@@ -570,7 +606,7 @@ struct Writer {
                 painter.scale(scale, scale);
                 painter.drawPicture(0, 0, o.vectorPicture);
             }
-            if (raster.isNull()) { warnings.add(QStringLiteral("A picture had no data to write"), ctx.number); return; }
+            if (raster.isNull()) { warnings.add(QStringLiteral("A picture had no data to write"), ctx.number); return {}; }
             data = pngOf(raster);
             extension = QStringLiteral("png");
             if (o.imageFormat.toLower() == QLatin1String("svg")) warnings.add(QStringLiteral("A vector picture was written as a bitmap"), ctx.number);
@@ -578,7 +614,12 @@ struct Writer {
         mime = extension == QLatin1String("png") ? QStringLiteral("image/png") : extension == QLatin1String("jpeg") ? QStringLiteral("image/jpeg")
              : extension == QLatin1String("gif") ? QStringLiteral("image/gif") : extension == QLatin1String("webp") ? QStringLiteral("image/webp") : QStringLiteral("application/octet-stream");
         const auto path = mediaPart(o.imageId + QLatin1Char('/') + extension, data, extension, mime);
-        const auto rel = ctx.rels->add(relBase + QStringLiteral("image"), QStringLiteral("../") + path.mid(4));
+        return ctx.rels->add(relBase + QStringLiteral("image"), QStringLiteral("../") + path.mid(4));
+    }
+
+    void writePicture(Xml &x, const SceneObject &o, SlideCtx &ctx) {
+        const auto rel = pictureRel(o, ctx);
+        if (rel.isEmpty()) return;
         x.start("p:pic");
         writeNonVisual(x, "p:nvPicPr", "p:cNvPicPr", o, ctx, QStringLiteral("Picture %1").arg(ctx.nextId));
         writePictureCommon(x, o, ctx, rel, false);
