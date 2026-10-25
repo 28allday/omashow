@@ -44,6 +44,10 @@ QJsonObject objectToJson(const SceneObject &object) {
     if (object.origFont.isEmpty()) {
         for (const auto *key : {"origFont", "origFontSize", "fontScale", "origWeight"}) json.remove(QLatin1String(key));
     }
+    // Likewise a box with no insets, which is every box but an imported one.
+    if (object.insetLeft == 0 && object.insetTop == 0 && object.insetRight == 0 && object.insetBottom == 0) {
+        for (const auto *key : {"insetLeft", "insetTop", "insetRight", "insetBottom"}) json.remove(QLatin1String(key));
+    }
     return json;
 }
 SceneObject objectFromJson(const QJsonObject &json) {

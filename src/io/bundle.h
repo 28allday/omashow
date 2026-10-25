@@ -50,7 +50,9 @@ namespace Bundle {
 // Format 24 adds the cover, uncover, fade-through-black, zoom and whirl transitions.
 // Format 25 adds the Office font a box was written in and the size that makes
 // its stand-in set as wide (origFont, origFontSize, fontScale, origWeight).
-constexpr int kFormatVersion = 25;
+// Format 26 adds the room a text box keeps between its edge and its words
+// (insetLeft, insetTop, insetRight, insetBottom).
+constexpr int kFormatVersion = 26;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 

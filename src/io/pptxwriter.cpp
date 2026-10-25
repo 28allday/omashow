@@ -397,7 +397,7 @@ struct Writer {
     // The words of a text object, or of a table cell, as a txBody.
     void writeTextBody(Xml &x, const char *tag, const SceneObject &o, SlideCtx &ctx, bool inTable) {
         x.start(tag);
-        x.start("a:bodyPr").attr("wrap", "square").attr("lIns", inTable ? 45720 : 0).attr("tIns", inTable ? 45720 : 0).attr("rIns", inTable ? 45720 : 0).attr("bIns", inTable ? 45720 : 0)
+        x.start("a:bodyPr").attr("wrap", "square").attr("lIns", inTable ? 45720 : emu(o.insetLeft)).attr("tIns", inTable ? 45720 : emu(o.insetTop)).attr("rIns", inTable ? 45720 : emu(o.insetRight)).attr("bIns", inTable ? 45720 : emu(o.insetBottom))
             .attr("rtlCol", o.direction == 2 ? "1" : "0")
             .attr("anchor", o.verticalAlign == 1 ? "ctr" : o.verticalAlign == 2 ? "b" : "t");
         if (o.columns > 1) x.attr("numCol", o.columns);

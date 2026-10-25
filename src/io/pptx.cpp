@@ -548,7 +548,7 @@ void applyPPr(ParaLook &para, RunLook &run, const Node *pPr, const TextContext &
 }
 
 // Layers holding lvl1pPr…lvl9pPr, lowest priority first; and the bodyPr
-// layers the same way, for the anchor and the autofit.
+// layers the same way, for the anchor, the insets and the autofit.
 struct TextChain {
     QVector<const Node *> levels;
     QVector<const Node *> bodies;
@@ -569,6 +569,8 @@ struct TextOut {
     ParaLook para;
     int listStyle = 0, listStart = 1;
     int anchor = 0;           // 0 top, 1 middle, 2 bottom
+    // lIns, tIns, rIns, bIns in EMU; unsaid, 0.1 in at the sides, 0.05 in above and below.
+    qreal insets[4] = {91440, 45720, 91440, 45720};
     bool shrink = false;
     qreal fontScale = 1;
     QString link;
@@ -580,19 +582,30 @@ struct TextOut {
 TextOut convertText(const Node *txBody, const TextChain &chain, const TextContext &ctx) {
     TextOut out;
     if (!txBody) return out;
-    // bodyPr: the nearest layer that says wins.
+    // bodyPr: the nearest layer that says wins, each inset on its own.
+    const auto readInsets = [&out](const Node *body) {
+        const QString names[4] = {QStringLiteral("lIns"), QStringLiteral("tIns"), QStringLiteral("rIns"), QStringLiteral("bIns")};
+        for (int i = 0; i < 4; ++i) {
+            if (!body->has(names[i])) continue;
+            bool ok = false;
+            const qreal value = body->attr(names[i]).toDouble(&ok);
+            if (ok && std::isfinite(value)) out.insets[i] = qMax(0.0, value);
+        }
+    };
     for (const auto *body : chain.bodies) {
         if (!body) continue;
         const auto anchor = body->attr(QStringLiteral("anchor"));
         if (anchor == QLatin1String("t")) out.anchor = 0;
         else if (anchor == QLatin1String("ctr")) out.anchor = 1;
         else if (anchor == QLatin1String("b")) out.anchor = 2;
+        readInsets(body);
     }
     if (const Node *own = txBody->child(QStringLiteral("bodyPr"))) {
         const auto anchor = own->attr(QStringLiteral("anchor"));
         if (anchor == QLatin1String("t")) out.anchor = 0;
         else if (anchor == QLatin1String("ctr")) out.anchor = 1;
         else if (anchor == QLatin1String("b")) out.anchor = 2;
+        readInsets(own);
         if (const Node *fit = own->child(QStringLiteral("normAutofit"))) {
             out.shrink = true;
             if (fit->has(QStringLiteral("fontScale")))
@@ -939,6 +952,10 @@ struct Reader {
         if (!b.lang.isEmpty()) { o.language = b.lang; o.language.replace(QLatin1Char('-'), QLatin1Char('_')); }
         o.textAlign = text.para.algn < 0 ? 0 : text.para.algn;
         o.verticalAlign = text.anchor;
+        o.insetLeft = text.insets[0] * u.k;
+        o.insetTop = text.insets[1] * u.k;
+        o.insetRight = text.insets[2] * u.k;
+        o.insetBottom = text.insets[3] * u.k;
         o.lineHeight = text.para.lnSpc > 0 ? text.para.lnSpc : 100;
         o.paragraphSpacing = text.para.spcBef > 0 ? text.para.spcBef * u.pt : 0;
         o.listStyle = text.listStyle;

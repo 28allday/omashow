@@ -370,6 +370,11 @@ Item {
             objectName: "inlineTextEditor"
             width: backend.selection.w ?? 0
             height: backend.selection.h ?? 0
+            // The box's insets, so the words sit where the slide draws them.
+            leftPadding: backend.selection.insetLeft ?? 0
+            topPadding: backend.selection.insetTop ?? 0
+            rightPadding: backend.selection.insetRight ?? 0
+            bottomPadding: backend.selection.insetBottom ?? 0
             scale: root.s
             transformOrigin: Item.TopLeft
             // Drawn at the size it will really be, so what you type is what the

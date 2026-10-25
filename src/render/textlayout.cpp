@@ -136,6 +136,22 @@ PathText alongPath(const SceneObject &o, qreal size) {
 MathLayout::Rendered equation(const SceneObject &o, qreal size) {
     return MathLayout::build(o.text, fontFor(o, size), size, o.textAlign);
 }
+// Whether the box keeps room between its edge and its words. Words on a path
+// follow the line, not the box, so they have none.
+bool inset(const SceneObject &o) {
+    return !onPath(o) && (o.insetLeft > 0 || o.insetTop > 0 || o.insetRight > 0 || o.insetBottom > 0);
+}
+// The box the words are set in: the box less its insets, each held to half the
+// box so the room left is never negative.
+SceneObject within(const SceneObject &o) {
+    auto inner = o;
+    const qreal w = qMax(0.0, o.rect.width()), h = qMax(0.0, o.rect.height());
+    const qreal left = qMin(o.insetLeft, w / 2), right = qMin(o.insetRight, w / 2);
+    const qreal top = qMin(o.insetTop, h / 2), bottom = qMin(o.insetBottom, h / 2);
+    inner.rect = o.rect.adjusted(left, top, -right, -bottom);
+    inner.insetLeft = inner.insetTop = inner.insetRight = inner.insetBottom = 0;
+    return inner;
+}
 bool legacy(const SceneObject &o) {
     return !maths(o) && !onPath(o) && o.origFont.isEmpty() && o.runs.isEmpty() && o.textAlign == 0 && o.verticalAlign == 1 && o.lineHeight == 100 &&
            o.paragraphSpacing == 0 && o.textIndent == 0 && o.listStyle == 0 && o.textFit == 0 &&
@@ -321,6 +337,9 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
     Metrics m;
     if (o.type != ObjectType::Text)
         return m;
+    // Room, overflow and fit are all of the box inside the insets.
+    if (inset(o))
+        return measure(within(o));
     m.effectiveSize = o.fontSize;
     auto dimensions = contentSize(o, o.fontSize);
     m.naturalHeight = dimensions.height();
@@ -353,9 +372,12 @@ TextLayout::Metrics TextLayout::measure(const SceneObject &o) {
                  dimensions.width() > o.rect.width() + .5;
     return m;
 }
-void TextLayout::paint(QPainter &painter, const SceneObject &o) {
+namespace {
+// Draws the words in o.rect; clip is the whole box, insets and all, so words
+// that run long may use the inset before they are cut off.
+void paintWords(QPainter &painter, const SceneObject &o, const QRectF &clip) {
     if (onPath(o)) {
-        const auto metrics = measure(o);
+        const auto metrics = TextLayout::measure(o);
         const auto laid = alongPath(o, metrics.effectiveSize);
         painter.save();
         painter.setPen(o.textColor);
@@ -374,14 +396,14 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
         return;
     }
     if (maths(o)) {
-        const auto metrics = measure(o);
+        const auto metrics = TextLayout::measure(o);
         const auto rendered = equation(o, metrics.effectiveSize);
         if (!rendered.ok) {
             // The fallback is honest: the source, as ordinary text, and the
             // review says what stopped it.
             auto words = o;
             words.textKind = 0;
-            paint(painter, words);
+            paintWords(painter, words, clip);
             return;
         }
         const qreal spare = qMax(0.0, o.rect.height() - rendered.size.height());
@@ -389,7 +411,7 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
         const qreal room = qMax(0.0, o.rect.width() - rendered.size.width());
         const qreal dx = o.textAlign == 1 ? room / 2 : o.textAlign == 2 ? room : 0;
         painter.save();
-        painter.setClipRect(o.rect, Qt::IntersectClip);
+        painter.setClipRect(clip, Qt::IntersectClip);
         MathLayout::paint(painter, rendered, o.rect.topLeft() + QPointF(dx, dy),
                           fontFor(o, metrics.effectiveSize), o.textColor);
         painter.restore();
@@ -402,7 +424,7 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
                          o.uppercase ? o.text.toUpper() : o.text);
         return;
     }
-    const auto metrics = measure(o);
+    const auto metrics = TextLayout::measure(o);
     auto doc = layout(o, metrics.effectiveSize);
     QAbstractTextDocumentLayout::PaintContext context;
     context.palette.setColor(QPalette::Text, o.textColor);
@@ -413,7 +435,7 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
         const qreal gap = columnGap(o, metrics.effectiveSize);
         const qreal height = qMax(1.0, o.rect.height());
         painter.save();
-        painter.setClipRect(o.rect, Qt::IntersectClip);
+        painter.setClipRect(clip, Qt::IntersectClip);
         for (int column = 0; column < qMin(columns, qMax(1, doc->pageCount())); ++column) {
             painter.save();
             painter.translate(o.rect.topLeft() + QPointF(column * (width + gap), -FontSwap::verticalFix(o, metrics.effectiveSize).shift));
@@ -428,14 +450,22 @@ void TextLayout::paint(QPainter &painter, const SceneObject &o) {
     const qreal spare = qMax(0.0, o.rect.height() - metrics.renderedHeight);
     const qreal dy = o.verticalAlign == 1 ? spare / 2 : o.verticalAlign == 2 ? spare : 0;
     painter.save();
-    painter.setClipRect(o.rect, Qt::IntersectClip);
+    painter.setClipRect(clip, Qt::IntersectClip);
     painter.translate(o.rect.topLeft() + QPointF(0, dy - FontSwap::verticalFix(o, metrics.effectiveSize).shift));
     doc->documentLayout()->draw(&painter, context);
     painter.restore();
 }
+} // namespace
+void TextLayout::paint(QPainter &painter, const SceneObject &o) {
+    if (inset(o))
+        paintWords(painter, within(o), o.rect);
+    else
+        paintWords(painter, o, o.rect);
+}
 
 QString TextLayout::editorHtml(const SceneObject &object) {
-    auto content = object;
+    // The editor pads itself by the insets, so it is given the inner width.
+    auto content = inset(object) ? within(object) : object;
     content.uppercase = false;
     // An equation, or words on a path, are edited as what was typed.
     content.textKind = 0;

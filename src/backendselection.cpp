@@ -398,7 +398,7 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   if (!changed)
     return;
   QString label=key;
-  const QMap<QString,QString> labels={{"imageBrightness",tr("brightness")},{"imageContrast",tr("contrast")},{"imageSaturation",tr("saturation")},{"imageTintAmount",tr("tint amount")},{"imageTint",tr("tint colour")},{"imageMask",tr("picture mask")},{"imageFocalX",tr("horizontal focal point")},{"imageFocalY",tr("vertical focal point")},{"pathData",tr("path")},{"fillStyle",tr("fill type")},{"fillSecondary",tr("second fill colour")},{"strokeWidth",tr("stroke width")},{"connectorRoute",tr("connector routing")}};
+  const QMap<QString,QString> labels={{"imageBrightness",tr("brightness")},{"imageContrast",tr("contrast")},{"imageSaturation",tr("saturation")},{"imageTintAmount",tr("tint amount")},{"imageTint",tr("tint colour")},{"imageMask",tr("picture mask")},{"imageFocalX",tr("horizontal focal point")},{"imageFocalY",tr("vertical focal point")},{"pathData",tr("path")},{"fillStyle",tr("fill type")},{"fillSecondary",tr("second fill colour")},{"strokeWidth",tr("stroke width")},{"connectorRoute",tr("connector routing")},{"insetLeft",tr("left inset")},{"insetTop",tr("top inset")},{"insetRight",tr("right inset")},{"insetBottom",tr("bottom inset")}};
   label=labels.value(key,label);
   m_history.begin(m_document, tr("Change %1").arg(label));
   for (const auto &id : ids)
@@ -627,7 +627,7 @@ void Backend::fitSelectedTextBox() {
   m_history.begin(m_document,tr("Fit box to text"));
   for (const auto &id:ids) if (const auto *source=shown.find(id)) if (source->type==ObjectType::Text) {
     auto copy=*source; copy.textFit=0;
-    const auto height=qMax(8.0,TextLayout::measure(copy).naturalHeight+1);
+    const auto height=qMax(8.0,TextLayout::measure(copy).naturalHeight+copy.insetTop+copy.insetBottom+1);
     if (auto *o=m_document.slides[m_currentSlide].find(id)) {
       Arrange::setRect(*o,source->rect,QRectF(source->rect.topLeft(),QSizeF(source->rect.width(),height)));
       o->textFit=0; Design::markOverride(*o,"textFit");

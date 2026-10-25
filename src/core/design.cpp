@@ -57,6 +57,7 @@ QVariantMap Design::properties(const SceneObject &o) {
             {"text", o.text}, {"fontSize", o.fontSize}, {"fontWeight", o.fontWeight},
             {"italic",o.italic},{"underline",o.underline},{"textAlign",o.textAlign},{"verticalAlign",o.verticalAlign},
             {"lineHeight",o.lineHeight},{"paragraphSpacing",o.paragraphSpacing},{"textIndent",o.textIndent},
+            {"insetLeft",o.insetLeft},{"insetTop",o.insetTop},{"insetRight",o.insetRight},{"insetBottom",o.insetBottom},
             {"listStyle",o.listStyle},{"listStart",o.listStart},{"textFit",o.textFit},{"textKind",o.textKind},
             {"tabStop",o.tabStop},{"columns",o.columns},{"columnGap",o.columnGap},{"direction",o.direction},
             {"language",o.language},
@@ -67,7 +68,7 @@ QVariantMap Design::properties(const SceneObject &o) {
 }
 bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, bool constrainForEditing) {
     const QStringList numeric = {"textKind","tabStop","columns","columnGap","direction","mediaBytes","mediaModified","mediaDuration","mediaTrimStart","mediaTrimEnd","mediaVolume","mediaLoops","x", "y", "w", "h", "rotation", "opacity", "cornerRadius",
-                                 "linkKind", "connectorStartX", "connectorStartY", "connectorEndX", "connectorEndY", "connectorFromSide", "connectorToSide", "connectorRoute", "shapeKind", "fillStyle", "fillAngle", "patternStyle", "strokeWidth", "strokeStyle", "strokeJoin", "strokeCap", "shadowX", "shadowY", "fontSize", "fontWeight", "origFontSize", "fontScale", "origWeight", "letterSpacing", "textAlign", "verticalAlign", "lineHeight", "paragraphSpacing", "textIndent", "listStyle", "listStart", "textFit", "imageMask", "imageFocalX", "imageFocalY", "imageBrightness", "imageContrast", "imageSaturation", "imageTintAmount", "imageMode", "cropX", "cropY", "cropW", "cropH"};
+                                 "linkKind", "connectorStartX", "connectorStartY", "connectorEndX", "connectorEndY", "connectorFromSide", "connectorToSide", "connectorRoute", "shapeKind", "fillStyle", "fillAngle", "patternStyle", "strokeWidth", "strokeStyle", "strokeJoin", "strokeCap", "shadowX", "shadowY", "fontSize", "fontWeight", "origFontSize", "fontScale", "origWeight", "letterSpacing", "textAlign", "verticalAlign", "lineHeight", "paragraphSpacing", "textIndent", "insetLeft", "insetTop", "insetRight", "insetBottom", "listStyle", "listStart", "textFit", "imageMask", "imageFocalX", "imageFocalY", "imageBrightness", "imageContrast", "imageSaturation", "imageTintAmount", "imageMode", "cropX", "cropY", "cropW", "cropH"};
     bool ok = false;
     const qreal n = v.toDouble(&ok);
     if (numeric.contains(key) && (!ok || !std::isfinite(n))) return false;
@@ -184,6 +185,10 @@ bool Design::setProperty(SceneObject &o, const QString &key, const QVariant &v, 
     else if (key == "lineHeight") o.lineHeight = qBound(50.0,n,300.0);
     else if (key == "paragraphSpacing") o.paragraphSpacing = constrainForEditing ? qBound(0.0,n,1000.0) : qMax(0.0,n);
     else if (key == "textIndent") o.textIndent = constrainForEditing ? qBound(0.0,n,1000.0) : qMax(0.0,n);
+    else if (key == "insetLeft" || key == "insetTop" || key == "insetRight" || key == "insetBottom") {
+        qreal &inset = key == "insetLeft" ? o.insetLeft : key == "insetTop" ? o.insetTop : key == "insetRight" ? o.insetRight : o.insetBottom;
+        inset = constrainForEditing ? qBound(0.0,n,1000.0) : qMax(0.0,n);
+    }
     else if (key == "listStyle") o.listStyle = qBound(0,v.toInt(),8);
     else if (key == "listStart") o.listStart = qBound(1,v.toInt(),9999);
     else if (key == "textFit") o.textFit = qBound(0,v.toInt(),1);
