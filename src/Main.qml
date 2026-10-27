@@ -56,6 +56,11 @@ ApplicationWindow {
     property real inspectorWidth: backend.panelState.inspectorWidth ?? Theme.wInspector
     property bool navigatorCollapsed: (backend.panelState.navigatorCollapsed ?? "false") === "true"
     property bool inspectorCollapsed: (backend.panelState.inspectorCollapsed ?? "false") === "true"
+    // How the commands are laid out: "menus" (the menu bar and toolbar) or "ribbon" (one row of
+    // tabs named after the menus; a tab's items slide down over the top of the slide). Kept with
+    // the panels, never in a deck. The switch is at the right end of the status bar.
+    property string layoutMode: (backend.panelState.layout ?? "menus") === "ribbon" ? "ribbon" : "menus"
+    function setLayoutMode(mode) { win.commitEditors(); win.layoutMode = mode; backend.setPanelState("layout", mode) }
     // Saved when a drag ends, not on every move: each save rewrites the panel
     // settings file.
     function savePanelWidths() {
@@ -202,6 +207,7 @@ ApplicationWindow {
     Shortcut { sequence: "Escape"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible
                onActivated: {
                    if (win.presenting) win.endShow()
+                   else if (win.ribbonFocus) win.leaveRibbon()
                    else if(editCanvas.cropMode) editCanvas.cancelCrop()
                    else if(editCanvas.pathMode!==0) editCanvas.cancelPathTool()
                    else if (win.inMode) win.leaveMode()
@@ -222,13 +228,13 @@ ApplicationWindow {
 
     // Arrows mean different things per workspace, so they are bound per
     // workspace rather than doing something surprising in one of them.
-    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
+    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && !win.ribbonFocus && (win.workspace !== 1)
                onActivated: win.editing ? backend.nudgeSelected(-Theme.nudge, 0) : backend.step(-0.1) }
-    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
+    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && !win.ribbonFocus && (win.workspace !== 1)
                onActivated: win.editing ? backend.nudgeSelected(Theme.nudge, 0) : backend.step(0.1) }
-    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && !win.ribbonFocus && (win.editing)
                onActivated: backend.nudgeSelected(0, -Theme.nudge) }
-    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
+    Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && !win.ribbonFocus && (win.editing)
                onActivated: backend.nudgeSelected(0, Theme.nudge) }
     Shortcut { sequence: "PgDown"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible
                onActivated: backend.currentSlide = backend.currentSlide + 1 }
@@ -239,6 +245,43 @@ ApplicationWindow {
     // Never lose work without asking — and never ask when nothing would be lost.
     property bool allowClose: false
     readonly property bool textEntryFocused: activeFocusItem && typeof activeFocusItem.cursorPosition === "number"
+
+    // ── The ribbon's keyboard: Alt+Left / Alt+Right go along the tabs (or, in the strip, along
+    // its buttons); Down goes into the open tab's buttons, Left / Right along them, Up back to
+    // the tab, Esc back to where the keyboard was.
+    property int ribbonTab: 0
+    property Item ribbonReturn: null
+    readonly property bool ribbonFocus: inRibbon(activeFocusItem)
+    readonly property bool ribbonKeys: layoutMode === "ribbon" && !dialogOpen && !presenter.running && !backend.startVisible
+    function inRibbon(item) {
+        for (let it = item; it; it = it.parent) if (it === ribbonTabBar || it === ribbonStrip) return true
+        return false
+    }
+    function inStrip(item) {
+        for (let it = item; it; it = it.parent) if (it === ribbonStrip) return true
+        return false
+    }
+    function stepRibbonTab(by) {
+        if (!ribbonFocus) ribbonReturn = activeFocusItem
+        const n = appMenus.count
+        ribbonTab = ((ribbonTab + by) % n + n) % n
+        ribbonDrop.open = true
+        ribbonDrop.engaged = true
+        ribbonDrop.byKeys = true
+        const t = ribbonTabButtons.itemAt(ribbonTab)
+        if (t) t.forceActiveFocus(Qt.TabFocusReason)
+    }
+    function leaveRibbon() {
+        const back = ribbonReturn && ribbonReturn.visible && !inRibbon(ribbonReturn) ? ribbonReturn : editCanvas
+        ribbonReturn = null
+        back.forceActiveFocus()
+        if (ribbonFocus) editCanvas.forceActiveFocus()   // where it was could not take it back
+        if (!ribbonDrop.hovering) ribbonDrop.open = false
+    }
+    Shortcut { sequence: "Alt+Left"; context: Qt.ApplicationShortcut; enabled: win.ribbonKeys
+               onActivated: win.inStrip(win.activeFocusItem) ? ribbonDrop.stepInStrip(false) : win.stepRibbonTab(-1) }
+    Shortcut { sequence: "Alt+Right"; context: Qt.ApplicationShortcut; enabled: win.ribbonKeys
+               onActivated: win.inStrip(win.activeFocusItem) ? ribbonDrop.stepInStrip(true) : win.stepRibbonTab(1) }
     function commitEditors() {
         tableEditor.commitCell()
         editCanvas.commitTextEdit()
@@ -484,6 +527,7 @@ ApplicationWindow {
 
                 MenuBar {
                     id: appMenus
+                    visible: win.layoutMode === "menus"
                     Layout.fillHeight: true
                     Menu {
                         title: qsTr("File")
@@ -653,6 +697,41 @@ ApplicationWindow {
                     }
                 }
 
+                // Ribbon mode: a tab per menu. Clicking one (or resting on the tabs) slides its
+                // items down over the slide; the slide area never moves or changes size.
+                RowLayout {
+                    id: ribbonTabBar
+                    objectName: "ribbonTabBar"
+                    visible: win.layoutMode === "ribbon"
+                    Layout.fillHeight: true
+                    spacing: 0
+                    Accessible.role: Accessible.PageTabList
+                    Accessible.name: qsTr("Ribbon tabs")
+                    HoverHandler {
+                        id: tabsHover
+                        onHoveredChanged: if (hovered) hoverOpenTimer.restart(); else hoverOpenTimer.stop()
+                    }
+                    Repeater {
+                        id: ribbonTabButtons
+                        model: appMenus.count
+                        ToolAction {
+                            required property int index
+                            objectName: "ribbonTab" + index
+                            text: appMenus.menuAt(index) ? appMenus.menuAt(index).title : ""
+                            display: AbstractButton.TextOnly
+                            implicitHeight: Theme.hTitleBar - 6
+                            checked: win.ribbonTab === index && ribbonDrop.open
+                            focusPolicy: Qt.StrongFocus
+                            Accessible.role: Accessible.PageTab
+                            Accessible.checked: checked
+                            Keys.onDownPressed: { win.ribbonTab = index; ribbonDrop.enterByKeyboard() }
+                            Keys.onLeftPressed: { win.ribbonTab = index; win.stepRibbonTab(-1) }
+                            Keys.onRightPressed: { win.ribbonTab = index; win.stepRibbonTab(1) }
+                            onClicked: { win.ribbonTab = index; ribbonDrop.open = true; ribbonDrop.engaged = true }
+                        }
+                    }
+                }
+
                 Item { Layout.fillWidth: true }
 
                 Label {
@@ -681,6 +760,7 @@ ApplicationWindow {
         // a title and a Done button, so there is always a single way back.
         Rectangle {
             objectName: "mainToolbar"
+            visible: win.layoutMode === "menus" || win.inMode
             Layout.fillWidth: true
             // A room's bar is only a title and Done, so it takes the slimmer height.
             implicitHeight: win.inMode ? Theme.hWorkspaceBar : Theme.hToolbar
@@ -1170,8 +1250,175 @@ ApplicationWindow {
                     text: backend.modified ? qsTr("Unsaved changes") : qsTr("Saved")
                     color: backend.modified ? Theme.warning : Theme.textSecondary
                 }
+                StatusRule {}
+                // Menus or ribbon. Fixed width, so it stays put whichever it says.
+                ToolButton {
+                    id: layoutSwitch
+                    objectName: "layoutSwitch"
+                    text: win.layoutMode === "ribbon" ? qsTr("Ribbon") : qsTr("Menus")
+                    icon.name: win.layoutMode === "ribbon" ? "rows-3" : "menu"
+                    implicitWidth: Math.max(layoutWordRibbon.advanceWidth, layoutWordMenus.advanceWidth) + Theme.s5 + Theme.s3
+                    onClicked: win.setLayoutMode(win.layoutMode === "ribbon" ? "menus" : "ribbon")
+                    ToolTip.visible: hovered; ToolTip.delay: Theme.tooltipDelay
+                    ToolTip.text: win.layoutMode === "ribbon" ? qsTr("Switch to the menu bar and toolbar") : qsTr("Switch to the ribbon")
+                    TextMetrics { id: layoutWordRibbon; font: layoutSwitch.font; text: qsTr("Ribbon") }
+                    TextMetrics { id: layoutWordMenus; font: layoutSwitch.font; text: qsTr("Menus") }
+                }
             }
         }
+    }
+
+    // ── Ribbon mode: the open tab's items, a strip that slides down from under the tab row over
+    // the top of the slide (it never pushes it). Each button is the menu's own item, so the
+    // ribbon always says and does what the menu does. How long it stays after the pointer leaves:
+    // 2.4 s if you only looked, 5 s if you used it, back to 2.4 s from when you left once you click
+    // something else. An open menu or dialog, or the keyboard in it, holds it down.
+    Item {
+        id: ribbonDrop
+        objectName: "ribbonDrop"
+        z: 9
+        visible: win.layoutMode === "ribbon" && !win.presenting && !backend.startVisible && !win.inMode
+        y: Theme.hTitleBar
+        width: parent.width
+        height: Theme.hToolbar
+        clip: true
+        property bool open: false
+        property bool engaged: false
+        property bool clickedAway: false
+        property bool byKeys: false
+        property real leftAt: 0
+        readonly property bool shown: ribbonStrip.y > -ribbonStrip.height
+        readonly property bool hovering: tabsHover.hovered || stripHover.hovered
+        readonly property var menu: appMenus.menuAt(win.ribbonTab)
+        function waitMs() { return engaged && !clickedAway ? 5000 : 2400 }
+        function check() {
+            if (!open || hovering) return
+            if (busy()) { leftAt = Date.now(); return }
+            if (Date.now() - leftAt >= waitMs()) open = false
+        }
+        function busy() {
+            const k = Overlay.overlay ? Overlay.overlay.children : []
+            for (let i = 0; i < k.length; ++i) if (k[i].visible && k[i].width > 0) return true
+            return win.inStrip(win.activeFocusItem) || (byKeys && win.ribbonFocus)
+        }
+        function pressedAt(p) {
+            byKeys = false
+            if (!open) return
+            const inStrip = ribbonStrip.contains(ribbonStrip.mapFromItem(null, p.x, p.y))
+            const inTabs = ribbonTabBar.contains(ribbonTabBar.mapFromItem(null, p.x, p.y))
+            if (inStrip || inTabs) { engaged = true; clickedAway = false; return }
+            if (engaged) { clickedAway = true; check() }
+        }
+        function enterByKeyboard() {
+            open = true
+            engaged = true
+            byKeys = true
+            Qt.callLater(() => {
+                const first = ribbonStrip.nextItemInFocusChain(true)
+                if (win.inStrip(first)) first.forceActiveFocus(Qt.TabFocusReason)
+            })
+        }
+        // The next (or previous) button along the strip, round again at either end.
+        function stepInStrip(forward) {
+            const from = win.activeFocusItem
+            let to = from ? from.nextItemInFocusChain(forward) : null
+            if (!win.inStrip(to)) {
+                to = from
+                for (let it = from ? from.nextItemInFocusChain(!forward) : null; win.inStrip(it) && it !== from; it = it.nextItemInFocusChain(!forward)) to = it
+            }
+            if (to && to !== from) to.forceActiveFocus(Qt.TabFocusReason)
+        }
+        onHoveringChanged: { if (hovering) clickedAway = false; else leftAt = Date.now() }
+        onOpenChanged: { if (open) leftAt = Date.now(); else { engaged = false; clickedAway = false; byKeys = false } }
+        Timer { id: hoverOpenTimer; interval: 250; onTriggered: ribbonDrop.open = true }
+        Timer { interval: 100; repeat: true; running: ribbonDrop.open && !ribbonDrop.hovering; onTriggered: ribbonDrop.check() }
+
+        Rectangle {
+            id: ribbonStrip
+            objectName: "ribbonStrip"
+            width: parent.width
+            height: Theme.hToolbar
+            y: ribbonDrop.open ? 0 : -height
+            visible: ribbonDrop.open || ribbonDrop.shown
+            Behavior on y { NumberAnimation { duration: backend.reducedMotion ? 0 : 160; easing.type: Easing.OutCubic } }
+            color: Theme.panelBg
+            HoverHandler { id: stripHover }
+            Keys.onUpPressed: { const t = ribbonTabButtons.itemAt(win.ribbonTab); if (t) t.forceActiveFocus(Qt.TabFocusReason) }
+            Keys.onLeftPressed: ribbonDrop.stepInStrip(false)
+            Keys.onRightPressed: ribbonDrop.stepInStrip(true)
+            Hairline { anchors.top: parent.top; width: parent.width }
+            Hairline { anchors.bottom: parent.bottom; width: parent.width }
+
+            Flickable {
+                id: stripRow
+                anchors.fill: parent
+                anchors.leftMargin: Theme.s3
+                anchors.rightMargin: Theme.s3
+                contentWidth: stripItems.implicitWidth
+                contentHeight: height
+                flickableDirection: Flickable.HorizontalFlick
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+                ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded; height: 3 }
+                RowLayout {
+                    id: stripItems
+                    height: parent.height
+                    spacing: Theme.s1
+                    // The menu's own items, in its order: a separator is a rule, a submenu a drop-down.
+                    Repeater {
+                        model: ribbonDrop.menu ? ribbonDrop.menu.count : 0
+                        delegate: Loader {
+                            required property int index
+                            readonly property var entry: ribbonDrop.menu ? ribbonDrop.menu.itemAt(index) : null
+                            readonly property bool rule: !!entry && entry.text === undefined
+                            // (Not entry.visible: an item in a closed menu always reads as hidden.)
+                            Layout.fillHeight: rule
+                            Layout.topMargin: rule ? Theme.s3 : 0
+                            Layout.bottomMargin: rule ? Theme.s3 : 0
+                            sourceComponent: !entry ? null : rule ? stripRule : stripButton
+                        }
+                    }
+                    // The toolbar's three commands no menu has.
+                    Loader { readonly property var entry: layoutButton; visible: ribbonDrop.menu && ribbonDrop.menu.title === qsTr("Slide"); sourceComponent: stripButton }
+                    Loader { readonly property var entry: win.menuEntry(mediaMenu, "openMediaPreflight"); visible: ribbonDrop.menu && ribbonDrop.menu.title === qsTr("Insert"); sourceComponent: stripButton }
+                    Loader { readonly property var entry: win.menuEntry(arrangeMenu, "textOnShapeAction"); visible: ribbonDrop.menu && ribbonDrop.menu.title === qsTr("Arrange"); sourceComponent: stripButton }
+                }
+            }
+        }
+        Component { id: stripRule; ToolbarRule {} }
+        // A button that is the menu item (or toolbar button) it shows: same words, icon, enabled
+        // and tick; clicking it clicks the item. A submenu opens under it.
+        Component {
+            id: stripButton
+            ToolAction {
+                readonly property var entry: parent ? parent.entry : null
+                readonly property var sub: entry && entry.subMenu ? entry.subMenu : null
+                readonly property bool opensMenu: !!sub || (entry && entry.opensMenu === true)
+                text: entry ? (sub ? sub.title : entry.text) : ""
+                icon.name: entry && entry.icon ? entry.icon.name : ""
+                enabled: !!entry && entry.enabled && (!sub || sub.enabled)
+                checked: !!entry && entry.checkable === true && entry.checked
+                tip: entry && entry.tip ? entry.tip : ""
+                focusPolicy: Qt.StrongFocus
+                onActiveFocusChanged: if (activeFocus) stripRow.contentX = Math.max(0, Math.min(mapToItem(stripItems, 0, 0).x - Theme.s3, stripRow.contentWidth - stripRow.width))
+                onClicked: {
+                    if (sub) sub.popup(this, 0, height)
+                    else if (entry === layoutButton) backend.design.layouts.length ? layoutMenu.popup(this, 0, height) : backend.setupDesign()
+                    else entry.click()
+                }
+            }
+        }
+    }
+    function menuEntry(menu, name) {
+        for (let i = 0; i < menu.count; ++i) if (menu.itemAt(i) && menu.itemAt(i).objectName === name) return menu.itemAt(i)
+        return null
+    }
+    // Watches presses anywhere while the strip is down (for its timing); never takes them.
+    Item {
+        anchors.fill: parent
+        z: 1000
+        enabled: ribbonDrop.visible && ribbonDrop.open
+        PointHandler { acceptedButtons: Qt.AllButtons; onActiveChanged: if (active) ribbonDrop.pressedAt(point.scenePosition) }
     }
 
     // Offered only when a previous session actually left work behind — a clean
@@ -1360,6 +1607,7 @@ ApplicationWindow {
                     qsTr("Arrows — nudge (step time in Animate)"),
                     qsTr("Shift+click — add to the selection"),
                     qsTr("Alt+click — select the object behind"),
+                    qsTr("Ribbon: Alt+← / Alt+→ tabs; ↓ into its buttons, ← → along them, ↑ back, Esc to the slide"),
                     qsTr("Ctrl+A — select everything on the slide"),
                     qsTr("Ctrl+G / Ctrl+Shift+G — group / ungroup"),
                     qsTr("Enter — step inside a group, Escape leaves"),
