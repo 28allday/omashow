@@ -223,13 +223,20 @@ ApplicationWindow {
     // Arrows mean different things per workspace, so they are bound per
     // workspace rather than doing something surprising in one of them.
     Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
-               onActivated: win.editing ? backend.nudgeSelected(-Theme.nudge, 0) : backend.step(-0.1) }
+               onActivated: editCanvas.cropMode ? editCanvas.nudgeCrop(-Theme.nudge, 0) : win.editing ? backend.nudgeSelected(-Theme.nudge, 0) : backend.step(-0.1) }
     Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.workspace !== 1)
-               onActivated: win.editing ? backend.nudgeSelected(Theme.nudge, 0) : backend.step(0.1) }
+               onActivated: editCanvas.cropMode ? editCanvas.nudgeCrop(Theme.nudge, 0) : win.editing ? backend.nudgeSelected(Theme.nudge, 0) : backend.step(0.1) }
     Shortcut { sequence: "Up"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
-               onActivated: backend.nudgeSelected(0, -Theme.nudge) }
+               onActivated: editCanvas.cropMode ? editCanvas.nudgeCrop(0, -Theme.nudge) : backend.nudgeSelected(0, -Theme.nudge) }
     Shortcut { sequence: "Down"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible && !win.textEntryFocused && !win.slideFocus && (win.editing)
-               onActivated: backend.nudgeSelected(0, Theme.nudge) }
+               onActivated: editCanvas.cropMode ? editCanvas.nudgeCrop(0, Theme.nudge) : backend.nudgeSelected(0, Theme.nudge) }
+    // Repositioning a picture inside its box (Crop on slide): bigger steps, and zoom.
+    Shortcut { sequence: "Shift+Left"; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.nudgeCrop(-Theme.nudge*5, 0) }
+    Shortcut { sequence: "Shift+Right"; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.nudgeCrop(Theme.nudge*5, 0) }
+    Shortcut { sequence: "Shift+Up"; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.nudgeCrop(0, -Theme.nudge*5) }
+    Shortcut { sequence: "Shift+Down"; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.nudgeCrop(0, Theme.nudge*5) }
+    Shortcut { sequences: ["+", "=", "Shift+="]; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.zoomCrop(1.2) }
+    Shortcut { sequence: "-"; enabled: editCanvas.cropMode && !win.dialogOpen; onActivated: editCanvas.zoomCrop(1/1.2) }
     Shortcut { sequence: "PgDown"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible
                onActivated: backend.currentSlide = backend.currentSlide + 1 }
     Shortcut { sequence: "PgUp"; context: Qt.ApplicationShortcut; enabled: !win.dialogOpen && !presenter.running && !backend.startVisible
@@ -1358,6 +1365,7 @@ ApplicationWindow {
                     qsTr("T / S — add text / shape"),
                     qsTr("Delete — remove the selected object"),
                     qsTr("Arrows — nudge (step time in Animate)"),
+                    qsTr("Crop on slide · drag, wheel, +/− and arrows reposition the picture"),
                     qsTr("Shift+click — add to the selection"),
                     qsTr("Alt+click — select the object behind"),
                     qsTr("Ctrl+A — select everything on the slide"),

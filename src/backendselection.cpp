@@ -64,7 +64,7 @@ QVariantMap Backend::selection() const {
     for(const auto &step:m_document.slides.at(m_currentSlide).timeline.steps) if(step.targetId==primary->id && step.effect==Effect::Media) values["mediaOnClick"]=step.trigger==BuildTrigger::OnClick;
   }
   values["imageHasOriginal"]=bool(primary->imageOriginal);
-  if(primary->type==ObjectType::Image) { const auto frame=ImageCrop::frame(*primary); values["cropFrameX"]=frame.x(); values["cropFrameY"]=frame.y(); values["cropFrameW"]=frame.width(); values["cropFrameH"]=frame.height(); }
+  if(primary->type==ObjectType::Image) { const auto frame=ImageCrop::frame(*primary); values["cropFrameX"]=frame.x(); values["cropFrameY"]=frame.y(); values["cropFrameW"]=frame.width(); values["cropFrameH"]=frame.height(); const auto spill=ImageCrop::overflow(*primary); values["imageFocalXUseful"]=bool(spill&Qt::Horizontal); values["imageFocalYUseful"]=bool(spill&Qt::Vertical); }
   const auto rect = Arrange::bounds(slide, ids);
   values["x"] = rect.x();
   values["y"] = rect.y();

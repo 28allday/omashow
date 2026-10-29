@@ -6,11 +6,13 @@ ColumnLayout {
     id: root
     property var sel: backend.selection
     Layout.fillWidth: true
-    SectionLabel { text: qsTr("FOCAL POINT (%)"); visible: root.sel.imageMode===1  }
+    // Only the axis the picture spills over can move; repositioning in Crop on slide
+    // can leave neither.
+    SectionLabel { text: qsTr("FOCAL POINT (%)"); visible: root.sel.imageMode===1 && (root.sel.imageFocalXUseful || root.sel.imageFocalYUseful) }
     RowLayout {
-        visible: root.sel.imageMode===1
-        NumField { objectName: "imageFocalX"; Layout.fillWidth: true; label: qsTr("X"); value: (root.sel.imageFocalX??.5)*100; onCommitted: v=>backend.setSelectedProperty("imageFocalX",v/100) }
-        NumField { objectName: "imageFocalY"; Layout.fillWidth: true; label: qsTr("Y"); value: (root.sel.imageFocalY??.5)*100; onCommitted: v=>backend.setSelectedProperty("imageFocalY",v/100) }
+        visible: root.sel.imageMode===1 && (root.sel.imageFocalXUseful || root.sel.imageFocalYUseful)
+        NumField { objectName: "imageFocalX"; Layout.fillWidth: true; visible: root.sel.imageFocalXUseful??false; label: qsTr("X"); value: (root.sel.imageFocalX??.5)*100; onCommitted: v=>backend.setSelectedProperty("imageFocalX",v/100) }
+        NumField { objectName: "imageFocalY"; Layout.fillWidth: true; visible: root.sel.imageFocalYUseful??false; label: qsTr("Y"); value: (root.sel.imageFocalY??.5)*100; onCommitted: v=>backend.setSelectedProperty("imageFocalY",v/100) }
     }
     SectionLabel { text: qsTr("MASK") }
     ComboBox { objectName: "imageMask"; Layout.fillWidth: true; model: [qsTr("Rectangle"),qsTr("Ellipse"),qsTr("Rounded rectangle"),qsTr("Hexagon"),qsTr("Heart")]; currentIndex: root.sel.imageMask??0; onActivated: backend.setSelectedProperty("imageMask",currentIndex) }

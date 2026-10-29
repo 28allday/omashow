@@ -15,6 +15,8 @@ Item {
     function startCrop() { cropper.start() }
     function cancelCrop() { cropper.cancel() }
     function finishCrop() { cropper.finish() }
+    function nudgeCrop(dx,dy) { cropper.nudge(dx,dy) }
+    function zoomCrop(factor) { cropper.zoomBy(factor) }
     CropOverlay { id: cropper; canvas: root; anchors.fill: parent; z: 16 }
     readonly property int pathMode: pathTools.mode
     function cancelPathTool() { pathTools.cancel() }
