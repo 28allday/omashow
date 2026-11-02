@@ -197,7 +197,7 @@ with a note saying which verb does that instead, so `--dry-run` really is dry.
 
 ```
 omashow export talk.omashow --kind pdf     --out talk.pdf [--layout notes] [--stages]
-omashow export talk.omashow --kind images  --out frames/slide.png --width 1920 [--format jpeg]
+omashow export talk.omashow --kind images  --out frames/slide.png --width 1920 [--format jpeg] [--stages]
 omashow export talk.omashow --kind video   --out talk.mp4 --fps 30 [--quality 1]
 omashow export talk.omashow --kind package --out talk.zip --approve-media
 omashow export talk.omashow --kind print   --printer "Office" --copies 2
@@ -210,6 +210,10 @@ builds. What PowerPoint has no form for — an equation, words on a path, a
 morph, a picture fill — is written in the nearest form, and the answer's `log`
 says so, slide by slide. The log also names the typefaces the deck asks for,
 since a `.pptx` carries their names and not the fonts themselves.
+
+Pictures with `--stages` are the show as the presenter steps through it: one
+before each click's build and one with the slide complete, named
+`slide-03-1.png`, `slide-03-2.png` and so on.
 
 `--from` and `--to` take a slide range, `--include-skipped` includes the slides
 the deck skips, `--per-page` sets handout sheets and `--layout` is `slides`,

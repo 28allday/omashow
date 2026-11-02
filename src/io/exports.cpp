@@ -66,6 +66,27 @@ QString pictureFile(const Exports::Request &request, int index, int count, int t
                : chosen.absolutePath() + '/' + chosen.completeBaseName() + '.' + suffix;
 }
 
+// The moments a show stops on one slide, as the presenter does: before each
+// click's build, then with everything in place.
+QVector<qreal> presenterStops(const Slide &slide) {
+    QVector<qreal> stops;
+    for (const BuildStep &step : slide.timeline.resolvedSteps())
+        if (step.trigger == BuildTrigger::OnClick) stops.append(qMax(0.0, step.start - step.delay));
+    stops.append(slide.timeline.duration());
+    std::sort(stops.begin(), stops.end());
+    stops.erase(std::unique(stops.begin(), stops.end(),
+                            [](qreal a, qreal b) { return qFuzzyCompare(a + 1.0, b + 1.0); }),
+                stops.end());
+    return stops;
+}
+
+// With stages, each slide's pictures are numbered by slide, then by stop.
+QString stageFile(const Exports::Request &request, int index, int total, int stop) {
+    const QString slide = numbered(request.path, index + 1, total, pictureSuffix(request));
+    const QFileInfo info(slide);
+    return info.absolutePath() + '/' + info.completeBaseName() + '-' + QString::number(stop + 1) + '.' + info.suffix();
+}
+
 } // namespace
 
 QStringList Exports::targets(const Document &document, const Request &request) {
@@ -73,7 +94,11 @@ QStringList Exports::targets(const Document &document, const Request &request) {
     if (request.kind != Images) return {request.path};
     const auto indices = slidesIn(document, request);
     QStringList files;
-    for (int index : indices) files << pictureFile(request, index, indices.size(), document.slides.size());
+    for (int index : indices) {
+        if (!request.stages) { files << pictureFile(request, index, indices.size(), document.slides.size()); continue; }
+        const int stops = presenterStops(Design::resolve(document, index)).size();
+        for (int stop = 0; stop < stops; ++stop) files << stageFile(request, index, document.slides.size(), stop);
+    }
     return files;
 }
 
@@ -132,9 +157,10 @@ QString Exports::Request::describe() const {
     const QString shape = layout == 3 ? pages.at(3).arg(perPage) : pages.at(qBound(0, layout, 2));
     switch (kind) {
     case Images:
-        return QStringLiteral("%1 pictures, %2 wide%3")
+        return QStringLiteral("%1 pictures, %2 wide%3%4")
             .arg(format == 0 ? "PNG" : "JPEG").arg(width)
-            .arg(transparent && format == 0 ? ", no background" : "");
+            .arg(transparent && format == 0 ? ", no background" : "")
+            .arg(stages ? ", one for every click" : "");
     case Video:
         return QStringLiteral("H.264 film, %1 wide at %2 frames a second")
             .arg(width).arg(fps);
@@ -264,17 +290,23 @@ Exports::Outcome Exports::run(const Document &document, const Request &request,
             if (canceled()) return fail(QStringLiteral("Export canceled."));
             const int index = indices.at(n);
             const Slide resolved = Design::resolve(document, index);
-            const auto states = Evaluator::stateAt(resolved, resolved.timeline.duration());
             const QColor background = request.transparent && request.format == 0
                                           ? QColor(Qt::transparent) : resolved.background;
-            auto image = SceneRenderer::render(states, document.size, size, background);
-            const QString file = pictureFile(request, index, indices.size(), document.slides.size());
-            QImageWriter writer(file, suffix.toUtf8());
-            if (request.format == 1) writer.setQuality(92);
-            if (!writer.write(image))
-                return fail(QStringLiteral("Could not write %1: %2")
-                                .arg(QFileInfo(file).fileName(), writer.errorString()));
-            outcome.files.append(file);
+            const auto stops = request.stages ? presenterStops(resolved)
+                                              : QVector<qreal>{resolved.timeline.duration()};
+            for (int stop = 0; stop < stops.size(); ++stop) {
+                const auto states = Evaluator::stateAt(resolved, stops.at(stop));
+                auto image = SceneRenderer::render(states, document.size, size, background);
+                const QString file = request.stages
+                                         ? stageFile(request, index, document.slides.size(), stop)
+                                         : pictureFile(request, index, indices.size(), document.slides.size());
+                QImageWriter writer(file, suffix.toUtf8());
+                if (request.format == 1) writer.setQuality(92);
+                if (!writer.write(image))
+                    return fail(QStringLiteral("Could not write %1: %2")
+                                    .arg(QFileInfo(file).fileName(), writer.errorString()));
+                outcome.files.append(file);
+            }
             report(qBound(1, (n + 1) * 100 / indices.size(), 100));
         }
         outcome.log.append(QStringLiteral("%1 × %2 pixels").arg(size.width()).arg(size.height()));

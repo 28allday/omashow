@@ -24,7 +24,7 @@ struct Request {
     int kind = Pdf;
     QString path;             // the file to write, or the first of a numbered set
     bool includeSkipped = false;
-    bool stages = false;      // PDF: a page for every build stage
+    bool stages = false;      // PDF: a page for every build stage; pictures: one for every click
     int layout = 0;           // PDF and print: slides, notes, outline, handout
     int perPage = 2;          // handout sheets
     int from = -1, to = -1;   // slide range, -1 for the whole deck
