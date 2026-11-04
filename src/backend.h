@@ -333,6 +333,8 @@ public:
     Q_INVOKABLE void resetImageAdjustments();
     Q_INVOKABLE void editSelectedImageCrop() { if(selectionCount()==1 && selection().value("type").toString()=="image") emit imageCropEditorRequested(); }
     Q_INVOKABLE void resizeImageCrop(int handle,qreal x,qreal y,bool lockAspect=false);
+    Q_INVOKABLE void panImageCrop(qreal dx,qreal dy);
+    Q_INVOKABLE void zoomImageCrop(qreal factor,qreal x,qreal y);
     QStringList chartNames() const;
     QVariantMap diagramPreview() const { return m_diagramPreview; }
     QVector<SceneObject> diagramObjects() const;
@@ -418,6 +420,8 @@ public:
     Q_INVOKABLE void selectRegion(qreal x, qreal y, qreal w, qreal h, bool extend = false);
     Q_INVOKABLE void groupSelected();
     Q_INVOKABLE void ungroupSelected();
+    // By id from a script, reaching into groups: see backendselection.cpp.
+    Q_INVOKABLE void selectNamed(const QStringList &ids);
     Q_INVOKABLE void enterGroup();
     Q_INVOKABLE void leaveGroup();
     Q_INVOKABLE void alignSelected(const QString &mode, int reference = 0);
@@ -696,6 +700,7 @@ private:
     mutable int m_reviewRevision = -1;
     mutable QVariantList m_reviewIssues;
     SlideRows *m_browserModel = nullptr;
+    bool m_browserSyncPending = false;
     History m_history;
     void resetSlideSelection();
     void restoreCurrentSlide(const QString &id);

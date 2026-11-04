@@ -10,6 +10,7 @@ QStringList ObjectStyles::keys() {
           "fontToken",     "textColor",     "textColorToken",   "uppercase",
           "letterSpacing", "italic",        "underline",        "textAlign",
           "verticalAlign", "lineHeight",    "paragraphSpacing", "textIndent",
+          "insetLeft",     "insetTop",      "insetRight",       "insetBottom",
           "listStyle",     "listStart",     "textFit"};
 }
 SceneObject ObjectStyles::capture(const SceneObject &object) {

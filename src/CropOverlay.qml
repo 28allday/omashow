@@ -14,8 +14,21 @@ Item {
         if(backend.selectionCount!==1 || backend.selection.type!=="image") return
         canvas.commitTextEdit(); canvas.cancelPathTool(); imageId=backend.selectedId; slideId=backend.navigator[backend.currentSlide]?.id??""; active=true; canvas.forceActiveFocus()
     }
-    function cancel() { if(dragging) backend.cancelEdit(); dragging=false; active=false }
-    function finish() { if(dragging) backend.endEdit(); dragging=false; active=false }
+    // A burst of wheel zooming that has not timed out yet is kept, not undone.
+    function settle() { if(zoomEnd.running) { zoomEnd.stop(); backend.endEdit(); dragging=false } }
+    function cancel() { settle(); if(dragging) backend.cancelEdit(); dragging=false; active=false }
+    function finish() { settle(); if(dragging) backend.endEdit(); dragging=false; active=false }
+    // The middle of the box; rotation turns about it, so it stays put on the slide.
+    function frameCentre() { return Qt.point((backend.selection.cropFrameX??0)+(backend.selection.cropFrameW??0)/2,(backend.selection.cropFrameY??0)+(backend.selection.cropFrameH??0)/2) }
+    // Keys make one undo step each; the wheel makes one per burst of scrolling.
+    function nudge(dx,dy) { settle(); if(dragging) return; backend.beginEdit(qsTr("Move picture")); backend.panImageCrop(dx,dy); backend.endEdit() }
+    function zoomBy(factor) { settle(); if(dragging) return; const c=frameCentre(); backend.beginEdit(qsTr("Zoom picture")); backend.zoomImageCrop(factor,c.x,c.y); backend.endEdit() }
+    function wheelZoom(factor,x,y) {
+        if(dragging && !zoomEnd.running) return
+        if(!dragging) { dragging=true; backend.beginEdit(qsTr("Zoom picture")) }
+        backend.zoomImageCrop(factor,x,y); zoomEnd.restart()
+    }
+    Timer { id: zoomEnd; interval: 400; onTriggered: { if(root.dragging) backend.endEdit(); root.dragging=false } }
     onVisibleChanged: if(!visible && active) cancel()
     Connections {
         target: backend
@@ -28,6 +41,18 @@ Item {
         width: (backend.selection.cropFrameW??0)*canvas.s; height: (backend.selection.cropFrameH??0)*canvas.s
         rotation: backend.selection.rotation??0
         Rectangle { anchors.fill: parent; color: "transparent"; border.color: Theme.accent; border.width: 1 }
+        MouseArea {
+            objectName: "cropPan"
+            property point start
+            anchors.fill: parent; preventStealing: true
+            cursorShape: pressed?Qt.ClosedHandCursor:Qt.OpenHandCursor
+            onPressed: mouse=> { root.settle(); const p=mapToItem(canvas,mouse.x,mouse.y); start=canvas.documentPoint(p.x,p.y); root.dragging=true; backend.beginEdit(qsTr("Move picture")); canvas.forceActiveFocus() }
+            onPositionChanged: mouse=> { if(!pressed || !root.dragging) return; const p=mapToItem(canvas,mouse.x,mouse.y); const doc=canvas.documentPoint(p.x,p.y); backend.panImageCrop(doc.x-start.x,doc.y-start.y) }
+            onReleased: { if(root.dragging) backend.endEdit(); root.dragging=false }
+            onCanceled: { if(root.dragging) backend.cancelEdit(); root.dragging=false }
+            // Ctrl+wheel still zooms the canvas.
+            onWheel: wheel=> { if((wheel.modifiers&Qt.ControlModifier) || pressed || !wheel.angleDelta.y) { wheel.accepted=false; return } const p=mapToItem(canvas,wheel.x,wheel.y); const doc=canvas.documentPoint(p.x,p.y); root.wheelZoom(Math.pow(1.2,wheel.angleDelta.y/120),doc.x,doc.y) }
+        }
         Repeater {
             model: [{x:0,y:0},{x:.5,y:0},{x:1,y:0},{x:1,y:.5},{x:1,y:1},{x:.5,y:1},{x:0,y:1},{x:0,y:.5}]
             Rectangle {
@@ -53,7 +78,7 @@ Item {
         width: tools.implicitWidth+Theme.s3; height: tools.implicitHeight+Theme.s1
         RowLayout {
             id: tools; anchors.centerIn: parent
-            Label { text: qsTr("Crop · Shift keeps proportions"); color: Theme.textSecondary; font.pixelSize: Theme.fsCaption }
+            Label { text: qsTr("Handles crop · Drag to move · Scroll or +/− to zoom · Shift keeps proportions"); color: Theme.textSecondary; font.pixelSize: Theme.fsCaption }
             Button { objectName: "finishImageCrop"; text: qsTr("Done"); onClicked: root.finish() }
         }
     }

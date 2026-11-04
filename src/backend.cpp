@@ -40,7 +40,16 @@ Backend::Backend(QObject *parent)
   connect(this,&Backend::documentChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::currentSlideChanged,this,[this]{ if(!m_importSource.slides.isEmpty()) refreshImport(); });
   connect(this,&Backend::documentChanged,this,&Backend::browserChanged);
-  connect(this,&Backend::browserChanged,this,[this]{ browserSlides(); });
+  // The browser's model is brought up to date once per turn of the event
+  // loop, not once per edit: every edit used to re-serialise every slide for
+  // the navigator's stamps, so a script's apply slowed down with the size of
+  // the deck (#27) and a drag paid for it on every step. A headless run has
+  // no event loop and nobody looking at the browser, so it never pays.
+  connect(this,&Backend::browserChanged,this,[this]{
+    if (m_browserSyncPending) return;
+    m_browserSyncPending = true;
+    QTimer::singleShot(0, this, [this]{ m_browserSyncPending = false; browserSlides(); });
+  });
   connect(this,&Backend::currentSlideChanged,this,&Backend::slideSelectionChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &Backend::clipboardChanged);
   connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, [this] { ++m_clipboardVersion; });

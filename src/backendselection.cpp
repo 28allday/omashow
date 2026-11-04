@@ -64,7 +64,7 @@ QVariantMap Backend::selection() const {
     for(const auto &step:m_document.slides.at(m_currentSlide).timeline.steps) if(step.targetId==primary->id && step.effect==Effect::Media) values["mediaOnClick"]=step.trigger==BuildTrigger::OnClick;
   }
   values["imageHasOriginal"]=bool(primary->imageOriginal);
-  if(primary->type==ObjectType::Image) { const auto frame=ImageCrop::frame(*primary); values["cropFrameX"]=frame.x(); values["cropFrameY"]=frame.y(); values["cropFrameW"]=frame.width(); values["cropFrameH"]=frame.height(); }
+  if(primary->type==ObjectType::Image) { const auto frame=ImageCrop::frame(*primary); values["cropFrameX"]=frame.x(); values["cropFrameY"]=frame.y(); values["cropFrameW"]=frame.width(); values["cropFrameH"]=frame.height(); const auto spill=ImageCrop::overflow(*primary); values["imageFocalXUseful"]=bool(spill&Qt::Horizontal); values["imageFocalYUseful"]=bool(spill&Qt::Vertical); }
   const auto rect = Arrange::bounds(slide, ids);
   values["x"] = rect.x();
   values["y"] = rect.y();
@@ -103,6 +103,40 @@ void Backend::selectIds(const QStringList &requested) {
   m_selectedIds = ids;
   m_selectedId = ids.isEmpty() ? QString() : ids.last();
   emit selectionChanged();
+}
+// A script naming an object means that object, not the group it sits in
+// (#26). The group scope moves to the deepest group every named object
+// shares, so each named object is a unit of its own where it can be; named
+// objects in different groups still take their group's siblings along, as a
+// click would, and selectedIds() shows that. select() and selectIds() are
+// what a click does: they keep the scope where the person put it.
+void Backend::selectNamed(const QStringList &ids) {
+  const auto slide = Design::resolve(m_document, m_currentSlide);
+  QStringList scope;
+  bool found = false;
+  for (const auto &id : ids)
+    if (const auto *o = slide.find(id)) {
+      if (!found) {
+        scope = o->groups;
+        found = true;
+        continue;
+      }
+      int shared = 0;
+      while (shared < scope.size() && shared < o->groups.size() &&
+             scope.at(shared) == o->groups.at(shared))
+        ++shared;
+      scope = scope.mid(0, shared);
+    }
+  if (!found) {
+    clearSelection();
+    return;
+  }
+  if (scope != m_groupScope) {
+    m_groupScope = scope;
+    m_selectedIds.clear();
+    m_selectedId.clear();
+  }
+  selectIds(ids);
 }
 void Backend::select(const QString &id) {
   selectIds(id.isEmpty() ? QStringList() : QStringList{id});
@@ -364,7 +398,7 @@ void Backend::setSelectedProperty(const QString &key, const QVariant &given) {
   if (!changed)
     return;
   QString label=key;
-  const QMap<QString,QString> labels={{"imageBrightness",tr("brightness")},{"imageContrast",tr("contrast")},{"imageSaturation",tr("saturation")},{"imageTintAmount",tr("tint amount")},{"imageTint",tr("tint colour")},{"imageMask",tr("picture mask")},{"imageFocalX",tr("horizontal focal point")},{"imageFocalY",tr("vertical focal point")},{"pathData",tr("path")},{"fillStyle",tr("fill type")},{"fillSecondary",tr("second fill colour")},{"strokeWidth",tr("stroke width")},{"connectorRoute",tr("connector routing")}};
+  const QMap<QString,QString> labels={{"imageBrightness",tr("brightness")},{"imageContrast",tr("contrast")},{"imageSaturation",tr("saturation")},{"imageTintAmount",tr("tint amount")},{"imageTint",tr("tint colour")},{"imageMask",tr("picture mask")},{"imageFocalX",tr("horizontal focal point")},{"imageFocalY",tr("vertical focal point")},{"pathData",tr("path")},{"fillStyle",tr("fill type")},{"fillSecondary",tr("second fill colour")},{"strokeWidth",tr("stroke width")},{"connectorRoute",tr("connector routing")},{"insetLeft",tr("left inset")},{"insetTop",tr("top inset")},{"insetRight",tr("right inset")},{"insetBottom",tr("bottom inset")}};
   label=labels.value(key,label);
   m_history.begin(m_document, tr("Change %1").arg(label));
   for (const auto &id : ids)
@@ -407,21 +441,40 @@ void Backend::deleteSelected() {
   clearSelection();
   touch();
 }
+// Moves the selection |delta| places up (positive) or down the stacking
+// order, stopping at the ends: a large delta is bring-to-front or
+// send-to-back. Nothing moving is nothing done, so it is not an edit.
 void Backend::raiseSelected(int delta) {
   const auto ids = selectedIds();
-  if (ids.isEmpty())
+  if (ids.isEmpty() || delta == 0)
     return;
   m_history.begin(m_document,
                   delta > 0 ? tr("Bring forward") : tr("Send backward"));
   auto &objects = m_document.slides[m_currentSlide].objects;
-  if (delta > 0) {
-    for (int i = objects.size() - 2; i >= 0; --i)
-      if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i + 1).id))
-        objects.swapItemsAt(i, i + 1);
-  } else {
-    for (int i = 1; i < objects.size(); ++i)
-      if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i - 1).id))
-        objects.swapItemsAt(i, i - 1);
+  const qint64 steps = qMin<qint64>(qAbs(qint64(delta)), objects.size());
+  bool movedAtAll = false;
+  for (qint64 step = 0; step < steps; ++step) {
+    bool moved = false;
+    if (delta > 0) {
+      for (int i = objects.size() - 2; i >= 0; --i)
+        if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i + 1).id)) {
+          objects.swapItemsAt(i, i + 1);
+          moved = true;
+        }
+    } else {
+      for (int i = 1; i < objects.size(); ++i)
+        if (ids.contains(objects.at(i).id) && !ids.contains(objects.at(i - 1).id)) {
+          objects.swapItemsAt(i, i - 1);
+          moved = true;
+        }
+    }
+    if (!moved)
+      break;
+    movedAtAll = true;
+  }
+  if (!movedAtAll) {
+    m_history.abandon();
+    return;
   }
   m_history.commit();
   touch();
@@ -574,7 +627,7 @@ void Backend::fitSelectedTextBox() {
   m_history.begin(m_document,tr("Fit box to text"));
   for (const auto &id:ids) if (const auto *source=shown.find(id)) if (source->type==ObjectType::Text) {
     auto copy=*source; copy.textFit=0;
-    const auto height=qMax(8.0,TextLayout::measure(copy).naturalHeight+1);
+    const auto height=qMax(8.0,TextLayout::measure(copy).naturalHeight+copy.insetTop+copy.insetBottom+1);
     if (auto *o=m_document.slides[m_currentSlide].find(id)) {
       Arrange::setRect(*o,source->rect,QRectF(source->rect.topLeft(),QSizeF(source->rect.width(),height)));
       o->textFit=0; Design::markOverride(*o,"textFit");

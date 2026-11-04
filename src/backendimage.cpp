@@ -113,3 +113,24 @@ void Backend::resizeImageCrop(int handle,qreal x,qreal y,bool lockAspect) {
   for(const auto &key:{"x","y","w","h","cropX","cropY","cropW","cropH"}) Design::markOverride(*o,key);
   touch();
 }
+// Moves the picture inside its box by the whole distance since the gesture began.
+void Backend::panImageCrop(qreal dx,qreal dy) {
+  if(!m_gestureActive || selectionCount()!=1) return;
+  const auto *basis=m_gestureBasis.find(selectedId()); if(!basis || basis->type!=ObjectType::Image) return;
+  auto result=*basis; if(!ImageCrop::pan(result,*basis,QPointF(dx,dy))) return;
+  auto *o=m_document.slides[m_currentSlide].find(selectedId()); if(!o) return;
+  o->imageCrop=result.imageCrop;
+  for(const auto &key:{"cropX","cropY","cropW","cropH"}) Design::markOverride(*o,key);
+  touch();
+}
+// Zooms from where the picture is now, so the wheel steps of one gesture add up.
+void Backend::zoomImageCrop(qreal factor,qreal x,qreal y) {
+  if(!m_gestureActive || selectionCount()!=1) return;
+  const auto shown=Design::resolve(m_document,m_currentSlide);
+  const auto *now=shown.find(selectedId()); if(!now || now->type!=ObjectType::Image) return;
+  auto result=*now; if(!ImageCrop::zoom(result,*now,factor,QPointF(x,y))) return;
+  auto *o=m_document.slides[m_currentSlide].find(selectedId()); if(!o) return;
+  o->imageCrop=result.imageCrop;
+  for(const auto &key:{"cropX","cropY","cropW","cropH"}) Design::markOverride(*o,key);
+  touch();
+}

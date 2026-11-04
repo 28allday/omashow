@@ -39,6 +39,10 @@ void DeckResize::scaleObject(SceneObject &o, qreal scale, const QPointF &origin)
   o.letterSpacing *= scale;
   o.paragraphSpacing *= scale;
   o.textIndent *= scale;
+  o.insetLeft *= scale;
+  o.insetTop *= scale;
+  o.insetRight *= scale;
+  o.insetBottom *= scale;
   o.cornerRadius *= scale;
   o.connectorStart = origin + (o.connectorStart - origin) * scale;
   o.connectorEnd = origin + (o.connectorEnd - origin) * scale;

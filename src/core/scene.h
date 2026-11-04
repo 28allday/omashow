@@ -137,6 +137,8 @@ struct SceneObject {
     int verticalAlign = 1;   // top, middle, bottom; middle preserves older decks
     qreal lineHeight = 100;  // percentage
     qreal paragraphSpacing = 0, textIndent = 0;
+    // Room between the box's edge and its words: left, top, right, bottom.
+    qreal insetLeft = 0, insetTop = 0, insetRight = 0, insetBottom = 0;
     int listStyle = 0;       // none, bullets, numbers; leading tabs nest items
     int listStart = 1;   // where a numbered list starts counting
     int textFit = 0;         // clip with overflow warning, shrink to fit

@@ -645,6 +645,16 @@ Rectangle {
                 NumField { Layout.fillWidth: true; value: root.sel.textIndent ?? 0; onCommitted: v => backend.setSelectedProperty("textIndent",v) }
             }
             FieldRow {
+                label: qsTr("Inset")
+                NumField { objectName: "insetLeft"; Layout.fillWidth: true; label: qsTr("L"); decimals: 1; value: (root.sel.insetLeft ?? 0) * root.ptPerUnit; onCommitted: v => backend.setSelectedProperty("insetLeft", v / root.ptPerUnit) }
+                NumField { objectName: "insetRight"; Layout.fillWidth: true; label: qsTr("R"); decimals: 1; value: (root.sel.insetRight ?? 0) * root.ptPerUnit; onCommitted: v => backend.setSelectedProperty("insetRight", v / root.ptPerUnit) }
+            }
+            FieldRow {
+                label: ""
+                NumField { objectName: "insetTop"; Layout.fillWidth: true; label: qsTr("T"); decimals: 1; value: (root.sel.insetTop ?? 0) * root.ptPerUnit; onCommitted: v => backend.setSelectedProperty("insetTop", v / root.ptPerUnit) }
+                NumField { objectName: "insetBottom"; Layout.fillWidth: true; label: qsTr("B"); decimals: 1; value: (root.sel.insetBottom ?? 0) * root.ptPerUnit; onCommitted: v => backend.setSelectedProperty("insetBottom", v / root.ptPerUnit) }
+            }
+            FieldRow {
                 label: qsTr("List")
                 ComboBox {
                     objectName: "textListStyle"
