@@ -52,7 +52,8 @@ namespace Bundle {
 // its stand-in set as wide (origFont, origFontSize, fontScale, origWeight).
 // Format 26 adds the room a text box keeps between its edge and its words
 // (insetLeft, insetTop, insetRight, insetBottom).
-constexpr int kFormatVersion = 26;
+// Format 27 adds the theme colour a shape's outline follows (strokeColorToken).
+constexpr int kFormatVersion = 27;
 
 QByteArray toBytes(const Document &document, const QByteArray &recoveryMetadata = {});
 
