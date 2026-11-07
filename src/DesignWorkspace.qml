@@ -11,7 +11,8 @@ RowLayout {
     property string masterId: ""
     property string layoutId: ""
     property string roleId: ""
-    property int previewTheme: -1
+    // -1 for none, a preset's index, or an Omarchy theme's name.
+    property var previewTheme: -1
     property var auditChosen: []
     readonly property var audit: backend.designAudit
     function chooseAudit(id, on) {
@@ -166,6 +167,17 @@ RowLayout {
                 }
             }
         }
+        ComboBox {
+            objectName: "omarchyThemeBox"
+            visible: count > 0
+            Layout.fillWidth: true
+            model: backend.omarchyThemes()
+            readonly property int shown: model.indexOf(typeof root.previewTheme === "string" ? root.previewTheme : root.previewTheme < 0 ? root.info.name : "")
+            currentIndex: shown
+            displayText: currentIndex < 0 ? qsTr("Omarchy theme…") : currentText
+            // Choosing breaks the binding; restore it so Cancel and presets clear the box.
+            onActivated: index => { root.previewTheme = textAt(index); currentIndex = Qt.binding(() => shown) }
+        }
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -184,10 +196,10 @@ RowLayout {
             }
         }
         RowLayout {
-            Label { Layout.fillWidth: true; text: root.previewTheme < 0 ? qsTr("Current theme: %1").arg(root.info.name) : qsTr("Theme preview · no changes applied"); color: Theme.textSecondary }
-            Button { visible: root.previewTheme >= 0; text: qsTr("Cancel"); onClicked: root.previewTheme = -1 }
-            Button { objectName: "applyThemeButton"; visible: root.previewTheme >= 0; text: qsTr("Apply theme");
-                     onClicked: { backend.applyTheme(root.previewTheme); root.previewTheme = -1 } }
+            Label { Layout.fillWidth: true; text: root.previewTheme === -1 ? qsTr("Current theme: %1").arg(root.info.name) : qsTr("Theme preview · no changes applied"); color: Theme.textSecondary }
+            Button { visible: root.previewTheme !== -1; text: qsTr("Cancel"); onClicked: root.previewTheme = -1 }
+            Button { objectName: "applyThemeButton"; visible: root.previewTheme !== -1; text: qsTr("Apply theme");
+                     onClicked: { typeof root.previewTheme === "string" ? backend.applyOmarchyTheme(root.previewTheme) : backend.applyTheme(root.previewTheme); root.previewTheme = -1 } }
         }
         Label { Layout.fillWidth: true; color: Theme.textMuted; wrapMode: Text.Wrap;
                 text: qsTr("%1 linked slides · %2 × %3 · local colours are preserved").arg(root.info.linkedSlides).arg(backend.slideSize.width).arg(backend.slideSize.height) }

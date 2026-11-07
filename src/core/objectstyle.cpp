@@ -4,7 +4,7 @@
 QStringList ObjectStyles::keys() {
   return {"fill",          "fillToken",     "fillStyle",        "fillSecondary",
           "fillAngle",     "patternStyle",  "opacity",          "cornerRadius",
-          "strokeColor",   "strokeWidth",   "strokeStyle",      "strokeJoin",
+          "strokeColor",   "strokeColorToken", "strokeWidth",   "strokeStyle",      "strokeJoin",
           "strokeCap",     "shadowEnabled", "shadowColor",      "shadowX",
           "shadowY",       "fontSize",      "fontWeight",       "fontFamily",
           "fontToken",     "textColor",     "textColorToken",   "uppercase",

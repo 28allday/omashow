@@ -131,7 +131,8 @@ Help is built in, so you don't need this page open while you work:
 
 ### Design
 
-- Switch themes at any time. Edit **masters and layouts** with their colours
+- Switch themes at any time, or take the colours of any Omarchy theme — a
+  light one for a bright room. Edit **masters and layouts** with their colours
   and fonts, and apply a layout to one slide, a selection or the whole deck,
   with a before-and-after preview.
 - Slide numbers, date and footer come from the masters.

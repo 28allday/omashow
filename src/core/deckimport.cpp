@@ -53,6 +53,7 @@ void keepOnlyKnownTokens(SceneObject &o, const DeckTheme &theme, const DeckTheme
     };
     colour(o.fillToken, o.fill);
     colour(o.textColorToken, o.textColor);
+    colour(o.strokeColorToken, o.strokeColor);
     colour(o.table.headerFillToken, o.table.headerFill);
     colour(o.table.borderColorToken, o.table.borderColor);
     if (!o.fontToken.isEmpty() && !theme.fonts.contains(o.fontToken)) {

@@ -185,8 +185,11 @@ QImage SlideThumbnailProvider::requestImage(const QString &id, QSize *size,
         Document preview = snapshot.document;
         Design::ensureDefaults(preview);
         const QString layoutId = id.section('/', 1, 1);
-        const int preset = id.section('/', 3, 3).toInt();
-        if (preset >= 0 && preset <= 2) preview.theme = Design::preset(preset);
+        const QString theme = id.section('/', 3, 3);
+        bool numbered = false;
+        const int preset = theme.toInt(&numbered);
+        if (!numbered) Backend::omarchyRestyle(preview, theme);
+        else if (preset >= 0 && preset <= 2) preview.theme = Design::preset(preset);
         preview.slides.clear();
         Slide slide; slide.id = "preview"; preview.slides.append(slide);
         const QString chosen = Design::layout(preview, layoutId) ? layoutId : preview.layouts.first().id;

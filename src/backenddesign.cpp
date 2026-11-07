@@ -4,6 +4,8 @@
 #include "core/review.h"
 #include "io/bundle.h"
 #include "anim/presentation.h"
+#include "theme.h"
+#include <QDir>
 #include <QDate>
 
 QVariantMap Backend::design() const {
@@ -108,6 +110,97 @@ void Backend::setThemeToken(const QString &key, const QString &value,
     m_document.theme.fonts[key] = value;
   else
     m_document.theme.colors[key] = QColor(value);
+  m_history.commit();
+  touch();
+}
+// User themes shadow the ones Omarchy ships, as in omarchy-theme-list.
+static QStringList omarchyThemeDirs() {
+  return {QDir::homePath() + QStringLiteral("/.config/omarchy/themes"),
+          qEnvironmentVariable("OMARCHY_PATH", QStringLiteral("/usr/share/omarchy")) +
+              QStringLiteral("/themes")};
+}
+// A theme folder's deck colours, or none when its colors.toml is missing or
+// lacks a valid colour the deck needs.
+static QMap<QString, QColor> omarchyColors(const QString &folder) {
+  QHash<QString, QString> colors;
+  for (const auto &dir : omarchyThemeDirs()) {
+    colors = OmarchyTheme::colorsFromFile(dir + '/' + folder + QStringLiteral("/colors.toml"));
+    if (!colors.isEmpty())
+      break;
+  }
+  // Deck colour <- Omarchy colour. Omarchy's own `muted` is a border tone,
+  // too faint for text, so side notes take light_foreground and borders take
+  // `muted`; `surface` is for boxes such as code.
+  static const QList<std::pair<QString, QString>> sources{
+      {QStringLiteral("background"), QStringLiteral("background")},
+      {QStringLiteral("foreground"), QStringLiteral("foreground")},
+      {QStringLiteral("accent"), QStringLiteral("accent")},
+      {QStringLiteral("muted"), QStringLiteral("light_foreground")},
+      {QStringLiteral("surface"), QStringLiteral("lighter_background")},
+      {QStringLiteral("border"), QStringLiteral("muted")}};
+  QMap<QString, QColor> next;
+  for (const auto &[deck, omarchy] : sources) {
+    const QColor color(colors.value(omarchy));
+    if (!color.isValid())
+      return {};
+    next[deck] = color;
+  }
+  return next;
+}
+QStringList Backend::omarchyThemes() const {
+  QStringList names;
+  for (const auto &dir : omarchyThemeDirs())
+    for (const auto &name : QDir(dir).entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+      if (!names.contains(name) && !omarchyColors(name).isEmpty())
+        names += name;
+  names.sort();
+  return names;
+}
+// Takes a theme's colours, keeps the deck's fonts. "Matte Black" and
+// "matte-black" both name the folder.
+bool Backend::omarchyRestyle(Document &d, const QString &name) {
+  const auto folder = name.trimmed().toLower().replace(QLatin1Char(' '), QLatin1Char('-'));
+  if (folder.isEmpty() || folder.contains(QLatin1Char('/')))
+    return false;
+  const auto next = omarchyColors(folder);
+  if (next.isEmpty())
+    return false;
+  // Titles take the accent and body text the theme's own text colour. A
+  // colour picked by hand that equals one of the old theme's colours becomes
+  // that colour's token, so it follows along.
+  const auto old = d.theme.colors;
+  const auto relink = [&old](SceneObject &o) {
+    for (auto it = old.cbegin(); it != old.cend(); ++it) {
+      if (o.textColorToken.isEmpty() && o.textColor == it.value())
+        o.textColorToken = it.key();
+      if (o.fillToken.isEmpty() && o.fill == it.value())
+        o.fillToken = it.key();
+      if (o.strokeColorToken.isEmpty() && o.strokeColor == it.value())
+        o.strokeColorToken = it.key();
+    }
+  };
+  const QHash<QString, QString> roles{{QStringLiteral("title"), QStringLiteral("accent")},
+                                      {QStringLiteral("body"), QStringLiteral("foreground")}};
+  for (auto &l : d.layouts)
+    for (auto &p : l.placeholders)
+      if (roles.contains(p.id))
+        p.textColorToken = roles.value(p.id);
+  for (auto &s : d.slides)
+    for (auto &o : s.objects) {
+      if (roles.contains(o.placeholderId))
+        o.overrides.removeAll(QStringLiteral("textColor"));
+      relink(o);
+    }
+  d.theme.name = folder;
+  d.theme.colors.insert(next);
+  return true;
+}
+void Backend::applyOmarchyTheme(const QString &name) {
+  m_history.begin(m_document, tr("Change theme"));
+  if (!omarchyRestyle(m_document, name)) {
+    m_history.abandon();
+    return;
+  }
   m_history.commit();
   touch();
 }
@@ -290,7 +383,7 @@ void Backend::setPlaceholderProperty(const QString &id, const QString &role,
           SceneObject changed = l.placeholders.at(j);
           if (!Design::setProperty(changed, key, value))
             return;
-          if ((key == "fillToken" || key == "textColorToken") &&
+          if ((key == "fillToken" || key == "textColorToken" || key == "strokeColorToken") &&
               !value.toString().isEmpty() &&
               !m_document.theme.colors.contains(value.toString()))
             return;
